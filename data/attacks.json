@@ -50,8 +50,8 @@
     "effetti_applicati": [],
     "id": 2,
     "cooldown_turni": 0,
-    "usi_limitati": false,
-    "usi_massimi": 1
+    "usi_limitati": true,
+    "usi_massimi": 7
   },
   {
     "nome": "Colpo Devastante",

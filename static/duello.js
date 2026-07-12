@@ -67,6 +67,72 @@ function staminaBar(r) {
   return `<span class="stamina-bar" title="Stamina ${r.stamina}/${r.stamina_max}">⚡${tacche}</span>`;
 }
 
+/* ---------- arena: bookmaker live, sponsor, reazione del pubblico ---------- */
+let importoScommessaBozza = null;  // sopravvive ai re-render mentre l'utente digita
+
+function renderArena() {
+  const ar = S.arena;
+  if (!ar) return "";  // né duello normale né Torneo Evo: niente arena
+
+  const inTorneo = ar.torneo_pot != null;
+  const dest = inTorneo ? " nel montepremi del torneo" : "";
+
+  let bookmaker;
+  if (ar.scommessa) {
+    const vincita = Math.round(ar.scommessa.importo * ar.scommessa.quota);
+    bookmaker = `<div class="arena-riga">Scommessa piazzata: <b>${ar.scommessa.importo}¤</b>
+      a quota <b class="quota-val">${ar.scommessa.quota}x</b>
+      <span class="muted">(vinci il duello → +${vincita}¤${dest})</span></div>`;
+  } else {
+    const massimo = inTorneo ? 500 : ar.crediti;
+    const bozza = importoScommessaBozza ?? Math.min(50, massimo);
+    bookmaker = `<div class="arena-riga">Quota attuale su di te: <b class="quota-val">${ar.quota}x</b>
+      ${inTorneo ? `<span class="muted">— montepremi torneo: ${ar.torneo_pot}¤</span>` : ""}</div>
+      <div class="arena-scommessa-form">
+        <input type="number" id="importo-scommessa" min="1" max="${massimo}" step="1"
+               value="${bozza}" oninput="importoScommessaBozza=this.value">
+        <button class="btn btn-ghost" onclick="piazzaScommessa()">🎰 Scommetti su di te${dest}</button>
+      </div>`;
+  }
+
+  let sponsor;
+  if (ar.sponsor) {
+    sponsor = `<div class="arena-riga sponsor-scelto${ar.sponsor.fallito ? " fallito" : ""}">
+      <b>${ar.sponsor.nome}</b> <span class="muted">(+${ar.sponsor.bonus}¤${dest})</span><br>
+      <span class="muted">${ar.sponsor.descrizione}</span>
+      ${ar.sponsor.fallito ? ' <span class="chip-crip">CONDIZIONE FALLITA</span>' : ""}
+    </div>`;
+  } else if (ar.sponsor_offerte && ar.sponsor_offerte.length) {
+    sponsor = ar.sponsor_offerte.map(sp => `
+      <div class="arena-sponsor-card">
+        <div><b>${sp.nome}</b> <span class="muted">+${sp.bonus}¤</span></div>
+        <div class="muted">${sp.descrizione}</div>
+        <button class="btn btn-ghost" onclick='invia({tipo:"sponsor",id:"${sp.id}"})'>Firma</button>
+      </div>`).join("");
+  } else {
+    sponsor = `<div class="muted">Nessuna offerta.</div>`;
+  }
+
+  const pub = ar.pubblico;
+  const pubblico = `
+    <div class="hype-bar"><div class="hype-fill" style="width:${pub.hype}%"></div></div>
+    <div class="arena-riga muted">${pub.testo}</div>
+    <div class="arena-riga muted">${pub.tifo}</div>`;
+
+  return `<div class="pan-sec arena-sec">
+    <h4>🎰 Bookmaker</h4>${bookmaker}
+    <h4>📣 Sponsor</h4>${sponsor}
+    <h4>👥 Pubblico</h4>${pubblico}
+  </div>`;
+}
+
+async function piazzaScommessa() {
+  const val = parseInt(el("importo-scommessa").value, 10);
+  if (!val || val <= 0) return;
+  importoScommessaBozza = null;
+  await invia({tipo: "scommetti", importo: val});
+}
+
 function renderPannello(dove, p, mira_su) {
   const hp = Object.entries(p.hp).map(([loc, h]) => {
     const pct = Math.max(0, Math.round(h.val * 100 / h.max));
@@ -99,6 +165,7 @@ function renderPannello(dove, p, mira_su) {
     <div class="pan-sec"><h4>Locazioni</h4>${hp}</div>
     ${poteri ? `<div class="pan-sec pan-lista"><h4>Poteri</h4>${poteri}</div>` : ""}
     ${stance ? `<div class="pan-sec pan-lista"><h4>Stance</h4>${stance}</div>` : ""}
+    ${dove === "pan-player" ? renderArena() : ""}
     ${effetti ? `<div class="pan-sec pan-lista"><h4>Effetti</h4>${effetti}</div>` : ""}
   `;
 }

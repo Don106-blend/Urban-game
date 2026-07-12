@@ -293,6 +293,29 @@ a.fighter-card:hover { transform: translateY(-3px); border-color: var(--volt); }
 .esito.vittoria { background: rgba(215, 255, 62, .12); color: var(--volt); border: 1px solid var(--volt); }
 .esito.sconfitta { background: rgba(255, 70, 85, .12); color: var(--danger); border: 1px solid var(--danger); }
 
+/* ---------- arena: bookmaker live, sponsor, pubblico ---------- */
+.arena-sec { border-top: 1px dashed var(--line); padding-top: 10px; }
+.arena-sec h4:not(:first-child) { margin-top: 10px; }
+.arena-riga { font-size: 12.5px; line-height: 1.5; margin-bottom: 4px; }
+.quota-val { color: var(--volt); font-weight: 800; }
+.arena-scommessa-form { display: flex; gap: 6px; margin-top: 4px; }
+.arena-scommessa-form input {
+  width: 72px; background: var(--panel-2); border: 1px solid var(--line);
+  color: var(--text); border-radius: 6px; padding: 4px 6px; font: inherit;
+}
+.arena-scommessa-form .btn { padding: 4px 10px; font-size: 11.5px; }
+.arena-sponsor-card {
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px;
+  padding: 8px; margin-bottom: 6px; font-size: 12px;
+}
+.arena-sponsor-card .btn { margin-top: 6px; padding: 3px 10px; font-size: 11px; }
+.sponsor-scelto.fallito { opacity: .55; }
+.hype-bar { height: 6px; border-radius: 999px; background: #22262d; overflow: hidden; margin-bottom: 4px; }
+.hype-fill {
+  height: 100%; border-radius: 999px; transition: width .4s;
+  background: linear-gradient(90deg, var(--teal), var(--volt), var(--danger));
+}
+
 /* ---------- stamina: tacchette oblique tipo batteria ---------- */
 .stamina-bar { display: inline-flex; align-items: center; gap: 2px; }
 /* le tacche annullano lo stile "chip" ereditato da .pan-risorse span */
@@ -362,6 +385,14 @@ a.fighter-card:hover { transform: translateY(-3px); border-color: var(--volt); }
 .evo-stat span { color: var(--muted); margin-right: 4px; }
 .evo-stat b { color: var(--volt); letter-spacing: 1px; }
 .evo-poteri { font-size: 13px; }
+
+/* montepremi del torneo (scommesse/sponsor accumulati, si riscattano da campioni) */
+.evo-montepremi { display: inline-block; background: var(--panel-2); border: 1px solid var(--line);
+                  border-radius: 12px; padding: 12px 20px; margin: 8px auto 18px; text-align: left;
+                  max-width: 420px; }
+.evo-montepremi-val { font-size: 13px; }
+.evo-montepremi-val b { color: var(--volt); font-size: 15px; }
+.evo-arena-log { margin-top: 6px; font-size: 11.5px; color: var(--muted); line-height: 1.5; }
 
 /* bracket */
 .evo-bracket { display: flex; gap: 14px; justify-content: center; align-items: stretch;

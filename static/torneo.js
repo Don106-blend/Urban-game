@@ -63,6 +63,16 @@ function slotHtml(match, lato) {
   </div>`;
 }
 
+function potHtml() {
+  const pot = S.bonus_accumulato || 0;
+  const log = (S.log_arena || []).map(l => `<div class="evo-arena-riga">${l}</div>`).join("");
+  return `<div class="evo-montepremi">
+    <div class="evo-montepremi-val">💰 Montepremi torneo: <b>${pot}¤</b>
+      <span class="muted">— si riscatta tutto solo diventando campione, si perde se vieni eliminato</span></div>
+    ${log ? `<div class="evo-arena-log">${log}</div>` : ""}
+  </div>`;
+}
+
 function eroeCard() {
   const e = S.eroe;
   const stats = Object.entries(e.stats).map(([s, r]) =>
@@ -117,6 +127,7 @@ function renderPronto() {
       <h2 class="evo-vs">${S.eroe.nome} <span class="muted">vs</span> ${S.avversario}</h2>
       ${bracketHtml()}
       ${eroeCard()}
+      ${potHtml()}
       <button class="btn btn-volt evo-cta" onclick='azione({tipo:"combatti"})'>⚔ COMBATTI</button>
     </div>`;
 }
@@ -134,6 +145,7 @@ function renderRisultato() {
     <div class="evo-intro">
       <div class="evo-kicker">RISULTATI — VERSO ${S.nome_turno.toUpperCase()}</div>
       ${bracketHtml()}
+      ${potHtml()}
       <button class="btn btn-volt evo-cta" onclick='vista="scelte";render()'>
         🧬 SCEGLI IL POTENZIAMENTO →</button>
     </div>`;
@@ -220,6 +232,7 @@ function renderVittoria() {
       <div class="evo-eroe-nome">${S.eroe.nome}</div>
       <p class="muted">Ha superato il torneo ed è entrato nel tuo box (LIV 5).</p>
       ${eroeCard()}
+      ${potHtml()}
       <div class="evo-azioni-finali">
         <a class="btn btn-volt" href="/box" onclick='azione({tipo:"chiudi"})'>Vai al box →</a>
         <button class="btn btn-ghost" onclick='azione({tipo:"chiudi"})'>Nuovo torneo</button>
@@ -234,6 +247,7 @@ function renderEliminato() {
       <p class="muted">${S.eroe.nome} esce ai ${S.nome_turno.toLowerCase()}.
         Il torneo l'ha vinto <b>${S.campione}</b>.</p>
       ${bracketHtml()}
+      ${potHtml()}
       <button class="btn btn-volt evo-cta" onclick='azione({tipo:"chiudi"})'>NUOVO TORNEO</button>
     </div>`;
 }

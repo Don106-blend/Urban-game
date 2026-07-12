@@ -845,6 +845,151 @@ def main():
     webapp.STATO["crediti"] = _crediti
     webapp.DUELLO = None
 
+    # ---- arena: bookmaker live, sponsor, pubblico ----
+    rec_arena = {"id": 998, "nome": "Scommettitore", "stats": {s: 1 for s in
+                 ("fisico", "riflessi", "mente", "sociale", "controllo")},
+                 "skills": {}, "poteri": [], "hp": dict(LOCAZIONI), "crippled": [],
+                 "livello": 1, "xp": 0, "token": 0, "toughness": 0, "equip": [],
+                 "vittorie": 0, "sconfitte": 0, "morto": False}
+    _salva2 = webapp.salva_stato
+    webapp.salva_stato = lambda: None
+    webapp.STATO["crediti"] = 1000
+
+    d_ar = webapp.DuelloWeb(dict(rec_arena))
+    d_ar.fase = "player"
+    d_ar.attivo, d_ar.altro = d_ar.p, d_ar.cpu
+    assert d_ar.sponsor_offerte and len(d_ar.sponsor_offerte) == 2  # duello vero: offerte pronte
+
+    # quota: pari forze e pari vita -> vicino alla parità; perdere vita alza la quota (sfavorito)
+    q0 = d_ar.quota_attuale()
+    d_ar.p.hp["busto"] -= d_ar.p.hp_max["busto"] // 2
+    q1 = d_ar.quota_attuale()
+    assert q1 > q0  # meno vita = quota più alta (comeback mechanic)
+
+    # scommessa: piazzata in qualsiasi momento (qui è il turno del player, ma non richiesto)
+    assert d_ar.azione_player({"tipo": "scommetti", "importo": 99999}) == "crediti insufficienti"
+    prima_crediti = webapp.STATO["crediti"]
+    err = d_ar.azione_player({"tipo": "scommetti", "importo": 100})
+    assert err is None
+    assert d_ar.scommessa == {"importo": 100, "quota": q1}
+    assert webapp.STATO["crediti"] == prima_crediti - 100
+    assert d_ar.azione_player({"tipo": "scommetti", "importo": 50}) == "hai già scommesso su questo duello"
+
+    # sponsor: si sceglie tra le offerte, non due volte
+    scelto = d_ar.sponsor_offerte[0]
+    assert d_ar.azione_player({"tipo": "sponsor", "id": scelto["id"]}) is None
+    assert d_ar.sponsor is scelto
+    assert d_ar.azione_player({"tipo": "sponsor", "id": scelto["id"]}) == "hai già scelto uno sponsor"
+
+    # pubblico: hype clampato 0-100, testo e tifo presenti
+    d_ar._hype(1000)
+    assert d_ar.hype == 100
+    d_ar._hype(-1000)
+    assert d_ar.hype == 0
+    stato_pub = d_ar.pubblico_stato()
+    assert "testo" in stato_pub and "tifo" in stato_pub
+
+    # arena assente nel Torneo Evo (self.rec is None)
+    pT, cT = Personaggio("PT"), Personaggio("CT")
+    _dot(pT, webapp.DB["attacchi"], webapp.DB["stances"])
+    _dot(cT, webapp.DB["attacchi"], webapp.DB["stances"])
+    d_torneo2 = webapp.DuelloWeb(pg=pT, avversario=cT)
+    assert d_torneo2.sponsor_offerte is None
+    assert d_torneo2.info_arena() is None
+    assert d_torneo2.azione_player({"tipo": "scommetti", "importo": 10}) == "questa modalità non ha scommesse"
+
+    # sponsor "lampo": vince entro il round 3 -> condizione rispettata; oltre, fallita
+    d_lampo = webapp.DuelloWeb(dict(rec_arena, nome="Lampo"))
+    d_lampo.round = 2
+    assert d_lampo._sponsor_condizione({"id": "lampo"}) is True
+    assert not d_lampo._sponsor_fallito({"id": "lampo"})
+    d_lampo.round = 5
+    assert d_lampo._sponsor_condizione({"id": "lampo"}) is False
+    assert d_lampo._sponsor_fallito({"id": "lampo"})
+
+    # sponsor "bestia"/"stoico": mutuamente esclusivi sull'uso dei poteri
+    d_pot = webapp.DuelloWeb(dict(rec_arena, nome="Potente"))
+    assert d_pot._sponsor_condizione({"id": "bestia"}) is False
+    assert d_pot._sponsor_condizione({"id": "stoico"}) is True
+    d_pot.usato_potere = True
+    assert d_pot._sponsor_condizione({"id": "bestia"}) is True
+    assert d_pot._sponsor_condizione({"id": "stoico"}) is False
+    assert d_pot._sponsor_fallito({"id": "stoico"})  # ha già usato un potere: impossibile ormai
+
+    # sponsor "incassatore": bisogna essere scesi sotto il 30% degli hp totali
+    d_inc = webapp.DuelloWeb(dict(rec_arena, nome="Incassa"))
+    assert d_inc._sponsor_condizione({"id": "incassatore"}) is False
+    d_inc.min_hp_pct = 0.2
+    assert d_inc._sponsor_condizione({"id": "incassatore"}) is True
+
+    # payout a fine duello: scommessa vinta paga importo*quota, sponsor paga solo se la
+    # condizione (oltre alla vittoria) è rispettata
+    d_fin = webapp.DuelloWeb(dict(rec_arena, nome="Finale"))
+    d_fin.scommessa = {"importo": 100, "quota": 3.0}
+    d_fin.sponsor = {"id": "lampo", "nome": "Sponsor Lampo", "bonus": 150,
+                     "descrizione": "Paga se vinci entro il round 3."}
+    d_fin.round = 2  # entro il round 3: condizione rispettata
+    d_fin.finito = True
+    d_fin.vincitore = d_fin.p
+    prima = webapp.STATO["crediti"]
+    webapp.DUELLO = d_fin
+    webapp.chiudi_duello()
+    atteso = prima + webapp.RICOMPENSA_VITTORIA + 300 + 150  # vittoria + scommessa(100*3) + sponsor
+    assert webapp.STATO["crediti"] == atteso, (webapp.STATO["crediti"], atteso)
+
+    webapp.salva_stato = _salva2
+    webapp.DUELLO = None
+
+    # ---- arena nel Torneo Evo: montepremi accumulato, riscattato solo da campioni ----
+    _salva3 = webapp.salva_stato
+    webapp.salva_stato = lambda: None
+    webapp.STATO["crediti"] = 500
+
+    t3 = webapp.TorneoEvo()
+    t3.fase = "pronto"
+    avv3 = t3.eroi[t3.avversario_idx()]
+    d_t3 = webapp.DuelloWeb(pg=t3.eroi[t3.io], avversario=avv3, torneo=t3)
+    d_t3.fase = "player"
+    d_t3.attivo, d_t3.altro = d_t3.p, d_t3.cpu
+    assert d_t3.arena_attiva and d_t3.sponsor_offerte  # arena attiva anche nel torneo
+    assert d_t3.info_arena()["torneo_pot"] == 0
+
+    # la puntata nel torneo NON tocca i crediti reali (è virtuale finché non vinci tutto)
+    crediti_prima3 = webapp.STATO["crediti"]
+    assert d_t3.azione_player({"tipo": "scommetti", "importo": 999999}) == \
+        f"puntata massima nel torneo: {webapp.MAX_SCOMMESSA_TORNEO}¤"
+    err3 = d_t3.azione_player({"tipo": "scommetti", "importo": 100})
+    assert err3 is None
+    assert webapp.STATO["crediti"] == crediti_prima3  # invariati: è virtuale
+
+    # una vittoria di round accumula la vincita nel montepremi del torneo, non nei crediti
+    d_t3.vincitore = d_t3.p
+    t3.risolvi_duello(True, d_t3)
+    assert t3.bonus_accumulato == int(100 * d_t3.scommessa["quota"])
+    assert webapp.STATO["crediti"] == crediti_prima3  # ancora invariati
+
+    # eliminazione: il montepremi accumulato va perso (mai accreditato)
+    pot_prima_eliminazione = t3.bonus_accumulato
+    assert pot_prima_eliminazione > 0
+    t4 = webapp.TorneoEvo()
+    t4.bonus_accumulato = 777
+    t4.fase = "pronto"
+    t4.risolvi_duello(False)  # sconfitta: nessun duello arena da risolvere qui, solo il forfeit del pot
+    assert t4.fase == "eliminato"
+    assert any("perso" in r for r in t4.log_arena)
+    assert webapp.STATO["crediti"] == crediti_prima3  # il pot perso non è mai finito nei crediti
+
+    # vittoria del torneo: _premia() riscatta l'intero montepremi accumulato in crediti veri
+    t5 = webapp.TorneoEvo()
+    t5.bonus_accumulato = 321
+    crediti_prima5 = webapp.STATO["crediti"]
+    t5._premia()
+    assert webapp.STATO["crediti"] == crediti_prima5 + 321
+    assert any("Campione" in r for r in t5.log_arena)
+    webapp.STATO["personaggi"].pop()  # pulizia del campione fittizio di test
+
+    webapp.salva_stato = _salva3
+
     print("OK — tutti i check passati")
 
 

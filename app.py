@@ -25,6 +25,22 @@ RIGEN_HP_MIN = 5    # hp al minuto per locazione, da coscienti
 RIGEN_COMA_MIN = 1  # hp al minuto in coma: uscirne richiede ore
 N_CONTRATTI = 3
 
+MAX_SCOMMESSA_TORNEO = 500  # puntata virtuale per round nel Torneo Evo (niente crediti reali in gioco)
+
+# ---------------------------------------------------------------- sponsor (Arena + Torneo Evo)
+# ogni sponsor paga un bonus SOLO se vinci E rispetti la condizione (verificata da
+# DuelloWeb._sponsor_condizione, che legge lo stato tracciato durante il duello).
+SPONSOR = [
+    {"id": "lampo", "nome": "Sponsor Lampo", "bonus": 150,
+     "descrizione": "Paga se vinci entro il round 3."},
+    {"id": "bestia", "nome": "Sponsor Bestia", "bonus": 80,
+     "descrizione": "Paga se vinci avendo attivato almeno un potere."},
+    {"id": "stoico", "nome": "Sponsor Stoico", "bonus": 180,
+     "descrizione": "Paga se vinci senza mai attivare un potere."},
+    {"id": "incassatore", "nome": "Sponsor Incassatore", "bonus": 220,
+     "descrizione": "Paga se vinci dopo essere sceso sotto il 30% degli hp totali."},
+]
+
 app = Flask(__name__)
 app.secret_key = "urban-dev"  # ponytail: fisso in dev; da env quando andrà online
 app.json.sort_keys = False    # le locazioni hp devono restare in ordine testa→gambe
@@ -344,8 +360,9 @@ def stima_danno(att):
 class DuelloWeb:
     """Stato del duello lato server, pilotato da /api/duello/azione."""
 
-    def __init__(self, record=None, pg=None, avversario=None):
-        self.rec = record  # None = duello di torneo: le conseguenze le gestisce TorneoEvo
+    def __init__(self, record=None, pg=None, avversario=None, torneo=None):
+        self.rec = record  # None = duello senza box: torneo (o CPU vs CPU)
+        self.torneo = torneo  # riferimento al TorneoEvo, se questo duello ne fa parte
         if record is not None:
             self.p = record_to_pg(record)
             self.cpu = cpu_bilanciata(self.p)
@@ -361,6 +378,15 @@ class DuelloWeb:
         self.survey_fatto = False
         self.fase = None     # "player" | "cpu" | "risposta" | "fine"
         self.pending = None
+        # arena: scommesse/sponsor/pubblico — nei duelli veri e nel Torneo Evo (dove i bonus
+        # vinti si accumulano nel montepremi e si riscattano solo diventando campioni)
+        self.arena_attiva = record is not None or torneo is not None
+        self.scommessa = None    # {"importo": int, "quota": float}
+        self.sponsor = None      # uno degli elementi di SPONSOR, una volta scelto
+        self.sponsor_offerte = random.sample(SPONSOR, 2) if self.arena_attiva else None
+        self.usato_potere = False   # per lo sponsor "stoico"/"bestia"
+        self.min_hp_pct = 1.0       # hp minimi (%) toccati dal player, per "incassatore"
+        self.hype = 50               # umore del pubblico, 0-100
         self.scriv("=== DUELLO ===")
         self.scriv(f"{self.p.nome} (LIV {getattr(self.p, 'livello', 1)}) contro "
                    f"{self.cpu.nome} (LIV {getattr(self.cpu, 'livello', 1)}) — "
@@ -403,6 +429,7 @@ class DuelloWeb:
         self.scriv(f"▸ Turno di {self.attivo.nome}", "turno")
         for r in self.attivo.tick_turno():
             self.scriv("  " + r)
+        self._traccia_hp_minimo()  # copre anche i danni nel tempo (DoT)
         self.check_sconfitta(self.attivo, self.altro)
         if not self.finito:
             self.fase = "player" if self.attivo is self.p else "cpu"
@@ -421,6 +448,78 @@ class DuelloWeb:
             self.vincitore = vincitore
             self.scriv(f"*** {chi.nome} è sconfitto! {vincitore.nome} vince! ***", "crit")
 
+    # ---------- arena: bookmaker live, sponsor, pubblico ----------
+    def quota_attuale(self):
+        """Quota per una scommessa sul player: parte dal gap di potenziale pre-match
+        e si sposta in base a quanta vita ha perso ciascuno (è la leva del comeback:
+        favorito 1.5x -> perdi metà vita -> sfavorito e la stessa scommessa paga di più)."""
+        base = (valuta(self.p) - valuta(self.cpu)) / 30
+        hp_p = sum(max(0, self.p.hp[l]) for l in self.p.hp) / max(1, sum(self.p.hp_max.values()))
+        hp_c = sum(max(0, self.cpu.hp[l]) for l in self.cpu.hp) / max(1, sum(self.cpu.hp_max.values()))
+        vantaggio = base + (hp_p - hp_c) * 4
+        return round(min(6.0, max(1.1, 2.2 - vantaggio)), 2)
+
+    def _traccia_hp_minimo(self):
+        if not self.arena_attiva:
+            return
+        tot = sum(max(0, self.p.hp[l]) for l in self.p.hp)
+        mx = sum(self.p.hp_max.values())
+        self.min_hp_pct = min(self.min_hp_pct, tot / max(1, mx))
+
+    def _hype(self, delta):
+        self.hype = max(0, min(100, self.hype + delta))
+
+    def pubblico_stato(self):
+        if self.hype >= 80:
+            testo = "Il pubblico è in delirio!"
+        elif self.hype >= 60:
+            testo = "La folla è elettrizzata."
+        elif self.hype >= 40:
+            testo = "Il pubblico segue con interesse."
+        elif self.hype >= 20:
+            testo = "Qualche fischio dagli spalti."
+        else:
+            testo = "Il pubblico si sta annoiando..."
+        q = self.quota_attuale()
+        if q >= 2.5:
+            tifo = f"Il pubblico sogna la rimonta di {self.p.nome}!"
+        elif q <= 1.4:
+            tifo = f"Il pubblico dà per scontata la vittoria di {self.p.nome}."
+        else:
+            tifo = "Il pubblico è diviso, equilibrio totale."
+        return {"hype": self.hype, "testo": testo, "tifo": tifo}
+
+    def _sponsor_fallito(self, sp):
+        """Per il display live: la condizione (a parte vincere) è già impossibile?"""
+        if sp["id"] == "lampo":
+            return self.round > 3
+        if sp["id"] == "stoico":
+            return self.usato_potere
+        return False  # bestia/incassatore restano raggiungibili fino alla fine
+
+    def _sponsor_condizione(self, sp):
+        """Verifica finale (a fine duello) della condizione dello sponsor, vittoria esclusa."""
+        return {"lampo": self.round <= 3, "bestia": self.usato_potere,
+                "stoico": not self.usato_potere,
+                "incassatore": self.min_hp_pct <= 0.30}.get(sp["id"], False)
+
+    def info_arena(self):
+        if not self.arena_attiva:
+            return None
+        sponsor_vivo = None
+        if self.sponsor is not None:
+            sponsor_vivo = dict(self.sponsor, fallito=self._sponsor_fallito(self.sponsor))
+        return {
+            "quota": self.quota_attuale(),
+            "scommessa": self.scommessa,
+            "crediti": STATO["crediti"],
+            "sponsor_offerte": self.sponsor_offerte if self.sponsor is None else None,
+            "sponsor": sponsor_vivo,
+            "pubblico": self.pubblico_stato(),
+            # nel torneo le vincite non toccano i crediti reali finché non diventi campione
+            "torneo_pot": self.torneo.bonus_accumulato if self.torneo is not None else None,
+        }
+
     # ---------- azioni comuni ----------
     def usa_potere(self, chi, slot):
         if not chi.puo_attivare_potere(slot):
@@ -429,11 +528,15 @@ class DuelloWeb:
         chi.azioni -= 1
         for r in chi.attiva_potere(slot, DB["attacchi"], DB["stances"], DB["effetti"]):
             self.scriv(r)
+        if chi is self.p:
+            self.usato_potere = True
+        self._hype(4)
 
     def usa_stance(self, chi, sdef, avversario):
         chi.bonus -= 1
         for r in chi.attiva_stance(sdef, avversario, DB["effetti"]):
             self.scriv(r)
+        self._hype(2)
 
     def usa_attacco(self, att):
         a, d = self.attivo, self.altro
@@ -463,6 +566,7 @@ class DuelloWeb:
                    + (" Patta!" if patta else ""))
         if ta < td:
             self.scriv(f"{a.nome} manca il colpo.", "miss")
+            self._hype(-2)
             for r in a.scatta_trigger("manchi", d, DB["effetti"]):
                 self.scriv("  " + r)
             return
@@ -498,10 +602,12 @@ class DuelloWeb:
         att, ta, pen_mira, loc = pend["att"], pend["ta"], pend["pen_mira"], pend["loc"]
         tipo_danno = att.get("tipo_danno", "contundente")
         colpito = True
+        quota_prima = self.quota_attuale() if self.arena_attiva else None
         if scelta == "parata":
             d.risposte -= 1
             loc = loc_parata if loc_parata in d.hp else random.choice(list(d.hp))
             self.scriv(f"{d.nome} para e incassa su {loc}.")
+            self._hype(3)
         elif scelta == "schivata":
             d.risposte -= 1
             mg = d.malus_gambe()
@@ -512,6 +618,7 @@ class DuelloWeb:
             colpito = td2 < ta
             if not colpito:
                 self.scriv(f"{d.nome} schiva!", "miss")
+                self._hype(6)
         if not colpito:
             for r in a.scatta_trigger("manchi", d, DB["effetti"]):
                 self.scriv("  " + r)
@@ -523,6 +630,12 @@ class DuelloWeb:
             hp_prima = sum(d.hp.values())
             for r in d.applica_danno(loc, danno, tipo_danno, split=split):
                 self.scriv("  " + r)
+            # il pubblico si accende per i colpi pesanti, e va in delirio se è
+            # il player-sfavorito (quota alta) a piazzare il colpo: la rimonta
+            bonus_hype = 8 if (split or danno >= d.hp_max.get(loc, 100) * 0.3) else 5
+            if a is self.p and quota_prima is not None and quota_prima >= 2.5:
+                bonus_hype += 10
+            self._hype(bonus_hype)
             if att.get("speciale") == "assorbi_caratteristica":
                 for r in a.assorbi_caratteristica(d, att.get("speciale_turni", 3)):
                     self.scriv("  " + r)
@@ -538,6 +651,7 @@ class DuelloWeb:
                 for r in d.scatta_trigger("subisci_danni", a, DB["effetti"]):
                     self.scriv("  " + r)
             self.check_sconfitta(d, a)
+        self._traccia_hp_minimo()
         if not self.finito:
             self.fase = "player" if self.attivo is self.p else "cpu"
 
@@ -629,6 +743,41 @@ class DuelloWeb:
         if tipo == "cpu_step":
             if self.fase == "cpu" and not self.finito:
                 self.cpu_step()
+            return None
+        if tipo == "scommetti":
+            # si può scommettere su se stessi in qualsiasi momento del duello,
+            # non solo nel proprio turno: è la leva del "comeback" del bookmaker live
+            if not self.arena_attiva:
+                return "questa modalità non ha scommesse"
+            if self.scommessa is not None:
+                return "hai già scommesso su questo duello"
+            importo = dati.get("importo")
+            if not isinstance(importo, int) or importo <= 0:
+                return "importo non valido"
+            if self.rec is not None:
+                # duello vero: puntata reale, scalata subito dai crediti
+                if importo > STATO["crediti"]:
+                    return "crediti insufficienti"
+                STATO["crediti"] -= importo
+                salva_stato()
+            elif self.torneo is not None and importo > MAX_SCOMMESSA_TORNEO:
+                return f"puntata massima nel torneo: {MAX_SCOMMESSA_TORNEO}¤"
+            quota = self.quota_attuale()
+            self.scommessa = {"importo": importo, "quota": quota}
+            extra = (" (nel montepremi del torneo: si riscatta solo diventando campione)"
+                    if self.torneo is not None else "")
+            self.scriv(f"🎰 Scommessa piazzata: {importo}¤ su {self.p.nome} a quota {quota}x{extra}.")
+            return None
+        if tipo == "sponsor":
+            if not self.arena_attiva:
+                return "questa modalità non ha sponsor"
+            if self.sponsor is not None:
+                return "hai già scelto uno sponsor"
+            sp = next((s for s in (self.sponsor_offerte or []) if s["id"] == dati.get("id")), None)
+            if sp is None:
+                return "sponsor non disponibile"
+            self.sponsor = sp
+            self.scriv(f"📣 {sp['nome']} ti sponsorizza: {sp['descrizione']}")
             return None
         if self.fase != "player":
             return "non è il tuo turno"
@@ -734,6 +883,7 @@ class DuelloWeb:
             "locazioni": list(LOCAZIONI),
             "survey_fatto": self.survey_fatto,
             "torneo": self.rec is None,
+            "arena": self.info_arena(),
         }
 
 
@@ -765,6 +915,10 @@ class TorneoEvo:
         self.fase = "intro"  # intro | pronto | duello | risultato | vittoria | eliminato
         self.scelte = None
         self.campione = None
+        # arena: le vincite di scommesse/sponsor di ogni round si accumulano qui e si
+        # riscattano in crediti reali solo se si diventa campioni; altrimenti vanno perse
+        self.bonus_accumulato = 0
+        self.log_arena = []
 
     # ---------- bracket ----------
     def mio_match(self):
@@ -813,8 +967,32 @@ class TorneoEvo:
             e.stats[random.choice(su)] += 1
         self._cura75(e)
 
+    # ---------- arena: le vincite si accumulano, si riscattano solo da campioni ----------
+    def _risolvi_arena(self, d):
+        """Chiude scommessa/sponsor del duello appena finito: se vinto, il bonus va
+        nel montepremi del torneo (niente crediti reali finché non vinci tutto)."""
+        vinto = d.vincitore is d.p
+        if d.scommessa:
+            if vinto:
+                vincita = int(d.scommessa["importo"] * d.scommessa["quota"])
+                self.bonus_accumulato += vincita
+                self.log_arena.append(f"🎰 +{vincita}¤ nel montepremi (scommessa a "
+                                      f"{d.scommessa['quota']}x).")
+            else:
+                self.log_arena.append(f"🎰 Scommessa persa: {d.scommessa['importo']}¤ "
+                                      "andati (non erano nel montepremi).")
+        if d.sponsor:
+            if vinto and d._sponsor_condizione(d.sponsor):
+                self.bonus_accumulato += d.sponsor["bonus"]
+                self.log_arena.append(f"📣 {d.sponsor['nome']}: +{d.sponsor['bonus']}¤ "
+                                      "nel montepremi.")
+            else:
+                self.log_arena.append(f"📣 {d.sponsor['nome']}: condizione non rispettata.")
+
     # ---------- flusso ----------
-    def risolvi_duello(self, vinto):
+    def risolvi_duello(self, vinto, duello=None):
+        if duello is not None:
+            self._risolvi_arena(duello)
         m = self.mio_match()
         m["win"] = self.io if vinto else self.avversario_idx()
         for match in self.turni[self.round]:
@@ -832,6 +1010,9 @@ class TorneoEvo:
                 vincitori = [x["win"] for x in prossimo]
             self.campione = self.eroi[vincitori[0]].nome
             self.fase = "eliminato"
+            if self.bonus_accumulato:
+                self.log_arena.append(f"💸 Eliminato: il montepremi ({self.bonus_accumulato}¤) "
+                                      "è andato perso.")
             return
         if len(vincitori) == 1:
             self.campione = self.eroi[self.io].nome
@@ -885,6 +1066,10 @@ class TorneoEvo:
         rec["livello"] = 5
         rec["bio"] = "Campione del Torneo Evo."
         STATO["personaggi"].append(rec)
+        if self.bonus_accumulato:
+            # campione: tutto il montepremi accumulato durante il torneo diventa reale
+            STATO["crediti"] += self.bonus_accumulato
+            self.log_arena.append(f"🏆 Campione! Montepremi riscattato: +{self.bonus_accumulato}¤.")
         salva_stato()
 
     # ---------- api ----------
@@ -908,6 +1093,8 @@ class TorneoEvo:
                         "stats": self.scelte["stats"]} if self.scelte else None),
             "campione": self.campione,
             "pool_nomi": [p["nome"] for p in DB["poteri"]],
+            "bonus_accumulato": self.bonus_accumulato,
+            "log_arena": self.log_arena[-6:],
         }
 
 
@@ -966,6 +1153,21 @@ def chiudi_duello():
         STATO["crediti"] += RICOMPENSA_VITTORIA
     else:
         rec["sconfitte"] = rec.get("sconfitte", 0) + 1
+    # bookmaker: la puntata è già stata scalata al momento della scommessa
+    if d.scommessa:
+        if vittoria:
+            vincita = int(d.scommessa["importo"] * d.scommessa["quota"])
+            STATO["crediti"] += vincita
+            d.scriv(f"🎰 Scommessa vinta: +{vincita}¤ (quota {d.scommessa['quota']}x).", "crit")
+        else:
+            d.scriv(f"🎰 Scommessa persa: -{d.scommessa['importo']}¤.", "miss")
+    # sponsor: paga solo se vinci E rispetti la condizione
+    if d.sponsor:
+        if vittoria and d._sponsor_condizione(d.sponsor):
+            STATO["crediti"] += d.sponsor["bonus"]
+            d.scriv(f"📣 {d.sponsor['nome']} paga il bonus: +{d.sponsor['bonus']}¤!", "crit")
+        else:
+            d.scriv(f"📣 {d.sponsor['nome']}: condizione non rispettata, nessun bonus.")
     if not rec.get("morto"):
         # Toughness: cresce incassando danni — senza danni subiti, niente tempra
         if danni_subiti > 0:
@@ -1005,7 +1207,7 @@ def torneo():
     # un duello di torneo concluso (o abbandonato) fa avanzare il bracket
     if (TORNEO is not None and TORNEO.fase == "duello"
             and DUELLO is not None and DUELLO.finito and DUELLO.rec is None):
-        TORNEO.risolvi_duello(DUELLO.vincitore is DUELLO.p)
+        TORNEO.risolvi_duello(DUELLO.vincitore is DUELLO.p, DUELLO)
         DUELLO = None
     return render_template("torneo.html")
 
@@ -1030,7 +1232,7 @@ def api_torneo_azione():
         TORNEO.fase = "pronto"
     elif tipo == "combatti" and TORNEO.fase == "pronto":
         avv = TORNEO.eroi[TORNEO.avversario_idx()]
-        DUELLO = DuelloWeb(pg=TORNEO.eroi[TORNEO.io], avversario=avv)
+        DUELLO = DuelloWeb(pg=TORNEO.eroi[TORNEO.io], avversario=avv, torneo=TORNEO)
         TORNEO.fase = "duello"
         return jsonify({"vai": url_for("duello")})
     elif tipo == "scegli":
