@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Urban{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  <header class="topbar">
+    <a class="wordmark" href="{{ url_for('index') }}">URBAN<span class="slash">/</span></a>
+    <nav class="nav">
+      <a href="{{ url_for('box') }}" class="{{ 'on' if request.endpoint in ('box','personaggio') }}">Box</a>
+      <a href="{{ url_for('contratti') }}" class="{{ 'on' if request.endpoint == 'contratti' }}">Contratti</a>
+      <a href="{{ url_for('negozio') }}" class="{{ 'on' if request.endpoint == 'negozio' }}">Negozio</a>
+      <a href="{{ url_for('duelli') }}" class="{{ 'on' if request.endpoint in ('duelli','duello') }}">Duelli</a>
+      <a href="{{ url_for('torneo') }}" class="{{ 'on' if request.endpoint == 'torneo' }}">Torneo</a>
+      <a href="{{ url_for('debug') }}" class="nav-debug {{ 'on' if request.endpoint == 'debug' }}">Debug</a>
+    </nav>
+    <div class="crediti-chip" title="Crediti">
+      <span class="c-icon">¤</span> {{ crediti }}
+    </div>
+  </header>
+
+  {% with msgs = get_flashed_messages() %}
+    {% if msgs %}
+      <div class="flash-wrap">
+        {% for m in msgs %}<div class="flash">{{ m }}</div>{% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <main class="page">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

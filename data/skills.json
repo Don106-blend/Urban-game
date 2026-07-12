@@ -1,0 +1,6 @@
+[
+  {"id": 1, "nome": "armi_distanza", "fallback": "riflessi"},
+  {"id": 2, "nome": "armi_corpo_a_corpo", "fallback": "fisico"},
+  {"id": 3, "nome": "acrobatica", "fallback": "riflessi"},
+  {"id": 4, "nome": "tattica", "fallback": "mente"}
+]

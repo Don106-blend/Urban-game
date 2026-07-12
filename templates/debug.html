@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Debug — Urban{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>DEBUG</h1>
+  <p class="muted">Strumenti da sviluppo: soldi infiniti, cura totale (resuscita anche i morti), eliminazione eroi.</p>
+</div>
+
+<div class="card-grid">
+  <div class="fighter-card">
+    <div class="fc-top"><span class="fc-nome">¤ Crediti</span></div>
+    <p class="muted">Imposta i crediti a 999.999.</p>
+    <form method="post" action="{{ url_for('debug_crediti') }}">
+      <button class="btn btn-volt full">Soldi infiniti</button>
+    </form>
+  </div>
+
+  <div class="fighter-card">
+    <div class="fc-top"><span class="fc-nome">⚕ Cura totale</span></div>
+    <p class="muted">Riporta tutti gli eroi al massimo, morti compresi.</p>
+    <form method="post" action="{{ url_for('debug_cura') }}">
+      <button class="btn btn-volt full">Cura tutti</button>
+    </form>
+  </div>
+</div>
+
+{% if personaggi %}
+<h2 class="debug-sub">Eroi</h2>
+<div class="card-grid">
+  {% for p in personaggi %}
+  {% set c = p.rec %}
+  <div class="fighter-card">
+    <div class="fc-top">
+      <span class="fc-nome">{{ c.nome }}</span>
+      <span class="badge badge-{{ p.stato }}">{{ p.stato|upper }}</span>
+    </div>
+    <div class="debug-azioni">
+      <form method="post" action="{{ url_for('debug_cura') }}">
+        <input type="hidden" name="pid" value="{{ c.id }}">
+        <button class="btn btn-ghost">⚕ Cura</button>
+      </form>
+      <form method="post" action="{{ url_for('debug_elimina') }}">
+        <input type="hidden" name="pid" value="{{ c.id }}">
+        <button class="btn btn-ghost danger-btn">✕ Elimina</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

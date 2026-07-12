@@ -1,0 +1,227 @@
+{
+ "crediti": 998664,
+ "personaggi": [
+  {
+   "id": 7,
+   "nome": "Elia Nakamura",
+   "data_nascita": "25/12/1983",
+   "bio": "",
+   "stats": {
+    "fisico": 1,
+    "riflessi": 2,
+    "mente": 1,
+    "sociale": 1,
+    "controllo": 2
+   },
+   "skills": {
+    "armi_distanza": 1,
+    "armi_corpo_a_corpo": 1,
+    "acrobatica": 1,
+    "tattica": 1
+   },
+   "poteri": [
+    {
+     "id": 8,
+     "rango": 1
+    }
+   ],
+   "hp": {
+    "testa": -170,
+    "busto": 150,
+    "braccio_sx": 100,
+    "braccio_dx": 100,
+    "gamba_sx": 100,
+    "gamba_dx": 100
+   },
+   "crippled": [],
+   "livello": 2,
+   "xp": 250,
+   "token": 0,
+   "toughness": 10,
+   "equip": [
+    1
+   ],
+   "vittorie": 1,
+   "sconfitte": 7,
+   "morto": true,
+   "last_heal": 1783728169.5080562
+  },
+  {
+   "id": 9,
+   "nome": "Iris Duarte",
+   "data_nascita": "03/06/1980",
+   "bio": "",
+   "stats": {
+    "fisico": 2,
+    "riflessi": 1,
+    "mente": 1,
+    "sociale": 1,
+    "controllo": 1
+   },
+   "skills": {
+    "armi_distanza": 1,
+    "armi_corpo_a_corpo": 1,
+    "acrobatica": 1,
+    "tattica": 1
+   },
+   "poteri": [
+    {
+     "id": 10,
+     "rango": 1
+    }
+   ],
+   "hp": {
+    "testa": 50,
+    "busto": 150,
+    "braccio_sx": 6,
+    "braccio_dx": 37,
+    "gamba_sx": -16,
+    "gamba_dx": 100
+   },
+   "crippled": [],
+   "livello": 2,
+   "xp": 25,
+   "token": 1,
+   "toughness": 9,
+   "equip": [],
+   "vittorie": 1,
+   "sconfitte": 5,
+   "morto": false,
+   "last_heal": 1783821366.3464673
+  },
+  {
+   "id": 17,
+   "nome": "Gaia Vance",
+   "data_nascita": "12/09/1997",
+   "bio": "",
+   "stats": {
+    "fisico": 2,
+    "riflessi": 1,
+    "mente": 1,
+    "sociale": 1,
+    "controllo": 1
+   },
+   "skills": {
+    "armi_distanza": 1,
+    "armi_corpo_a_corpo": 1,
+    "acrobatica": 1,
+    "tattica": 1
+   },
+   "poteri": [
+    {
+     "id": 5,
+     "rango": 1
+    }
+   ],
+   "hp": {
+    "testa": -12,
+    "busto": 150,
+    "braccio_sx": 100,
+    "braccio_dx": 100,
+    "gamba_sx": 100,
+    "gamba_dx": 100
+   },
+   "crippled": [],
+   "livello": 1,
+   "xp": 100,
+   "token": 0,
+   "toughness": 1,
+   "equip": [],
+   "vittorie": 0,
+   "sconfitte": 1,
+   "morto": false,
+   "last_heal": 1783821408.6508348
+  }
+ ],
+ "prossimo_id": 18,
+ "contratti": [
+  {
+   "id": null,
+   "nome": "Gaia Anand",
+   "data_nascita": "06/07/2000",
+   "bio": "",
+   "stats": {
+    "fisico": 1,
+    "riflessi": 1,
+    "mente": 2,
+    "sociale": 1,
+    "controllo": 1
+   },
+   "skills": {
+    "armi_distanza": 1,
+    "armi_corpo_a_corpo": 1,
+    "acrobatica": 1,
+    "tattica": 1
+   },
+   "poteri": [
+    {
+     "id": 10,
+     "rango": 1
+    }
+   ],
+   "hp": {
+    "testa": 50,
+    "busto": 150,
+    "braccio_sx": 100,
+    "braccio_dx": 100,
+    "gamba_sx": 100,
+    "gamba_dx": 100
+   },
+   "crippled": [],
+   "livello": 1,
+   "xp": 0,
+   "token": 0,
+   "toughness": 0,
+   "equip": [],
+   "vittorie": 0,
+   "sconfitte": 0,
+   "morto": false,
+   "last_heal": 1783778052.1985364,
+   "costo": 200
+  },
+  {
+   "id": null,
+   "nome": "Dante Reyes",
+   "data_nascita": "17/04/1970",
+   "bio": "",
+   "stats": {
+    "fisico": 1,
+    "riflessi": 1,
+    "mente": 2,
+    "sociale": 1,
+    "controllo": 1
+   },
+   "skills": {
+    "armi_distanza": 1,
+    "armi_corpo_a_corpo": 1,
+    "acrobatica": 1,
+    "tattica": 1
+   },
+   "poteri": [
+    {
+     "id": 2,
+     "rango": 1
+    }
+   ],
+   "hp": {
+    "testa": 50,
+    "busto": 150,
+    "braccio_sx": 100,
+    "braccio_dx": 100,
+    "gamba_sx": 100,
+    "gamba_dx": 100
+   },
+   "crippled": [],
+   "livello": 1,
+   "xp": 0,
+   "token": 0,
+   "toughness": 0,
+   "equip": [],
+   "vittorie": 0,
+   "sconfitte": 0,
+   "morto": false,
+   "last_heal": 1783778052.1985536,
+   "costo": 200
+  }
+ ]
+}

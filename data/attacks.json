@@ -1,0 +1,1322 @@
+[
+  {
+    "id": 1,
+    "nome": "Pugno",
+    "descrizione": "Un pugno a mani nude.",
+    "ranged": false,
+    "can_aim": true,
+    "can_dodge": true,
+    "attivo_default": true,
+    "tipo_danno": "contundente",
+    "danno": {
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "d6"
+        }
+      ],
+      "flat": 0,
+      "mult": 10
+    },
+    "sostituisce": null,
+    "effetti_applicati": [],
+    "split_danni": false,
+    "skill_colpire": null,
+    "cooldown_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1
+  },
+  {
+    "nome": "Spara la pistola",
+    "descrizione": "Un colpo di pistola.\n\n2d6*20",
+    "ranged": true,
+    "can_aim": true,
+    "can_dodge": true,
+    "attivo_default": true,
+    "split_danni": false,
+    "tipo_danno": "perforante",
+    "skill_colpire": null,
+    "danno": {
+      "dadi": [
+        {
+          "n": 2,
+          "tipo": "d6"
+        }
+      ],
+      "flat": 0,
+      "mult": 20
+    },
+    "sostituisce": null,
+    "effetti_applicati": [],
+    "id": 2,
+    "cooldown_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1
+  },
+  {
+    "nome": "Colpo Devastante",
+    "descrizione": "Pugno potenziato dalla super forza.",
+    "ranged": false,
+    "can_aim": true,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": false,
+    "tipo_danno": "contundente",
+    "skill_colpire": "controllo",
+    "danno": {
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "fisico"
+        },
+        {
+          "n": 1,
+          "tipo": "controllo"
+        }
+      ],
+      "flat": 0,
+      "mult": 20
+    },
+    "sostituisce": 1,
+    "effetti_applicati": [],
+    "id": 3
+  },
+  {
+    "nome": "Palla di fuoco",
+    "descrizione": "Una palla di fuoco",
+    "ranged": true,
+    "can_aim": true,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": false,
+    "tipo_danno": "fuoco",
+    "skill_colpire": "controllo",
+    "danno": {
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "controllo"
+        }
+      ],
+      "flat": 0,
+      "mult": 30
+    },
+    "sostituisce": 9,
+    "effetti_applicati": [],
+    "id": 4
+  },
+  {
+    "nome": "Lanciafiamme",
+    "descrizione": "FUOCOFUOCOAIUTO",
+    "ranged": true,
+    "can_aim": false,
+    "can_dodge": false,
+    "attivo_default": false,
+    "split_danni": true,
+    "tipo_danno": "fuoco",
+    "skill_colpire": "controllo",
+    "danno": {
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "controllo"
+        }
+      ],
+      "flat": 0,
+      "mult": 50
+    },
+    "sostituisce": null,
+    "effetti_applicati": [
+      {
+        "effetto": 1,
+        "turni": 2
+      }
+    ],
+    "id": 5
+  },
+  {
+    "nome": "Pugno rinforzato",
+    "descrizione": "Un colpo da un pugno rinforzato",
+    "ranged": false,
+    "can_aim": true,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": false,
+    "tipo_danno": "contundente",
+    "skill_colpire": "fisico",
+    "danno": {
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "fisico"
+        }
+      ],
+      "flat": 0,
+      "mult": 20
+    },
+    "sostituisce": 1,
+    "effetti_applicati": [],
+    "id": 6
+  },
+  {
+    "nome": "Scheggie",
+    "descrizione": "",
+    "ranged": true,
+    "can_aim": true,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": false,
+    "tipo_danno": "perforante",
+    "skill_colpire": "controllo",
+    "danno": {
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "controllo"
+        }
+      ],
+      "flat": 0,
+      "mult": 20
+    },
+    "sostituisce": null,
+    "effetti_applicati": [],
+    "id": 7
+  },
+  {
+    "nome": "Scarica elettrica",
+    "descrizione": "Una scarica elettrica si diffonde da te",
+    "ranged": true,
+    "can_aim": false,
+    "can_dodge": false,
+    "attivo_default": false,
+    "split_danni": true,
+    "tipo_danno": "elettrico",
+    "skill_colpire": "controllo",
+    "danno": {
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "controllo"
+        }
+      ],
+      "flat": 0,
+      "mult": 20
+    },
+    "sostituisce": 9,
+    "effetti_applicati": [],
+    "id": 8
+  },
+  {
+    "nome": "scintilla",
+    "descrizione": "una scintilla schiocca dalla mano",
+    "ranged": true,
+    "can_aim": true,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": false,
+    "tipo_danno": "fuoco",
+    "skill_colpire": "controllo",
+    "danno": {
+      "dadi": [],
+      "flat": 0,
+      "mult": 10
+    },
+    "sostituisce": null,
+    "effetti_applicati": [],
+    "id": 9
+  },
+  {
+    "nome": "Fulmine",
+    "descrizione": "un fulmine dirompente",
+    "ranged": true,
+    "can_aim": false,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": true,
+    "tipo_danno": "elettrico",
+    "skill_colpire": "controllo",
+    "danno": {
+      "dadi": [],
+      "flat": 0,
+      "mult": 100
+    },
+    "sostituisce": null,
+    "effetti_applicati": [],
+    "id": 10
+  },
+  {
+    "nome": "Artigli Affilati",
+    "descrizione": "Attacco con artigli",
+    "ranged": false,
+    "can_aim": true,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": false,
+    "tipo_danno": "taglio",
+    "skill_colpire": "fisico",
+    "danno": {
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "fisico"
+        }
+      ],
+      "flat": 0,
+      "mult": 15
+    },
+    "sostituisce": 1,
+    "effetti_applicati": [
+      {
+        "effetto": 3,
+        "turni": 1
+      }
+    ],
+    "id": 11
+  },
+  {
+    "nome": "Artigli Sanguinari",
+    "descrizione": "Cercano il Sangue",
+    "ranged": false,
+    "can_aim": true,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": false,
+    "tipo_danno": "taglio",
+    "skill_colpire": "controllo",
+    "danno": {
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "controllo"
+        }
+      ],
+      "flat": 0,
+      "mult": 20
+    },
+    "sostituisce": 11,
+    "effetti_applicati": [
+      {
+        "effetto": 3,
+        "turni": 3
+      }
+    ],
+    "id": 12
+  },
+  {
+    "nome": "Braccio Lama",
+    "descrizione": "Il tuo braccio diventa una lama affilata",
+    "ranged": false,
+    "can_aim": true,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": false,
+    "tipo_danno": "taglio",
+    "skill_colpire": null,
+    "danno": {
+      "dadi": [
+        {
+          "n": 2,
+          "tipo": "d6"
+        }
+      ],
+      "flat": 0,
+      "mult": 10
+    },
+    "sostituisce": 12,
+    "effetti_applicati": [
+      {
+        "effetto": 3,
+        "turni": 5
+      }
+    ],
+    "id": 13,
+    "cooldown_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1
+  },
+  {
+    "nome": "Grido Acuto",
+    "descrizione": "",
+    "ranged": true,
+    "can_aim": false,
+    "can_dodge": false,
+    "attivo_default": false,
+    "split_danni": true,
+    "tipo_danno": "psionico",
+    "skill_colpire": "controllo",
+    "danno": {
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "controllo"
+        }
+      ],
+      "flat": 0,
+      "mult": 10
+    },
+    "sostituisce": null,
+    "effetti_applicati": [
+      {
+        "effetto": 4,
+        "turni": 1
+      }
+    ],
+    "id": 14
+  },
+  {
+    "nome": "Affamare",
+    "descrizione": "Rendi un avversario affamato",
+    "ranged": true,
+    "can_aim": false,
+    "can_dodge": false,
+    "attivo_default": false,
+    "split_danni": false,
+    "tipo_danno": "nessuno",
+    "skill_colpire": "controllo",
+    "danno": {
+      "dadi": [],
+      "flat": 0,
+      "mult": 1
+    },
+    "sostituisce": null,
+    "effetti_applicati": [
+      {
+        "effetto": 5,
+        "turni": 2
+      }
+    ],
+    "id": 15,
+    "cooldown_turni": 4,
+    "usi_limitati": false,
+    "usi_massimi": 1
+  },
+  {
+    "nome": "Affaticare",
+    "descrizione": "rendi un avversario affaticato",
+    "ranged": true,
+    "can_aim": false,
+    "can_dodge": false,
+    "attivo_default": false,
+    "split_danni": false,
+    "tipo_danno": "nessuno",
+    "skill_colpire": "controllo",
+    "danno": {
+      "dadi": [],
+      "flat": 0,
+      "mult": 1
+    },
+    "sostituisce": null,
+    "effetti_applicati": [
+      {
+        "effetto": 6,
+        "turni": 2
+      }
+    ],
+    "id": 16,
+    "cooldown_turni": 4,
+    "usi_limitati": false,
+    "usi_massimi": 1
+  },
+  {
+    "nome": "Sfascia Timpani",
+    "descrizione": "le orecchie fischiano, e le ossa tremano.",
+    "ranged": true,
+    "can_aim": false,
+    "can_dodge": false,
+    "attivo_default": false,
+    "split_danni": true,
+    "tipo_danno": "psionico",
+    "skill_colpire": "controllo",
+    "danno": {
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "controllo"
+        }
+      ],
+      "flat": 0,
+      "mult": 20
+    },
+    "sostituisce": 14,
+    "effetti_applicati": [
+      {
+        "effetto": 4,
+        "turni": 1
+      },
+      {
+        "effetto": 3,
+        "turni": 2
+      }
+    ],
+    "id": 17
+  },
+  {
+    "nome": "Attacco Rapido",
+    "descrizione": "",
+    "ranged": false,
+    "can_aim": true,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": false,
+    "tipo_danno": "contundente",
+    "skill_colpire": null,
+    "danno": {
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "fisico"
+        }
+      ],
+      "flat": 0,
+      "mult": 10
+    },
+    "sostituisce": null,
+    "effetti_applicati": [],
+    "id": 18
+  },
+  {
+    "nome": "Bocca di fuoco assemblata",
+    "descrizione": "2d6*20",
+    "ranged": true,
+    "can_aim": true,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": false,
+    "tipo_danno": "contundente",
+    "skill_colpire": "armi_distanza",
+    "danno": {
+      "dadi": [
+        {
+          "n": 2,
+          "tipo": "d6"
+        }
+      ],
+      "flat": 0,
+      "mult": 20
+    },
+    "sostituisce": null,
+    "effetti_applicati": [],
+    "id": 19,
+    "cooldown_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1
+  },
+  {
+    "nome": "Colpo di lama assemblata",
+    "descrizione": "2d6",
+    "ranged": false,
+    "can_aim": true,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": false,
+    "tipo_danno": "taglio",
+    "skill_colpire": "armi_corpo_a_corpo",
+    "danno": {
+      "dadi": [
+        {
+          "n": 2,
+          "tipo": "d6"
+        }
+      ],
+      "flat": 0,
+      "mult": 1
+    },
+    "sostituisce": null,
+    "effetti_applicati": [
+      {
+        "effetto": 3,
+        "turni": 2
+      }
+    ],
+    "id": 20,
+    "cooldown_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1
+  },
+  {
+    "nome": "Fucile automatico assemblato",
+    "descrizione": "3d4x30",
+    "ranged": true,
+    "can_aim": true,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": false,
+    "tipo_danno": "perforante",
+    "skill_colpire": "armi_distanza",
+    "danno": {
+      "dadi": [
+        {
+          "n": 3,
+          "tipo": "d4"
+        }
+      ],
+      "flat": 0,
+      "mult": 30
+    },
+    "sostituisce": null,
+    "effetti_applicati": [],
+    "id": 21,
+    "cooldown_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1
+  },
+  {
+    "nome": "Lanciarazzi assemblato",
+    "descrizione": "1d12*50",
+    "ranged": true,
+    "can_aim": false,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": true,
+    "tipo_danno": "fuoco",
+    "skill_colpire": "armi_distanza",
+    "danno": {
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "d12"
+        }
+      ],
+      "flat": 0,
+      "mult": 50
+    },
+    "sostituisce": null,
+    "effetti_applicati": [],
+    "id": 22,
+    "cooldown_turni": 5,
+    "usi_limitati": false,
+    "usi_massimi": 1
+  },
+  {
+    "nome": "Granata stordente assemblata",
+    "descrizione": "2d4*30",
+    "ranged": true,
+    "can_aim": false,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": true,
+    "tipo_danno": "contundente",
+    "skill_colpire": null,
+    "danno": {
+      "dadi": [
+        {
+          "n": 2,
+          "tipo": "d4"
+        }
+      ],
+      "flat": 0,
+      "mult": 30
+    },
+    "sostituisce": null,
+    "effetti_applicati": [
+      {
+        "effetto": 4,
+        "turni": 3
+      }
+    ],
+    "id": 23,
+    "cooldown_turni": 0,
+    "usi_limitati": true,
+    "usi_massimi": 1
+  },
+  {
+    "id": 24,
+    "nome": "Assorbi caratteristica",
+    "descrizione": "Se colpisce, scambia per 3 turni una statistica casuale con quella dell'avversario.",
+    "ranged": false,
+    "can_aim": false,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": false,
+    "tipo_danno": "psionico",
+    "skill_colpire": "controllo",
+    "cooldown_turni": 5,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "danno": {
+      "dadi": [],
+      "flat": 0,
+      "mult": 1
+    },
+    "sostituisce": null,
+    "speciale": "assorbi_caratteristica",
+    "speciale_turni": 3,
+    "effetti_applicati": []
+  },
+  {
+    "nome": "Battito d'ala",
+    "descrizione": "",
+    "ranged": true,
+    "can_aim": true,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": false,
+    "tipo_danno": "contundente",
+    "skill_colpire": "controllo",
+    "danno": {
+      "dadi": [
+        {
+          "n": 2,
+          "tipo": "d10"
+        }
+      ],
+      "flat": 0,
+      "mult": 1
+    },
+    "sostituisce": null,
+    "cooldown_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "effetti_applicati": [],
+    "id": 25
+  },
+  {
+    "nome": "Folata Impetuosa",
+    "descrizione": "una folata di vento che sbilancia l'avversario",
+    "ranged": true,
+    "can_aim": false,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": false,
+    "tipo_danno": "contundente",
+    "skill_colpire": "controllo",
+    "danno": {
+      "dadi": [
+        {
+          "n": 2,
+          "tipo": "d10"
+        }
+      ],
+      "flat": 0,
+      "mult": 10
+    },
+    "sostituisce": 25,
+    "cooldown_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "effetti_applicati": [
+      {
+        "effetto": 7,
+        "turni": 1
+      }
+    ],
+    "id": 26
+  },
+  {
+    "nome": "Colpo di scudo",
+    "descrizione": "",
+    "ranged": false,
+    "can_aim": true,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": false,
+    "tipo_danno": "contundente",
+    "skill_colpire": null,
+    "danno": {
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "d6"
+        }
+      ],
+      "flat": 0,
+      "mult": 10
+    },
+    "sostituisce": null,
+    "cooldown_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "effetti_applicati": [],
+    "id": 27
+  },
+  {
+    "id": 28,
+    "nome": "Scheggia di Ghiaccio",
+    "descrizione": "Un frammento di ghiaccio affilato come una lama.",
+    "ranged": true,
+    "can_aim": true,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": false,
+    "tipo_danno": "gelo",
+    "skill_colpire": "controllo",
+    "danno": {
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "controllo"
+        }
+      ],
+      "flat": 0,
+      "mult": 12
+    },
+    "sostituisce": null,
+    "effetti_applicati": [],
+    "cooldown_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1
+  },
+  {
+    "id": 29,
+    "nome": "Raffica Glaciale",
+    "descrizione": "Una folata gelida che rallenta chi colpisce.",
+    "ranged": true,
+    "can_aim": true,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": false,
+    "tipo_danno": "gelo",
+    "skill_colpire": "controllo",
+    "danno": {
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "controllo"
+        }
+      ],
+      "flat": 0,
+      "mult": 18
+    },
+    "sostituisce": null,
+    "effetti_applicati": [
+      {
+        "effetto": 11,
+        "turni": 2
+      }
+    ],
+    "cooldown_turni": 1,
+    "usi_limitati": false,
+    "usi_massimi": 1
+  },
+  {
+    "id": 30,
+    "nome": "Tempesta di Ghiaccio",
+    "descrizione": "Una tormenta che avvolge tutto il corpo.",
+    "ranged": true,
+    "can_aim": false,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": true,
+    "tipo_danno": "gelo",
+    "skill_colpire": "controllo",
+    "danno": {
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "controllo"
+        }
+      ],
+      "flat": 0,
+      "mult": 30
+    },
+    "sostituisce": null,
+    "effetti_applicati": [],
+    "cooldown_turni": 2,
+    "usi_limitati": false,
+    "usi_massimi": 1
+  },
+  {
+    "id": 31,
+    "nome": "Spruzzo Acido",
+    "descrizione": "Un getto di acido corrosivo.",
+    "ranged": true,
+    "can_aim": true,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": false,
+    "tipo_danno": "acido",
+    "skill_colpire": "controllo",
+    "danno": {
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "controllo"
+        }
+      ],
+      "flat": 0,
+      "mult": 10
+    },
+    "sostituisce": null,
+    "effetti_applicati": [
+      {
+        "effetto": 12,
+        "turni": 2
+      }
+    ],
+    "cooldown_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1
+  },
+  {
+    "id": 32,
+    "nome": "Getto Corrosivo",
+    "descrizione": "Un fiotto di acido concentrato.",
+    "ranged": true,
+    "can_aim": true,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": false,
+    "tipo_danno": "acido",
+    "skill_colpire": "controllo",
+    "danno": {
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "controllo"
+        }
+      ],
+      "flat": 0,
+      "mult": 20
+    },
+    "sostituisce": null,
+    "effetti_applicati": [
+      {
+        "effetto": 12,
+        "turni": 3
+      }
+    ],
+    "cooldown_turni": 1,
+    "usi_limitati": false,
+    "usi_massimi": 1
+  },
+  {
+    "id": 33,
+    "nome": "Pioggia Acida",
+    "descrizione": "Acido che ricade su tutto il corpo del bersaglio.",
+    "ranged": true,
+    "can_aim": false,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": true,
+    "tipo_danno": "acido",
+    "skill_colpire": "controllo",
+    "danno": {
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "controllo"
+        }
+      ],
+      "flat": 0,
+      "mult": 28
+    },
+    "sostituisce": null,
+    "effetti_applicati": [
+      {
+        "effetto": 12,
+        "turni": 2
+      }
+    ],
+    "cooldown_turni": 2,
+    "usi_limitati": false,
+    "usi_massimi": 1
+  },
+  {
+    "id": 34,
+    "nome": "Spinta Telecinetica",
+    "descrizione": "Una forza invisibile scaraventa il bersaglio.",
+    "ranged": true,
+    "can_aim": false,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": false,
+    "tipo_danno": "psionico",
+    "skill_colpire": "controllo",
+    "danno": {
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "controllo"
+        }
+      ],
+      "flat": 0,
+      "mult": 15
+    },
+    "sostituisce": null,
+    "effetti_applicati": [],
+    "cooldown_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1
+  },
+  {
+    "id": 35,
+    "nome": "Stretta Mentale",
+    "descrizione": "Una morsa psichica che blocca i movimenti.",
+    "ranged": true,
+    "can_aim": false,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": false,
+    "tipo_danno": "psionico",
+    "skill_colpire": "controllo",
+    "danno": {
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "controllo"
+        }
+      ],
+      "flat": 0,
+      "mult": 10
+    },
+    "sostituisce": null,
+    "effetti_applicati": [
+      {
+        "effetto": 13,
+        "turni": 2
+      }
+    ],
+    "cooldown_turni": 2,
+    "usi_limitati": false,
+    "usi_massimi": 1
+  },
+  {
+    "id": 36,
+    "nome": "Esplosione Psionica",
+    "descrizione": "Un'onda mentale che travolge ogni cosa vicina.",
+    "ranged": true,
+    "can_aim": false,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": true,
+    "tipo_danno": "psionico",
+    "skill_colpire": "controllo",
+    "danno": {
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "controllo"
+        }
+      ],
+      "flat": 0,
+      "mult": 30
+    },
+    "sostituisce": null,
+    "effetti_applicati": [
+      {
+        "effetto": 13,
+        "turni": 1
+      }
+    ],
+    "cooldown_turni": 3,
+    "usi_limitati": false,
+    "usi_massimi": 1
+  },
+  {
+    "id": 37,
+    "nome": "Tocco Debilitante",
+    "descrizione": "Un tocco gelido che indebolisce il corpo.",
+    "ranged": false,
+    "can_aim": true,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": false,
+    "tipo_danno": "magico",
+    "skill_colpire": "controllo",
+    "danno": {
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "controllo"
+        }
+      ],
+      "flat": 0,
+      "mult": 14
+    },
+    "sostituisce": null,
+    "effetti_applicati": [
+      {
+        "effetto": 14,
+        "turni": 2
+      }
+    ],
+    "cooldown_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1
+  },
+  {
+    "id": 38,
+    "nome": "Dreno Vitale",
+    "descrizione": "Energia oscura che risucchia le forze a distanza.",
+    "ranged": true,
+    "can_aim": true,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": false,
+    "tipo_danno": "magico",
+    "skill_colpire": "controllo",
+    "danno": {
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "controllo"
+        }
+      ],
+      "flat": 0,
+      "mult": 22
+    },
+    "sostituisce": null,
+    "effetti_applicati": [
+      {
+        "effetto": 14,
+        "turni": 3
+      }
+    ],
+    "cooldown_turni": 1,
+    "usi_limitati": false,
+    "usi_massimi": 1
+  },
+  {
+    "id": 39,
+    "nome": "Falce delle Anime",
+    "descrizione": "Un fendente d'ombra che lacera corpo e spirito.",
+    "ranged": false,
+    "can_aim": true,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": false,
+    "tipo_danno": "magico",
+    "skill_colpire": "controllo",
+    "danno": {
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "controllo"
+        }
+      ],
+      "flat": 0,
+      "mult": 35
+    },
+    "sostituisce": null,
+    "effetti_applicati": [
+      {
+        "effetto": 14,
+        "turni": 2
+      }
+    ],
+    "cooldown_turni": 2,
+    "usi_limitati": false,
+    "usi_massimi": 1
+  },
+  {
+    "id": 40,
+    "nome": "Pugno di Roccia",
+    "descrizione": "Un pugno rinforzato dalla pietra.",
+    "ranged": false,
+    "can_aim": true,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": false,
+    "tipo_danno": "contundente",
+    "skill_colpire": "fisico",
+    "danno": {
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "fisico"
+        }
+      ],
+      "flat": 0,
+      "mult": 15
+    },
+    "sostituisce": null,
+    "effetti_applicati": [],
+    "cooldown_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1
+  },
+  {
+    "id": 41,
+    "nome": "Ondata Sismica",
+    "descrizione": "Una scossa che si propaga dal terreno.",
+    "ranged": true,
+    "can_aim": false,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": true,
+    "tipo_danno": "contundente",
+    "skill_colpire": "fisico",
+    "danno": {
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "fisico"
+        }
+      ],
+      "flat": 0,
+      "mult": 15
+    },
+    "sostituisce": null,
+    "effetti_applicati": [],
+    "cooldown_turni": 1,
+    "usi_limitati": false,
+    "usi_massimi": 1
+  },
+  {
+    "id": 42,
+    "nome": "Frana",
+    "descrizione": "Una frana di massi travolge il bersaglio.",
+    "ranged": true,
+    "can_aim": false,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": true,
+    "tipo_danno": "contundente",
+    "skill_colpire": "fisico",
+    "danno": {
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "fisico"
+        }
+      ],
+      "flat": 0,
+      "mult": 30
+    },
+    "sostituisce": null,
+    "effetti_applicati": [],
+    "cooldown_turni": 3,
+    "usi_limitati": false,
+    "usi_massimi": 1
+  },
+  {
+    "id": 43,
+    "nome": "Eruzione",
+    "descrizione": "Un geyser di lava esplode sotto il bersaglio.",
+    "ranged": true,
+    "can_aim": false,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": true,
+    "tipo_danno": "fuoco",
+    "skill_colpire": "controllo",
+    "danno": {
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "controllo"
+        }
+      ],
+      "flat": 0,
+      "mult": 35
+    },
+    "sostituisce": null,
+    "effetti_applicati": [
+      {
+        "effetto": 1,
+        "turni": 2
+      }
+    ],
+    "cooldown_turni": 3,
+    "usi_limitati": false,
+    "usi_massimi": 1
+  },
+  {
+    "id": 44,
+    "nome": "Raffica di Pugni",
+    "descrizione": "Una raffica di colpi troppo veloce per essere seguita.",
+    "ranged": false,
+    "can_aim": true,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": false,
+    "tipo_danno": "contundente",
+    "skill_colpire": "fisico",
+    "danno": {
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "fisico"
+        }
+      ],
+      "flat": 0,
+      "mult": 18
+    },
+    "sostituisce": null,
+    "effetti_applicati": [],
+    "cooldown_turni": 1,
+    "usi_limitati": false,
+    "usi_massimi": 1
+  },
+  {
+    "id": 45,
+    "nome": "Getto d'Acqua",
+    "descrizione": "Un getto d'acqua ad alta pressione.",
+    "ranged": true,
+    "can_aim": true,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": false,
+    "tipo_danno": "contundente",
+    "skill_colpire": "controllo",
+    "danno": {
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "controllo"
+        }
+      ],
+      "flat": 0,
+      "mult": 12
+    },
+    "sostituisce": null,
+    "effetti_applicati": [],
+    "cooldown_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1
+  },
+  {
+    "id": 46,
+    "nome": "Onda Anomala",
+    "descrizione": "Un'onda che travolge tutto intorno al bersaglio.",
+    "ranged": true,
+    "can_aim": false,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": true,
+    "tipo_danno": "contundente",
+    "skill_colpire": "controllo",
+    "danno": {
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "controllo"
+        }
+      ],
+      "flat": 0,
+      "mult": 18
+    },
+    "sostituisce": null,
+    "effetti_applicati": [],
+    "cooldown_turni": 1,
+    "usi_limitati": false,
+    "usi_massimi": 1
+  },
+  {
+    "id": 47,
+    "nome": "Maremoto",
+    "descrizione": "Una parete d'acqua che sommerge il bersaglio.",
+    "ranged": true,
+    "can_aim": false,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": true,
+    "tipo_danno": "contundente",
+    "skill_colpire": "controllo",
+    "danno": {
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "controllo"
+        }
+      ],
+      "flat": 0,
+      "mult": 30
+    },
+    "sostituisce": null,
+    "effetti_applicati": [],
+    "cooldown_turni": 2,
+    "usi_limitati": false,
+    "usi_massimi": 1
+  }
+]

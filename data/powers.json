@@ -1,0 +1,1041 @@
+[
+  {
+    "nome": "Pelle Invincibile",
+    "descrizione": "La pelle si indurisce: armatura (hp extra) su ogni locazione pari a 1 dado controllo x10 (x100 al rango 4).",
+    "rango": 4,
+    "effetti": {
+      "1": [
+        {
+          "tipo": "armatura",
+          "dadi": [
+            {
+              "n": 1,
+              "tipo": "controllo"
+            }
+          ],
+          "flat": 0,
+          "mult": 10
+        }
+      ],
+      "2": [
+        {
+          "tipo": "armatura",
+          "dadi": [
+            {
+              "n": 1,
+              "tipo": "controllo"
+            }
+          ],
+          "flat": 0,
+          "mult": 20
+        }
+      ],
+      "3": [
+        {
+          "tipo": "armatura",
+          "dadi": [
+            {
+              "n": 1,
+              "tipo": "controllo"
+            }
+          ],
+          "flat": 0,
+          "mult": 50
+        }
+      ],
+      "4": [
+        {
+          "tipo": "armatura",
+          "dadi": [
+            {
+              "n": 1,
+              "tipo": "controllo"
+            }
+          ],
+          "flat": 0,
+          "mult": 100
+        }
+      ]
+    },
+    "effetti_nel_tempo": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [
+        6
+      ],
+      "2": [],
+      "3": [
+        7
+      ],
+      "4": [
+        13
+      ]
+    },
+    "stance": {
+      "1": [
+        1
+      ],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "id": 1,
+    "stance_attivate": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    }
+  },
+  {
+    "id": 2,
+    "nome": "Super Forza",
+    "descrizione": "Forza sovrumana. Sostituisce Pugno con Colpo Devastante.",
+    "rango": 4,
+    "effetti": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "effetti_nel_tempo": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [
+        3
+      ],
+      "2": [],
+      "3": [
+        41
+      ],
+      "4": [
+        42
+      ]
+    },
+    "stance": {
+      "1": [],
+      "2": [
+        16
+      ],
+      "3": [],
+      "4": []
+    },
+    "stance_attivate": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    }
+  },
+  {
+    "nome": "Pirocinesi",
+    "descrizione": "Controlla le fiamme. Al rango 4 rende immuni a tutti i danni di tipo fuoco.",
+    "rango": 4,
+    "effetti": {
+      "1": [
+        {
+          "tipo": "resistenza",
+          "tipo_danno": "fuoco",
+          "valore": 20
+        }
+      ],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "effetti_nel_tempo": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [
+        9
+      ],
+      "2": [
+        4
+      ],
+      "3": [
+        5
+      ],
+      "4": [
+        43
+      ]
+    },
+    "stance": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance_attivate": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": [
+        6
+      ]
+    },
+    "id": 3
+  },
+  {
+    "id": 4,
+    "nome": "Assorbi Energia",
+    "descrizione": "assorbe i danni",
+    "rango": 4,
+    "effetti": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "effetti_nel_tempo": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance": {
+      "1": [
+        5
+      ],
+      "2": [
+        16
+      ],
+      "3": [
+        14
+      ],
+      "4": [
+        15
+      ]
+    },
+    "stance_attivate": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    }
+  },
+  {
+    "nome": "Electrocinesi",
+    "descrizione": "Controlla l'elettricità. Al rango 4 rende immuni a tutti i danni di tipo elettrico.",
+    "rango": 4,
+    "effetti": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "effetti_nel_tempo": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [
+        9
+      ],
+      "2": [
+        8
+      ],
+      "3": [],
+      "4": [
+        10
+      ]
+    },
+    "stance": {
+      "1": [],
+      "2": [],
+      "3": [
+        12
+      ],
+      "4": []
+    },
+    "stance_attivate": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": [
+        7
+      ]
+    },
+    "id": 5
+  },
+  {
+    "nome": "Appendici Affilate",
+    "descrizione": "",
+    "rango": 4,
+    "effetti": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "effetti_nel_tempo": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [
+        11
+      ],
+      "2": [
+        12
+      ],
+      "3": [
+        7
+      ],
+      "4": [
+        13
+      ]
+    },
+    "stance": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance_attivate": {
+      "1": [],
+      "2": [],
+      "3": [
+        10
+      ],
+      "4": []
+    },
+    "id": 6
+  },
+  {
+    "nome": "Supervelocità",
+    "descrizione": "Ti muovi a velocità sovrumana: azioni extra ogni turno. Rango 1: +1 azione bonus. Rango 4: +2 azioni e +1 azione bonus.",
+    "rango": 4,
+    "effetti": {
+      "1": [
+        {
+          "tipo": "azioni",
+          "azioni": 0,
+          "bonus": 1,
+          "risposte": 0
+        }
+      ],
+      "2": [],
+      "3": [],
+      "4": [
+        {
+          "tipo": "azioni",
+          "azioni": 2,
+          "bonus": 1,
+          "risposte": 0
+        }
+      ]
+    },
+    "effetti_nel_tempo": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [],
+      "2": [
+        44
+      ],
+      "3": [
+        18
+      ],
+      "4": []
+    },
+    "stance": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": [
+        12
+      ]
+    },
+    "stance_attivate": {
+      "1": [],
+      "2": [
+        11
+      ],
+      "3": [],
+      "4": []
+    },
+    "id": 7
+  },
+  {
+    "nome": "Anatema",
+    "descrizione": "Puoi scagliare maledizioni.",
+    "rango": 4,
+    "effetti": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "effetti_nel_tempo": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [
+        15,
+        16
+      ],
+      "2": [
+        24
+      ],
+      "3": [
+        38
+      ],
+      "4": []
+    },
+    "stance": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": [
+        25
+      ]
+    },
+    "stance_attivate": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "id": 8
+  },
+  {
+    "nome": "super-urlo",
+    "descrizione": "",
+    "rango": 4,
+    "effetti": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "effetti_nel_tempo": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [
+        14
+      ],
+      "2": [
+        17
+      ],
+      "3": [
+        35
+      ],
+      "4": [
+        36
+      ]
+    },
+    "stance": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance_attivate": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "id": 9
+  },
+  {
+    "nome": "Assemblatore",
+    "descrizione": "",
+    "rango": 4,
+    "effetti": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "effetti_nel_tempo": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [
+        20
+      ],
+      "2": [
+        19
+      ],
+      "3": [
+        21,
+        23
+      ],
+      "4": [
+        22
+      ]
+    },
+    "stance": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance_attivate": {
+      "1": [],
+      "2": [],
+      "3": [
+        16
+      ],
+      "4": []
+    },
+    "id": 10
+  },
+  {
+    "id": 11,
+    "nome": "Ali",
+    "descrizione": "Un paio di ali spunta dalla schiena: due arti extra (50 hp l'uno al rango 1, 100 hp al rango 3). Sblocca la stance Volo.",
+    "rango": 4,
+    "effetti": {
+      "1": [
+        {
+          "tipo": "locazione_extra",
+          "nome": "ala_sx",
+          "hp": 50
+        },
+        {
+          "tipo": "locazione_extra",
+          "nome": "ala_dx",
+          "hp": 50
+        }
+      ],
+      "2": [],
+      "3": [
+        {
+          "tipo": "locazione_extra",
+          "nome": "ala_sx",
+          "hp": 100
+        },
+        {
+          "tipo": "locazione_extra",
+          "nome": "ala_dx",
+          "hp": 100
+        }
+      ],
+      "4": []
+    },
+    "effetti_nel_tempo": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [
+        25
+      ],
+      "2": [],
+      "3": [],
+      "4": [
+        26
+      ]
+    },
+    "stance": {
+      "1": [
+        13
+      ],
+      "2": [
+        1
+      ],
+      "3": [],
+      "4": []
+    },
+    "stance_attivate": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    }
+  },
+  {
+    "nome": "2x2",
+    "descrizione": "Due braccia ti spuntano dalla schiena.",
+    "rango": 4,
+    "effetti": {
+      "1": [
+        {
+          "tipo": "locazione_extra",
+          "nome": "secondo braccio Sx",
+          "hp": 100
+        },
+        {
+          "tipo": "locazione_extra",
+          "nome": "Secondo braccio DX",
+          "hp": 100
+        }
+      ],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "effetti_nel_tempo": {
+      "1": [
+        {
+          "effetto": 8,
+          "turni": 1,
+          "persistente": true
+        }
+      ],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [],
+      "2": [
+        6
+      ],
+      "3": [
+        3
+      ],
+      "4": [
+        18
+      ]
+    },
+    "stance": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance_attivate": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "id": 12
+  },
+  {
+    "nome": "Campo di forza",
+    "descrizione": "",
+    "rango": 4,
+    "effetti": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "effetti_nel_tempo": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [],
+      "2": [
+        27
+      ],
+      "3": [],
+      "4": []
+    },
+    "stance": {
+      "1": [
+        14
+      ],
+      "2": [],
+      "3": [],
+      "4": [
+        15
+      ]
+    },
+    "stance_attivate": {
+      "1": [],
+      "2": [],
+      "3": [
+        16
+      ],
+      "4": []
+    },
+    "id": 13
+  },
+  {
+    "id": 14,
+    "nome": "Supersoldato",
+    "descrizione": "Addestramento sovrumano: mirare costa 1 azione bonus invece di 1 azione.",
+    "rango": 4,
+    "effetti": {
+      "1": [
+        {
+          "tipo": "mira_bonus"
+        }
+      ],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "effetti_nel_tempo": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance_attivate": {
+      "1": [],
+      "2": [
+        29
+      ],
+      "3": [
+        30
+      ],
+      "4": [
+        31
+      ]
+    }
+  },
+  {
+    "nome": "Hydrocinesi",
+    "descrizione": "",
+    "rango": 4,
+    "effetti": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "effetti_nel_tempo": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [
+        45
+      ],
+      "2": [
+        46
+      ],
+      "3": [],
+      "4": [
+        47
+      ]
+    },
+    "stance": {
+      "1": [
+        18
+      ],
+      "2": [],
+      "3": [
+        16
+      ],
+      "4": []
+    },
+    "stance_attivate": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "id": 15
+  },
+  {
+    "id": 16,
+    "nome": "Criocinesi",
+    "descrizione": "Controlla il ghiaccio: rallenta e congela gli avversari. Al rango 4 rende immuni a tutti i danni di tipo gelo.",
+    "rango": 4,
+    "effetti": {
+      "1": [
+        {
+          "tipo": "resistenza",
+          "tipo_danno": "gelo",
+          "valore": 15
+        }
+      ],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "effetti_nel_tempo": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [
+        28
+      ],
+      "2": [
+        29
+      ],
+      "3": [],
+      "4": [
+        30
+      ]
+    },
+    "stance": {
+      "1": [],
+      "2": [],
+      "3": [
+        19
+      ],
+      "4": []
+    },
+    "stance_attivate": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": [
+        20
+      ]
+    }
+  },
+  {
+    "id": 17,
+    "nome": "Acidocinesi",
+    "descrizione": "Genera e controlla acidi corrosivi. Al rango 4 rende immuni a tutti i danni di tipo acido.",
+    "rango": 4,
+    "effetti": {
+      "1": [
+        {
+          "tipo": "resistenza",
+          "tipo_danno": "acido",
+          "valore": 15
+        }
+      ],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "effetti_nel_tempo": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [
+        31
+      ],
+      "2": [
+        32
+      ],
+      "3": [],
+      "4": [
+        33
+      ]
+    },
+    "stance": {
+      "1": [],
+      "2": [],
+      "3": [
+        21
+      ],
+      "4": []
+    },
+    "stance_attivate": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": [
+        22
+      ]
+    }
+  },
+  {
+    "id": 18,
+    "nome": "Telecinesi",
+    "descrizione": "Controlla oggetti e menti con la forza del pensiero. Al rango 4 rende immuni a tutti i danni di tipo psionico.",
+    "rango": 4,
+    "effetti": {
+      "1": [
+        {
+          "tipo": "mod_statistica",
+          "statistica": "mente",
+          "delta": 1
+        }
+      ],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "effetti_nel_tempo": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [
+        34
+      ],
+      "2": [
+        35
+      ],
+      "3": [],
+      "4": [
+        36
+      ]
+    },
+    "stance": {
+      "1": [],
+      "2": [],
+      "3": [
+        23
+      ],
+      "4": []
+    },
+    "stance_attivate": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": [
+        24
+      ]
+    }
+  },
+  {
+    "id": 19,
+    "nome": "Necromanzia",
+    "descrizione": "Attinge a energie oscure per indebolire i nemici e rubarne le forze vitali. Al rango 4 rende immuni a tutti i danni di tipo magico.",
+    "rango": 4,
+    "effetti": {
+      "1": [
+        {
+          "tipo": "resistenza",
+          "tipo_danno": "magico",
+          "valore": 15
+        }
+      ],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "effetti_nel_tempo": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [
+        37
+      ],
+      "2": [
+        38
+      ],
+      "3": [],
+      "4": [
+        39
+      ]
+    },
+    "stance": {
+      "1": [],
+      "2": [],
+      "3": [
+        25
+      ],
+      "4": []
+    },
+    "stance_attivate": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": [
+        26
+      ]
+    }
+  },
+  {
+    "id": 20,
+    "nome": "Geocinesi",
+    "descrizione": "Piega la roccia e la terra al proprio volere, corazzandosi. Al rango 4 rende immuni a tutti i danni di tipo contundente.",
+    "rango": 4,
+    "effetti": {
+      "1": [
+        {
+          "tipo": "resistenza",
+          "tipo_danno": "contundente",
+          "valore": 15
+        }
+      ],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "effetti_nel_tempo": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [
+        40
+      ],
+      "2": [
+        41
+      ],
+      "3": [],
+      "4": [
+        42
+      ]
+    },
+    "stance": {
+      "1": [],
+      "2": [],
+      "3": [
+        27
+      ],
+      "4": []
+    },
+    "stance_attivate": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": [
+        28
+      ]
+    }
+  }
+]

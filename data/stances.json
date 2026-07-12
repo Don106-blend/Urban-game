@@ -1,0 +1,721 @@
+[
+  {
+    "nome": "Paladino",
+    "descrizione": "Puoi sempre parare i colpi che ti raggiungono.",
+    "attivo_default": false,
+    "durata": {
+      "tipo": "contrapposta"
+    },
+    "trigger": "attivo",
+    "cooldown_turni": 1,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "modificatori": [
+      {
+        "tipo": "parata_sempre"
+      }
+    ],
+    "effetti_applicati": [],
+    "effetti_avversario": [],
+    "id": 1
+  },
+  {
+    "nome": "Difensivo",
+    "descrizione": "-1 al dado per colpire dell'avversario, -1 al tuo.",
+    "attivo_default": true,
+    "durata": {
+      "tipo": "contrapposta"
+    },
+    "trigger": "attivo",
+    "cooldown_turni": 1,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "modificatori": [
+      {
+        "tipo": "colpire_avversario",
+        "flat": -1,
+        "dado_proprio": "",
+        "dado_avversario": ""
+      },
+      {
+        "tipo": "colpire_proprio",
+        "flat": -1,
+        "dado_proprio": "",
+        "dado_avversario": ""
+      }
+    ],
+    "effetti_applicati": [],
+    "effetti_avversario": [],
+    "id": 2
+  },
+  {
+    "nome": "Aggressivo",
+    "descrizione": "+1 al tuo dado per colpire, +1 a quello dell'avversario.",
+    "attivo_default": true,
+    "durata": {
+      "tipo": "contrapposta"
+    },
+    "trigger": "attivo",
+    "cooldown_turni": 1,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "modificatori": [
+      {
+        "tipo": "colpire_proprio",
+        "flat": 1,
+        "dado_proprio": "",
+        "dado_avversario": ""
+      },
+      {
+        "tipo": "colpire_avversario",
+        "flat": 1,
+        "dado_proprio": "",
+        "dado_avversario": ""
+      }
+    ],
+    "effetti_applicati": [],
+    "effetti_avversario": [],
+    "id": 3
+  },
+  {
+    "nome": "Taunt",
+    "descrizione": "Ad ogni dado per colpire si somma il tuo dado sociale meno quello dell'avversario.",
+    "attivo_default": true,
+    "durata": {
+      "tipo": "fissa",
+      "turni": 3
+    },
+    "trigger": "attivo",
+    "cooldown_turni": 0,
+    "usi_limitati": true,
+    "usi_massimi": 1,
+    "modificatori": [
+      {
+        "tipo": "colpire_proprio",
+        "flat": 0,
+        "dado_proprio": "sociale",
+        "dado_avversario": "sociale"
+      },
+      {
+        "tipo": "colpire_avversario",
+        "flat": 0,
+        "dado_proprio": "sociale",
+        "dado_avversario": "sociale"
+      }
+    ],
+    "effetti_applicati": [],
+    "effetti_avversario": [],
+    "id": 4
+  },
+  {
+    "id": 5,
+    "nome": "Assorbi Energie",
+    "descrizione": "Tutti i danni subiti vengono suddivisi tra tutte le parti del corpo.",
+    "attivo_default": false,
+    "durata": {
+      "tipo": "fissa",
+      "turni": 2
+    },
+    "modificatori": [
+      {
+        "tipo": "distribuisci_danni"
+      },
+      {
+        "tipo": "resistenza",
+        "tipo_danno": "tutto",
+        "valore": 0
+      }
+    ],
+    "effetti_applicati": [],
+    "trigger": "attivo",
+    "cooldown_turni": 1,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "effetti_avversario": []
+  },
+  {
+    "id": 6,
+    "nome": "Corpo di Fiamma",
+    "descrizione": "Immune a tutti i danni di tipo fuoco.",
+    "attivo_default": false,
+    "durata": {
+      "tipo": "contrapposta"
+    },
+    "modificatori": [
+      {
+        "tipo": "immunita",
+        "tipo_danno": "fuoco"
+      }
+    ],
+    "effetti_applicati": []
+  },
+  {
+    "id": 7,
+    "nome": "Corpo Elettrico",
+    "descrizione": "Immune a tutti i danni di tipo elettrico.",
+    "attivo_default": false,
+    "durata": {
+      "tipo": "contrapposta"
+    },
+    "modificatori": [
+      {
+        "tipo": "immunita",
+        "tipo_danno": "elettrico"
+      }
+    ],
+    "effetti_applicati": []
+  },
+  {
+    "id": 8,
+    "nome": "Intimidazione",
+    "descrizione": "Il tuo sguardo minaccioso abbassa i riflessi dell'avversario di 2 ranghi.",
+    "attivo_default": false,
+    "durata": {
+      "tipo": "contrapposta"
+    },
+    "modificatori": [
+      {
+        "tipo": "mod_rango",
+        "statistica": "riflessi",
+        "delta": -2,
+        "target": "avversario"
+      }
+    ],
+    "effetti_applicati": []
+  },
+  {
+    "nome": "Concentrazione",
+    "descrizione": "Ti concentri: +1 ranghi al tuo controllo.",
+    "attivo_default": false,
+    "durata": {
+      "tipo": "contrapposta"
+    },
+    "modificatori": [
+      {
+        "tipo": "mod_rango",
+        "statistica": "controllo",
+        "delta": 1,
+        "target": "self"
+      }
+    ],
+    "effetti_applicati": [],
+    "id": 9
+  },
+  {
+    "id": 10,
+    "nome": "Spine",
+    "descrizione": "Quando vieni colpito, chi ti colpisce inizia a sanguinare.",
+    "attivo_default": false,
+    "durata": {
+      "tipo": "fissa",
+      "turni": 3
+    },
+    "trigger": "vieni_colpito",
+    "modificatori": [],
+    "effetti_applicati": [],
+    "effetti_avversario": [
+      {
+        "effetto": 3,
+        "turni": 2
+      }
+    ]
+  },
+  {
+    "nome": "Riflessi Aumentati",
+    "descrizione": "I tuoi riflessi sono aumentati, sei più difficile da colpire",
+    "attivo_default": false,
+    "durata": {
+      "tipo": "fissa",
+      "turni": 1
+    },
+    "trigger": "attivo",
+    "modificatori": [
+      {
+        "tipo": "colpire_avversario",
+        "flat": -2,
+        "dado_proprio": "",
+        "dado_avversario": ""
+      }
+    ],
+    "effetti_applicati": [],
+    "effetti_avversario": [],
+    "id": 11
+  },
+  {
+    "nome": "Riflessi Fulminei",
+    "descrizione": "sei estremamente rapido e pronto a tutto",
+    "attivo_default": false,
+    "durata": {
+      "tipo": "fissa",
+      "turni": 1
+    },
+    "trigger": "attivo",
+    "cooldown_turni": 3,
+    "usi_limitati": true,
+    "usi_massimi": 3,
+    "modificatori": [
+      {
+        "tipo": "colpire_avversario",
+        "flat": -5,
+        "dado_proprio": "",
+        "dado_avversario": ""
+      }
+    ],
+    "effetti_applicati": [],
+    "effetti_avversario": [],
+    "id": 12
+  },
+  {
+    "id": 13,
+    "nome": "Volo",
+    "descrizione": "In volo: le mosse non a distanza non ti raggiungono.",
+    "attivo_default": false,
+    "durata": {
+      "tipo": "contrapposta"
+    },
+    "trigger": "attivo",
+    "cooldown_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "modificatori": [
+      {
+        "tipo": "immune_melee"
+      }
+    ],
+    "effetti_applicati": [],
+    "effetti_avversario": []
+  },
+  {
+    "nome": "Scudo",
+    "descrizione": "",
+    "attivo_default": false,
+    "durata": {
+      "tipo": "contrapposta"
+    },
+    "trigger": "attivo",
+    "cooldown_turni": 2,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "modificatori": [
+      {
+        "tipo": "immune_melee"
+      }
+    ],
+    "effetti_applicati": [],
+    "effetti_avversario": [],
+    "id": 14
+  },
+  {
+    "nome": "Campo di forza",
+    "descrizione": "",
+    "attivo_default": false,
+    "durata": {
+      "tipo": "fissa",
+      "turni": 1
+    },
+    "trigger": "attivo",
+    "cooldown_turni": 5,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "modificatori": [
+      {
+        "tipo": "immune_melee"
+      },
+      {
+        "tipo": "immunita",
+        "tipo_danno": "tutto"
+      }
+    ],
+    "effetti_applicati": [
+      {
+        "effetto": 9,
+        "turni": 1,
+        "persistente": false
+      }
+    ],
+    "effetti_avversario": [],
+    "id": 15
+  },
+  {
+    "nome": "Resistenza",
+    "descrizione": "",
+    "attivo_default": false,
+    "durata": {
+      "tipo": "fissa",
+      "turni": 2
+    },
+    "trigger": "attivo",
+    "cooldown_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "modificatori": [
+      {
+        "tipo": "resistenza",
+        "tipo_danno": "tutto",
+        "valore": 0
+      }
+    ],
+    "effetti_applicati": [],
+    "effetti_avversario": [],
+    "id": 16
+  },
+  {
+    "id": 17,
+    "nome": "Corazza",
+    "descrizione": "Ti copri di armatura: hp extra (1 dado controllo x10) finché dura la stance.",
+    "attivo_default": false,
+    "durata": {
+      "tipo": "fissa",
+      "turni": 3
+    },
+    "trigger": "attivo",
+    "cooldown_turni": 2,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "modificatori": [
+      {
+        "tipo": "armatura",
+        "flat": 0,
+        "dado_proprio": "controllo",
+        "mult": 10,
+        "locazione": "tutte"
+      }
+    ],
+    "effetti_applicati": [],
+    "effetti_avversario": []
+  },
+  {
+    "nome": "Forma d'acqua",
+    "descrizione": "",
+    "attivo_default": false,
+    "durata": {
+      "tipo": "fissa",
+      "turni": 3
+    },
+    "trigger": "attivo",
+    "cooldown_turni": 2,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "modificatori": [
+      {
+        "tipo": "immunita",
+        "tipo_danno": "fuoco"
+      },
+      {
+        "tipo": "immunita",
+        "tipo_danno": "perforante"
+      },
+      {
+        "tipo": "debolezza",
+        "tipo_danno": "elettrico"
+      },
+      {
+        "tipo": "debolezza",
+        "tipo_danno": "contundente"
+      }
+    ],
+    "effetti_applicati": [],
+    "effetti_avversario": [],
+    "id": 18
+  },
+  {
+    "id": 19,
+    "nome": "Corazza di Ghiaccio",
+    "descrizione": "Il ghiaccio ricopre la pelle come un'armatura.",
+    "attivo_default": false,
+    "durata": {
+      "tipo": "fissa",
+      "turni": 3
+    },
+    "trigger": "attivo",
+    "cooldown_turni": 2,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "modificatori": [
+      {
+        "tipo": "armatura",
+        "flat": 0,
+        "dado_proprio": "controllo",
+        "mult": 8,
+        "locazione": "tutte"
+      },
+      {
+        "tipo": "resistenza",
+        "tipo_danno": "gelo",
+        "valore": 10
+      }
+    ],
+    "effetti_applicati": [],
+    "effetti_avversario": []
+  },
+  {
+    "id": 20,
+    "nome": "Corpo di Ghiaccio",
+    "descrizione": "Il corpo è ghiaccio puro: nessun freddo può nuocerti.",
+    "attivo_default": false,
+    "durata": {
+      "tipo": "contrapposta"
+    },
+    "trigger": "attivo",
+    "cooldown_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "modificatori": [
+      {
+        "tipo": "immunita",
+        "tipo_danno": "gelo"
+      }
+    ],
+    "effetti_applicati": [],
+    "effetti_avversario": []
+  },
+  {
+    "id": 21,
+    "nome": "Pelle Corrosiva",
+    "descrizione": "Chi ti colpisce da vicino si ritrova corroso.",
+    "attivo_default": false,
+    "durata": {
+      "tipo": "fissa",
+      "turni": 3
+    },
+    "trigger": "vieni_colpito",
+    "cooldown_turni": 2,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "modificatori": [],
+    "effetti_applicati": [],
+    "effetti_avversario": [
+      {
+        "effetto": 12,
+        "turni": 2
+      }
+    ]
+  },
+  {
+    "id": 22,
+    "nome": "Corpo Acido",
+    "descrizione": "La pelle stessa è acido: nessun acido può corroderti.",
+    "attivo_default": false,
+    "durata": {
+      "tipo": "contrapposta"
+    },
+    "trigger": "attivo",
+    "cooldown_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "modificatori": [
+      {
+        "tipo": "immunita",
+        "tipo_danno": "acido"
+      }
+    ],
+    "effetti_applicati": [],
+    "effetti_avversario": []
+  },
+  {
+    "id": 23,
+    "nome": "Scudo Psichico",
+    "descrizione": "Un campo di forza mentale respinge i colpi ravvicinati.",
+    "attivo_default": false,
+    "durata": {
+      "tipo": "fissa",
+      "turni": 3
+    },
+    "trigger": "attivo",
+    "cooldown_turni": 2,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "modificatori": [
+      {
+        "tipo": "immune_melee"
+      },
+      {
+        "tipo": "mod_rango",
+        "statistica": "controllo",
+        "delta": 1,
+        "target": "self"
+      }
+    ],
+    "effetti_applicati": [],
+    "effetti_avversario": []
+  },
+  {
+    "id": 24,
+    "nome": "Fortezza Mentale",
+    "descrizione": "La mente è una fortezza: nessun assalto psichico la scalfisce.",
+    "attivo_default": false,
+    "durata": {
+      "tipo": "contrapposta"
+    },
+    "trigger": "attivo",
+    "cooldown_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "modificatori": [
+      {
+        "tipo": "immunita",
+        "tipo_danno": "psionico"
+      }
+    ],
+    "effetti_applicati": [],
+    "effetti_avversario": []
+  },
+  {
+    "id": 25,
+    "nome": "Manto d'Ombra",
+    "descrizione": "Ogni colpo inferto restituisce un po' di forza vitale.",
+    "attivo_default": false,
+    "durata": {
+      "tipo": "fissa",
+      "turni": 3
+    },
+    "trigger": "fai_danni",
+    "cooldown_turni": 2,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "modificatori": [],
+    "effetti_applicati": [
+      {
+        "effetto": 9,
+        "turni": 1
+      }
+    ],
+    "effetti_avversario": []
+  },
+  {
+    "id": 26,
+    "nome": "Egida Oscura",
+    "descrizione": "Il corpo si fonde con l'oscurità: la magia non può ferirlo.",
+    "attivo_default": false,
+    "durata": {
+      "tipo": "contrapposta"
+    },
+    "trigger": "attivo",
+    "cooldown_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "modificatori": [
+      {
+        "tipo": "immunita",
+        "tipo_danno": "magico"
+      }
+    ],
+    "effetti_applicati": [],
+    "effetti_avversario": []
+  },
+  {
+    "id": 27,
+    "nome": "Pelle di Pietra",
+    "descrizione": "La pelle si indurisce come roccia.",
+    "attivo_default": false,
+    "durata": {
+      "tipo": "fissa",
+      "turni": 3
+    },
+    "trigger": "attivo",
+    "cooldown_turni": 2,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "modificatori": [
+      {
+        "tipo": "armatura",
+        "flat": 0,
+        "dado_proprio": "fisico",
+        "mult": 10,
+        "locazione": "tutte"
+      }
+    ],
+    "effetti_applicati": [],
+    "effetti_avversario": []
+  },
+  {
+    "id": 28,
+    "nome": "Corpo di Pietra",
+    "descrizione": "Il corpo è pietra viva: i colpi contundenti non lo scalfiscono.",
+    "attivo_default": false,
+    "durata": {
+      "tipo": "contrapposta"
+    },
+    "trigger": "attivo",
+    "cooldown_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "modificatori": [
+      {
+        "tipo": "immunita",
+        "tipo_danno": "contundente"
+      }
+    ],
+    "effetti_applicati": [],
+    "effetti_avversario": []
+  },
+  {
+    "nome": "mira migliorata",
+    "descrizione": "la tua mira è finalmente decente",
+    "attivo_default": false,
+    "durata": {
+      "tipo": "contrapposta"
+    },
+    "trigger": "attivo",
+    "cooldown_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "modificatori": [
+      {
+        "tipo": "colpire_avversario",
+        "flat": 1,
+        "dado_proprio": "",
+        "dado_avversario": ""
+      }
+    ],
+    "effetti_applicati": [],
+    "effetti_avversario": [],
+    "id": 29
+  },
+  {
+    "nome": "Occhio attento",
+    "descrizione": "",
+    "attivo_default": false,
+    "durata": {
+      "tipo": "contrapposta"
+    },
+    "trigger": "attivo",
+    "cooldown_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "modificatori": [
+      {
+        "tipo": "colpire_avversario",
+        "flat": 0,
+        "dado_proprio": "",
+        "dado_avversario": ""
+      }
+    ],
+    "effetti_applicati": [],
+    "effetti_avversario": [],
+    "id": 30
+  },
+  {
+    "nome": "cecchino",
+    "descrizione": "",
+    "attivo_default": false,
+    "durata": {
+      "tipo": "contrapposta"
+    },
+    "trigger": "attivo",
+    "cooldown_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "modificatori": [
+      {
+        "tipo": "colpire_avversario",
+        "flat": 4,
+        "dado_proprio": "",
+        "dado_avversario": ""
+      }
+    ],
+    "effetti_applicati": [],
+    "effetti_avversario": [],
+    "id": 31
+  }
+]

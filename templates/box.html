@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Box — Urban{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>IL BOX</h1>
+  <p class="muted">I tuoi combattenti. Qui recuperano le forze col tempo: più sono feriti, più ci vorrà.</p>
+</div>
+
+{% if not personaggi %}
+  <div class="empty">
+    <p>Il box è vuoto.</p>
+    <a class="btn btn-volt" href="{{ url_for('contratti') }}">Vai ai contratti →</a>
+  </div>
+{% else %}
+<div class="card-grid">
+  {% for p in personaggi %}
+  {% set c = p.rec %}
+  <a class="fighter-card stato-{{ p.stato }}" href="{{ url_for('personaggio', pid=c.id) }}">
+    <div class="fc-top">
+      <span class="fc-nome">{{ c.nome }}</span>
+      <span class="badge badge-{{ p.stato }}">{{ p.stato|upper }}</span>
+    </div>
+    <div class="fc-liv">LIV {{ c.livello }} · {{ c.vittorie }}V / {{ c.sconfitte }}S
+      {% if c.token %}<span class="token-mini">🧬 {{ c.token }}</span>{% endif %}
+      <span class="muted">TGH {{ c.toughness or 0 }}</span>
+    </div>
+    <div class="hpbar">
+      {% set pct = (p.hp_tot * 100 / p.hp_max_tot)|round|int %}
+      <div class="hpbar-fill pct-{{ 'hi' if pct > 60 else ('mid' if pct > 30 else 'low') }}"
+           style="width: {{ pct }}%"></div>
+    </div>
+    <div class="fc-foot">
+      <span>{{ p.hp_tot }} / {{ p.hp_max_tot }} HP</span>
+      {% if p.stato == 'morto' %}
+        <span class="danger">✝ deceduto</span>
+      {% elif p.recupero %}
+        <span class="muted">~{{ p.recupero // 60 }}h {{ p.recupero % 60 }}m al recupero</span>
+      {% endif %}
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

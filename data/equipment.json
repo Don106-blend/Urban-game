@@ -1,0 +1,9 @@
+[
+  {
+    "id": 1,
+    "nome": "Pistola",
+    "descrizione": "Una pistola comune.",
+    "valore": 50,
+    "attacchi": [2]
+  }
+]

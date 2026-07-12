@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Negozio — Urban{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>NEGOZIO</h1>
+  <p class="muted">Oggetti ed equipaggiamenti. L'inventario crescerà.</p>
+</div>
+
+<div class="card-grid">
+  <div class="fighter-card shop-item">
+    <div class="fc-top">
+      <span class="fc-nome">⚕ Medikit</span>
+      <span class="costo">¤ {{ prezzo_medikit }}</span>
+    </div>
+    <p class="muted">Cura istantanea e completa di un combattente. Non riporta in vita i morti.</p>
+    {% if curabili %}
+    <form method="post" action="{{ url_for('negozio_medikit') }}">
+      <select name="pid" class="select">
+        {% for c in curabili %}
+        <option value="{{ c.id }}">{{ c.nome }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-volt full" {{ 'disabled' if crediti < prezzo_medikit }}>
+        {{ 'Compra e usa' if crediti >= prezzo_medikit else 'Crediti insufficienti' }}
+      </button>
+    </form>
+    {% else %}
+    <p class="muted">Nessun combattente da curare.</p>
+    {% endif %}
+  </div>
+
+  {% for e in equip %}
+  <div class="fighter-card shop-item">
+    <div class="fc-top">
+      <span class="fc-nome">🗡 {{ e.nome }}</span>
+      <span class="costo">¤ {{ e.valore }}</span>
+    </div>
+    <p class="muted">{{ e.descrizione or "Equipaggiamento." }}</p>
+    {% if vivi %}
+    <form method="post" action="{{ url_for('negozio_equip') }}">
+      <input type="hidden" name="eid" value="{{ e.id }}">
+      <select name="pid" class="select">
+        {% for c in vivi %}
+        <option value="{{ c.id }}">{{ c.nome }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-volt full" {{ 'disabled' if crediti < e.valore }}>
+        {{ 'Compra' if crediti >= e.valore else 'Crediti insufficienti' }}
+      </button>
+    </form>
+    {% else %}
+    <p class="muted">Nessun eroe nel box.</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

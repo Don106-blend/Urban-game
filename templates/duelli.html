@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Duelli — Urban{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>DUELLI</h1>
+  <p class="muted">Scegli chi manderai sul ring. Vittoria: <strong class="volt">¤ {{ ricompensa }}</strong>.
+     I danni restano addosso — anche la morte.</p>
+</div>
+
+{% if not idonei %}
+  <div class="empty">
+    <p>Nessun combattente in grado di battersi (in coma, morti o box vuoto).</p>
+    <a class="btn btn-volt" href="{{ url_for('contratti') }}">Vai ai contratti →</a>
+  </div>
+{% else %}
+<div class="card-grid">
+  {% for p in idonei %}
+  {% set c = p.rec %}
+  <div class="fighter-card">
+    <div class="fc-top">
+      <span class="fc-nome">{{ c.nome }}</span>
+      <span class="badge badge-{{ p.stato }}">{{ p.stato|upper }}</span>
+    </div>
+    <div class="fc-liv">LIV {{ c.livello }} · {{ c.vittorie }}V / {{ c.sconfitte }}S</div>
+    <form method="post" action="{{ url_for('duelli_avvia') }}">
+      <input type="hidden" name="pid" value="{{ c.id }}">
+      <button class="btn btn-volt full">Sali sul ring →</button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

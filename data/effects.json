@@ -1,0 +1,275 @@
+[
+  {
+    "id": 1,
+    "nome": "Bruciatura",
+    "descrizione": "Danni da fuoco all'inizio di ogni turno.",
+    "tipo": "danno",
+    "tipo_danno": "fuoco",
+    "formula": {
+      "dadi": [],
+      "flat": 10,
+      "mult": 1
+    }
+  },
+  {
+    "id": 2,
+    "nome": "Rigenerazione",
+    "descrizione": "Cura tutte le locazioni all'inizio di ogni turno.",
+    "tipo": "cura",
+    "tipo_danno": "",
+    "formula": {
+      "dadi": [],
+      "flat": 10,
+      "mult": 1
+    },
+    "split": false,
+    "modificatori": []
+  },
+  {
+    "nome": "Sanguinamento",
+    "descrizione": "",
+    "tipo": "danno",
+    "tipo_danno": "taglio",
+    "split": false,
+    "formula": {
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "controllo"
+        }
+      ],
+      "flat": 5,
+      "mult": 1
+    },
+    "id": 3,
+    "modificatori": []
+  },
+  {
+    "nome": "Stordimento",
+    "descrizione": "Abbassa di uno step il dado mente e dà -2 a tutti i tiri per colpire.",
+    "tipo": "modificatore",
+    "tipo_danno": "",
+    "split": false,
+    "formula": {
+      "dadi": [],
+      "flat": 0,
+      "mult": 1
+    },
+    "modificatori": [
+      {
+        "tipo": "mod_rango",
+        "statistica": "sociale",
+        "delta": -1
+      },
+      {
+        "tipo": "colpire",
+        "flat": -2
+      },
+      {
+        "tipo": "azioni",
+        "azioni": 0,
+        "bonus": 0,
+        "risposte": -1
+      }
+    ],
+    "id": 4
+  },
+  {
+    "nome": "Affamare",
+    "descrizione": "\"ti senti molto affamato...\"",
+    "tipo": "modificatore",
+    "tipo_danno": "",
+    "split": false,
+    "formula": {
+      "dadi": [],
+      "flat": 0,
+      "mult": 1
+    },
+    "modificatori": [
+      {
+        "tipo": "mod_rango",
+        "statistica": "riflessi",
+        "delta": -1
+      },
+      {
+        "tipo": "mod_rango",
+        "statistica": "fisico",
+        "delta": -1
+      }
+    ],
+    "id": 5
+  },
+  {
+    "nome": "Affaticare",
+    "descrizione": "\"ti senti affaticato...\"",
+    "tipo": "modificatore",
+    "tipo_danno": "",
+    "split": false,
+    "formula": {
+      "dadi": [],
+      "flat": 0,
+      "mult": 1
+    },
+    "modificatori": [
+      {
+        "tipo": "azioni",
+        "azioni": 0,
+        "bonus": -1,
+        "risposte": -1
+      }
+    ],
+    "id": 6
+  },
+  {
+    "nome": "Cancella_stance",
+    "descrizione": "Disattiva subito la stance attualmente attiva dell'avversario: il cooldown parte come se fosse scaduta da sola.",
+    "tipo": "cancella_stance",
+    "tipo_danno": "",
+    "split": false,
+    "formula": {
+      "dadi": [],
+      "flat": 0,
+      "mult": 1
+    },
+    "modificatori": [],
+    "id": 7
+  },
+  {
+    "nome": "Azione extra",
+    "descrizione": "",
+    "tipo": "danno",
+    "tipo_danno": "fuoco",
+    "split": false,
+    "formula": {
+      "dadi": [],
+      "flat": 0,
+      "mult": 1
+    },
+    "modificatori": [
+      {
+        "tipo": "azioni",
+        "azioni": 1,
+        "bonus": 0,
+        "risposte": 0
+      }
+    ],
+    "id": 8
+  },
+  {
+    "nome": "Cura",
+    "descrizione": "",
+    "tipo": "cura",
+    "tipo_danno": "",
+    "split": true,
+    "formula": {
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "controllo"
+        }
+      ],
+      "flat": 0,
+      "mult": 10
+    },
+    "modificatori": [],
+    "id": 9
+  },
+  {
+    "id": 10,
+    "nome": "Debolezza (fuoco)",
+    "descrizione": "Il bersaglio subisce il 50% di danni in più dal tipo indicato.",
+    "tipo": "modificatore",
+    "tipo_danno": "",
+    "split": false,
+    "formula": {
+      "dadi": [],
+      "flat": 0,
+      "mult": 1
+    },
+    "modificatori": [
+      {
+        "tipo": "debolezza",
+        "tipo_danno": "fuoco"
+      }
+    ]
+  },
+  {
+    "id": 11,
+    "nome": "Rallentamento",
+    "descrizione": "Il freddo intorpidisce i movimenti: -1 rango riflessi.",
+    "tipo": "modificatore",
+    "tipo_danno": "",
+    "split": false,
+    "formula": {
+      "dadi": [],
+      "flat": 0,
+      "mult": 1
+    },
+    "modificatori": [
+      {
+        "tipo": "mod_rango",
+        "statistica": "riflessi",
+        "delta": -1
+      }
+    ]
+  },
+  {
+    "id": 12,
+    "nome": "Corrosione",
+    "descrizione": "Acido che continua a bruciare la pelle.",
+    "tipo": "danno",
+    "tipo_danno": "acido",
+    "split": false,
+    "formula": {
+      "dadi": [],
+      "flat": 8,
+      "mult": 1
+    },
+    "modificatori": []
+  },
+  {
+    "id": 13,
+    "nome": "Paralisi Mentale",
+    "descrizione": "La mente è bloccata: perdi un'azione.",
+    "tipo": "modificatore",
+    "tipo_danno": "",
+    "split": false,
+    "formula": {
+      "dadi": [],
+      "flat": 0,
+      "mult": 1
+    },
+    "modificatori": [
+      {
+        "tipo": "azioni",
+        "azioni": -1,
+        "bonus": 0,
+        "risposte": 0
+      }
+    ]
+  },
+  {
+    "id": 14,
+    "nome": "Maledizione",
+    "descrizione": "Il corpo si indebolisce e la mira vacilla.",
+    "tipo": "modificatore",
+    "tipo_danno": "",
+    "split": false,
+    "formula": {
+      "dadi": [],
+      "flat": 0,
+      "mult": 1
+    },
+    "modificatori": [
+      {
+        "tipo": "mod_rango",
+        "statistica": "fisico",
+        "delta": -1
+      },
+      {
+        "tipo": "colpire",
+        "flat": -1
+      }
+    ]
+  }
+]

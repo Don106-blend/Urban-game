@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Urban{% endblock %}
+{% block content %}
+<section class="hero">
+  <h1 class="hero-title">URBAN<span class="slash">/</span></h1>
+  <p class="hero-sub">Gestisci la tua scuderia di combattenti. Scegli la modalità.</p>
+  <div class="mode-grid">
+    <a class="mode-card arena" href="{{ url_for('box') }}">
+      <div class="mode-kicker">Modalità</div>
+      <div class="mode-name">ARENA</div>
+      <p>Arruola combattenti, gestisci il box, vinci duelli e crediti. I danni sono permanenti — anche la morte.</p>
+      <span class="btn btn-volt">Entra nell'arena →</span>
+    </a>
+    <a class="mode-card sandbox" href="{{ url_for('sandbox') }}">
+      <div class="mode-kicker">Modalità</div>
+      <div class="mode-name">SANDBOX</div>
+      <p>Il mondo aperto di Urban. In costruzione.</p>
+      <span class="btn btn-ghost">In sviluppo</span>
+    </a>
+  </div>
+</section>
+{% endblock %}

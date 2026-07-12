@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Duello — Urban{% endblock %}
+{% block body_class %}duello-mode{% endblock %}
+{% block content %}
+<div class="duello-head">
+  <h1 id="d-titolo">DUELLO</h1>
+  <div id="d-round" class="round-chip"></div>
+</div>
+
+<div class="duello-grid">
+  <div class="corner corner-player">
+    <div id="pan-player"></div>
+  </div>
+
+  <div class="ring">
+    <div id="d-log" class="log"></div>
+    <div id="d-azioni" class="azioni"></div>
+  </div>
+
+  <div class="corner corner-cpu">
+    <div id="pan-cpu"></div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='duello.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}{{ c.nome }} — Urban{% endblock %}
+{% block content %}
+<div class="cv">
+  <aside class="cv-side">
+    <div class="cv-avatar">{{ c.nome[:1] }}</div>
+    <h1 class="cv-nome">{{ c.nome }}</h1>
+    <span class="badge badge-{{ stato }}">{{ stato|upper }}</span>
+    <div class="cv-liv">LIVELLO {{ c.livello }}</div>
+
+    <div class="cv-xp">
+      <div class="xp-label">XP {{ c.xp or 0 }} / {{ soglia }}</div>
+      <div class="hpbar"><div class="hpbar-fill pct-hi"
+           style="width: {{ ((c.xp or 0) * 100 / soglia)|round|int }}%"></div></div>
+    </div>
+    <div class="token-box">
+      <span class="token-sfera">🧬</span>
+      <span>Token: <b>{{ c.token or 0 }}</b></span>
+    </div>
+
+    <dl class="cv-anagrafica">
+      <dt>Data di nascita</dt><dd>{{ c.data_nascita or "—" }}</dd>
+      <dt>Bio</dt><dd>{{ c.bio or "—" }}</dd>
+      <dt>Movimento</dt><dd>standard</dd>
+      <dt>Record</dt><dd>{{ c.vittorie }}V — {{ c.sconfitte }}S</dd>
+      <dt>Toughness</dt><dd>{{ c.toughness or 0 }}</dd>
+      {% if recupero %}
+      <dt>Recupero stimato</dt><dd>~{{ recupero // 60 }}h {{ recupero % 60 }}m</dd>
+      {% endif %}
+    </dl>
+    <a class="btn btn-ghost" href="{{ url_for('box') }}">← Torna al box</a>
+  </aside>
+
+  <section class="cv-main">
+    <h2>Condizioni fisiche</h2>
+    <div class="loc-grid">
+      {% for loc, mx in LOCAZIONI.items() %}
+      {% set hp = c.hp[loc] %}
+      {% set pct = ((hp if hp > 0 else 0) * 100 / mx)|round|int %}
+      <div class="loc-row">
+        <span class="loc-nome">{{ loc.replace('_', ' ') }}
+          {% if loc in c.crippled %}<span class="danger">CRIPPLED</span>{% endif %}
+        </span>
+        <div class="hpbar">
+          <div class="hpbar-fill pct-{{ 'hi' if pct > 60 else ('mid' if pct > 30 else 'low') }}"
+               style="width: {{ pct }}%"></div>
+        </div>
+        <span class="loc-val {{ 'danger' if hp <= 0 }}">{{ hp }}/{{ mx }}</span>
+      </div>
+      {% endfor %}
+    </div>
+
+    <h2>Statistiche</h2>
+    <div class="stat-grid">
+      {% for s in STATS %}
+      <div class="stat-cell">
+        <div class="stat-nome">{{ s }}</div>
+        <div class="pips">
+          {% for i in range(1, 5) %}<span class="pip {{ 'full' if i <= c.stats[s] }}"></span>{% endfor %}
+        </div>
+        <div class="stat-dado">D{{ DADI[c.stats[s]] }}</div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <h2>Skill</h2>
+    <div class="stat-grid">
+      {% for s in SKILLS %}
+      <div class="stat-cell">
+        <div class="stat-nome">{{ s.replace('_', ' ') }}</div>
+        <div class="pips">
+          {% for i in range(1, 5) %}<span class="pip {{ 'full' if i <= c.skills.get(s, 0) }}"></span>{% endfor %}
+        </div>
+        <div class="stat-dado muted">
+          {% if c.skills.get(s, 0) %}D{{ DADI[c.skills[s]] }}{% else %}usa {{ FALLBACK.get(s, 'fisico') }}{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <h2>Poteri</h2>
+    {% if not poteri %}
+      <p class="muted">Nessun potere.</p>
+    {% else %}
+      <div class="poteri-list">
+        {% for pw in poteri %}
+        <div class="potere-row">
+          <span class="potere-nome">{{ pw.nome }}</span>
+          <span class="badge badge-rango">RANGO {{ pw.rango }}</span>
+          <p class="muted">{{ pw.descrizione }}</p>
+        </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <h2>Equipaggiamento</h2>
+    {% if not equip %}
+      <p class="muted">Nessun oggetto. Passa dal <a href="{{ url_for('negozio') }}">negozio</a>.</p>
+    {% else %}
+      <div class="poteri-list">
+        {% for e in equip %}
+        <div class="potere-row">
+          <span class="potere-nome">{{ e.nome }}</span>
+          <p class="muted">{{ e.descrizione }}</p>
+        </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <h2>Level up</h2>
+    {% if not (c.token or 0) %}
+      <p class="muted">Nessun Token 🧬 disponibile: vinci combattimenti per guadagnare XP e salire di livello.</p>
+    {% endif %}
+    <p class="muted">Un Token 🧬 per level up. Il costo raddoppia a ogni grado (1, 2, 4).
+      Il rango di un potere non può superare il rango di controllo.</p>
+    <div class="upgrade-grid">
+      {% for u in upgrades %}
+      <form method="post" action="{{ url_for('personaggio_upgrade', pid=c.id) }}" class="upgrade-row">
+        <input type="hidden" name="tipo" value="{{ u.tipo }}">
+        <input type="hidden" name="nome" value="{{ u.nome }}">
+        <span class="upg-label">{{ u.label }} <span class="muted">r{{ u.rango }} → r{{ u.rango + 1 }}</span></span>
+        <button class="btn btn-ghost upg-btn" {{ '' if u.ok and (c.token or 0) >= u.costo else 'disabled' }}
+                title="{{ u.motivo }}">
+          {{ u.costo }} 🧬{% if u.motivo %} — {{ u.motivo }}{% endif %}
+        </button>
+      </form>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+{% endblock %}

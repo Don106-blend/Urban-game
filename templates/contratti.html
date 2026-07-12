@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Contratti — Urban{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>CONTRATTI</h1>
+  <p class="muted">Combattenti liberi in cerca di ingaggio. Scegli con cura: il talento costa.</p>
+  <form method="post" action="{{ url_for('contratti_rinnova') }}">
+    <button class="btn btn-ghost">↻ Nuovi contratti</button>
+  </form>
+</div>
+
+<div class="card-grid">
+  {% for c in contratti %}
+  <div class="fighter-card contract">
+    <div class="fc-top">
+      <span class="fc-nome">{{ c.nome }}</span>
+      <span class="costo">¤ {{ c.costo }}</span>
+    </div>
+    <div class="fc-liv">Nato/a: {{ c.data_nascita }}</div>
+    <div class="mini-stats">
+      {% for s in STATS %}
+      <div class="mini-stat">
+        <span>{{ s[:3] }}</span>
+        <div class="pips small">
+          {% for i in range(1, 5) %}<span class="pip {{ 'full' if i <= c.stats[s] }}"></span>{% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="fc-poteri">
+      {% if c.poteri %}
+        {% for pw in c.poteri %}
+          {% set pd = (DB.poteri | selectattr("id", "equalto", pw.id) | list | first) %}
+          <span class="badge badge-rango">{{ pd.nome if pd else '?' }} r{{ pw.rango }}</span>
+        {% endfor %}
+      {% else %}
+        <span class="muted">Nessun potere</span>
+      {% endif %}
+    </div>
+    <form method="post" action="{{ url_for('contratti_ingaggia', idx=loop.index0) }}">
+      <button class="btn btn-volt full" {{ 'disabled' if crediti < c.costo }}>
+        {{ 'Ingaggia' if crediti >= c.costo else 'Crediti insufficienti' }}
+      </button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}
