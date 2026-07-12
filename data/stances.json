@@ -271,10 +271,11 @@
     "descrizione": "In volo: le mosse non a distanza non ti raggiungono.",
     "attivo_default": false,
     "durata": {
-      "tipo": "contrapposta"
+      "tipo": "fissa",
+      "turni": 4
     },
     "trigger": "attivo",
-    "cooldown_turni": 0,
+    "cooldown_turni": 4,
     "usi_limitati": false,
     "usi_massimi": 1,
     "modificatori": [

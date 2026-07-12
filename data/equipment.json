@@ -3,7 +3,19 @@
     "id": 1,
     "nome": "Pistola",
     "descrizione": "Una pistola comune.",
-    "valore": 50,
-    "attacchi": [2]
+    "valore": 500,
+    "attacchi": [
+      2
+    ]
+  },
+  {
+    "nome": "Spada",
+    "descrizione": "",
+    "valore": 150,
+    "attacchi": [
+      48,
+      49
+    ],
+    "id": 2
   }
 ]

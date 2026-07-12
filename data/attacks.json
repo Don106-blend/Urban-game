@@ -32,7 +32,7 @@
     "ranged": true,
     "can_aim": true,
     "can_dodge": true,
-    "attivo_default": true,
+    "attivo_default": false,
     "split_danni": false,
     "tipo_danno": "perforante",
     "skill_colpire": null,
@@ -40,7 +40,7 @@
       "dadi": [
         {
           "n": 2,
-          "tipo": "d6"
+          "tipo": "d8"
         }
       ],
       "flat": 0,
@@ -217,13 +217,21 @@
     "tipo_danno": "fuoco",
     "skill_colpire": "controllo",
     "danno": {
-      "dadi": [],
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "controllo"
+        }
+      ],
       "flat": 0,
-      "mult": 10
+      "mult": 5
     },
     "sostituisce": null,
     "effetti_applicati": [],
-    "id": 9
+    "id": 9,
+    "cooldown_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1
   },
   {
     "nome": "Fulmine",
@@ -1316,6 +1324,72 @@
     "sostituisce": null,
     "effetti_applicati": [],
     "cooldown_turni": 2,
+    "usi_limitati": false,
+    "usi_massimi": 1
+  },
+  {
+    "nome": "Colpo di lama",
+    "descrizione": "2d6",
+    "ranged": false,
+    "can_aim": true,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": false,
+    "tipo_danno": "taglio",
+    "skill_colpire": "armi_corpo_a_corpo",
+    "danno": {
+      "dadi": [
+        {
+          "n": 2,
+          "tipo": "d6"
+        }
+      ],
+      "flat": 0,
+      "mult": 1
+    },
+    "sostituisce": null,
+    "effetti_applicati": [
+      {
+        "effetto": 3,
+        "turni": 2,
+        "persistente": false
+      }
+    ],
+    "id": 48,
+    "cooldown_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1
+  },
+  {
+    "nome": "affondo di lama",
+    "descrizione": "2d6",
+    "ranged": false,
+    "can_aim": true,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": false,
+    "tipo_danno": "perforante",
+    "skill_colpire": "armi_corpo_a_corpo",
+    "danno": {
+      "dadi": [
+        {
+          "n": 2,
+          "tipo": "d6"
+        }
+      ],
+      "flat": 0,
+      "mult": 1
+    },
+    "sostituisce": null,
+    "effetti_applicati": [
+      {
+        "effetto": 3,
+        "turni": 2,
+        "persistente": false
+      }
+    ],
+    "id": 49,
+    "cooldown_turni": 0,
     "usi_limitati": false,
     "usi_massimi": 1
   }
