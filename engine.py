@@ -61,7 +61,8 @@ def carica_db():
     """Tutti i database di gioco in un dict."""
     return {"attacchi": carica("attacks.json"), "poteri": carica("powers.json"),
             "stances": carica("stances.json"), "effetti": carica("effects.json"),
-            "equip": carica("equipment.json")}
+            "equip": carica("equipment.json"), "armor": carica("armor.json"),
+            "protesi": carica("protesi.json"), "augments": carica("augments.json")}
 
 
 # skill definite in data/skills.json: nome + statistica di ripiego se il rango è 0
@@ -136,6 +137,13 @@ class Personaggio:
         self.mira = None       # locazione mirata per il prossimo attacco
         self.mira_bonus = False  # True (es. Supersoldato): mirare costa 1 bonus invece di 1 azione
         self.stamina = None    # inizializzata a inizio combattimento (init_stamina)
+        # protesi/augment/EMP
+        self.protesi_locazioni = set()  # locazioni sostituite da protesi: mai CRIPPLED, +10 vs elettrico
+        self.augments = []          # [{"def": augment, "rango": 1, "attivo": bool}], come i poteri
+        self.augment_stato = {}     # id augment -> {"usi_rimasti": int|None}
+        self.emp_turni = 0          # >0: augment disattivati, attacchi/stance da protesi inutilizzabili
+        self.attacchi_protesi = set()  # id attacco sbloccati da una protesi (bersaglio dell'EMP)
+        self.stance_protesi = set()    # id stance sbloccate da una protesi (bersaglio dell'EMP)
 
     # ---------- dadi ----------
     def _mod_rango(self, tipo, target):
@@ -281,6 +289,9 @@ class Personaggio:
         if self.immune(tipo_danno):
             return [f"{self.nome} è immune ai danni di tipo {tipo_danno}!"]
         righe = []
+        if not split and tipo_danno == "elettrico" and loc in self.protesi_locazioni and danno > 0:
+            danno += 10
+            righe.append("Debolezza elettrica della protesi: +10 danni.")
         if self.ha_debolezza(tipo_danno) and danno > 0:
             extra = danno // 2
             danno += extra
@@ -325,8 +336,8 @@ class Personaggio:
                     righe.append(f"{loc} è a 0: -{meta} all'arto ({self.hp[loc]} hp), "
                                  f"-{quota} a ciascuna altra locazione.")
         for l in self.hp:
-            if l in ("testa", "busto"):
-                continue
+            if l in ("testa", "busto") or l in self.protesi_locazioni:
+                continue  # una protesi non va mai in CRIPPLED
             if self.hp[l] <= -self.hp_max[l] and l not in self.crippled:
                 self.crippled.add(l)
                 righe.append(f"{l} è CRIPPLED!")
@@ -342,7 +353,7 @@ class Personaggio:
         """Aggiunge effetti nel tempo (specs: [{"effetto": id, "turni": n, "persistente": bool}]).
         loc = locazione colpita, usata dagli effetti non-split per il tick.
         persistente = dura finché la fonte (il potere) resta attiva: turni -1.
-        "cancella_stance" è istantaneo: non si aggiunge a effetti_attivi."""
+        "cancella_stance" ed "emp" sono istantanei: non si aggiungono a effetti_attivi."""
         righe = []
         for sp in specs:
             edef = next((e for e in db_effetti if e["id"] == sp.get("effetto")), None)
@@ -350,6 +361,9 @@ class Personaggio:
                 continue
             if edef.get("tipo") == "cancella_stance":
                 righe += self.cancella_stance_attiva()
+                continue
+            if edef.get("tipo") == "emp":
+                righe += self.applica_emp(sp.get("turni", 2))
                 continue
             turni = -1 if sp.get("persistente") else sp.get("turni", 1)
             self.effetti_attivi.append({"def": edef, "turni": turni, "loc": loc,
@@ -363,6 +377,8 @@ class Personaggio:
         mod_rango/flat_risultato/colpire sono controllati live (come le stance), non qui:
         solo "azioni" va applicato esplicitamente perché le risorse del turno sono un pool."""
         righe = []
+        if self.emp_turni > 0:
+            self.emp_turni -= 1
         for stato in list(self.stance_stato.values()) + list(self.attacco_stato.values()):
             if stato["cooldown"] > 0:  # cooldown residui da turni precedenti
                 stato["cooldown"] -= 1
@@ -397,6 +413,10 @@ class Personaggio:
                     self.azioni = max(0, self.azioni + m.get("azioni", 0))
                     self.bonus = max(0, self.bonus + m.get("bonus", 0))
                     self.risposte = max(0, self.risposte + m.get("risposte", 0))
+                elif m["tipo"] == "stamina_mod" and self.stamina is not None:
+                    delta = m.get("delta", 0)
+                    self.stamina = max(0, min(self.stamina_max(), self.stamina + delta))
+                    righe.append(f"Stamina {delta:+d} ({self.stamina}/{self.stamina_max()}).")
             if e["turni"] < 0:  # persistente: dura finché il potere-fonte resta attivo
                 continue
             e["turni"] -= 1
@@ -409,27 +429,46 @@ class Personaggio:
             st["turni"] -= 1
             if st["turni"] <= 0:
                 righe += self._termina_stance(st)
+        righe += self._tick_augment_durata()
         righe += self._tick_stamina()
         return righe
 
+    def _tick_augment_durata(self):
+        """Gli augment Attivi con una durata impostata si spengono da soli allo scadere."""
+        righe = []
+        for slot in list(self.augments):
+            if not slot["attivo"] or slot.get("turni_rimasti") is None:
+                continue
+            slot["turni_rimasti"] -= 1
+            if slot["turni_rimasti"] <= 0:
+                righe.append(f"{slot['def']['nome']} esaurisce la sua durata.")
+                righe += self.disattiva_potere(slot)
+        return righe
+
+    def _costo_stamina(self, slot, e_potere):
+        return slot["rango"] if e_potere else slot["def"].get("costo_stamina", 1)
+
     def _tick_stamina(self):
-        """I poteri attivi consumano stamina pari al proprio rango a ogni tuo turno.
-        Se la stamina non basta, i poteri si spengono da soli (dal rango più alto)."""
+        """I poteri attivi consumano stamina pari al proprio rango; gli augment Attivi
+        quella fissa impostata nell'editor (i Passivi non costano nulla). Se non basta,
+        si spengono da soli (il più costoso per primo)."""
         if self.stamina is None:
             self.init_stamina()
-        attivi = [s for s in self.poteri if s["attivo"]]
+        attivi = [(s, True) for s in self.poteri if s["attivo"]] + \
+                 [(s, False) for s in self.augments
+                  if s["attivo"] and s["def"].get("attivo", True)]
         if not attivi:
             return []
         righe = []
-        drain = sum(s["rango"] for s in attivi)
+        drain = sum(self._costo_stamina(s, ep) for s, ep in attivi)
         self.stamina -= drain
         righe.append(f"Stamina: -{drain} ({max(self.stamina, 0)}/{self.stamina_max()}).")
         while self.stamina < 0 and attivi:
-            peggiore = max(attivi, key=lambda s: s["rango"])
+            peggiore, ep = max(attivi, key=lambda t: self._costo_stamina(*t))
             righe.append(f"{self.nome} è esausto: {peggiore['def']['nome']} si spegne.")
             righe += self.disattiva_potere(peggiore)
-            attivi.remove(peggiore)
-            self.stamina += peggiore["rango"]  # quel potere non drena più questo turno
+            attivi.remove((peggiore, ep))
+            self.stamina += self._costo_stamina(peggiore, ep)
         self.stamina = max(0, self.stamina)
         return righe
 
@@ -474,6 +513,8 @@ class Personaggio:
         })
 
     def puo_usare_attacco(self, att):
+        if self.emp_turni > 0 and att["id"] in self.attacchi_protesi:
+            return False  # EMP: la protesi che sblocca questa mossa è fuori uso
         stato = self.stato_attacco(att)
         if stato["cooldown"] > 0:
             return False
@@ -501,6 +542,8 @@ class Personaggio:
         return next((st for st in self.stance_attive if st["turni"] >= 0), None)
 
     def puo_attivare_stance(self, sdef):
+        if self.emp_turni > 0 and sdef["id"] in self.stance_protesi:
+            return False  # EMP: la protesi che sblocca questa stance è fuori uso
         if self.stance_manuale_attiva() is not None:
             return False  # una sola stance attiva per volta
         stato = self.stato_stance(sdef)
@@ -564,6 +607,112 @@ class Personaggio:
         for st in list(self.stance_attive):
             if st["def"].get("trigger", "attivo") == evento:
                 righe += self._applica_effetti_stance(st["def"], avversario, db_effetti)
+        return righe
+
+    # ---------- equipaggiamento permanente (armatura/protesi) ----------
+    def equipaggia_armatura(self, armor, db_stances, db_effetti):
+        """Applica un'armatura indossata: hp extra sulle locazioni coperte, resistenze,
+        stance sbloccate/attivate permanentemente. Niente toggle: dura tutto il duello."""
+        righe = [f"{self.nome} indossa {armor['nome']}."]
+        amt = armor.get("armatura_hp", 0)
+        for loc in armor.get("locazioni", []):
+            if loc in self.armatura:
+                self.armatura[loc] += amt
+        if amt:
+            righe.append(f"Armatura +{amt} su {', '.join(armor.get('locazioni', []))}.")
+        for r in armor.get("resistenze", []):
+            t, v = r.get("tipo_danno", "contundente"), r.get("valore", 0)
+            self.resistenze[t] = self.resistenze.get(t, 0) + v
+            righe.append(f"Resistenza {t} +{v}.")
+        for sid in armor.get("stance", []):
+            sdef = next((x for x in db_stances if x["id"] == sid), None)
+            if sdef and all(x["id"] != sid for x in self.stance_conosciute):
+                self.stance_conosciute.append(sdef)
+                righe.append(f"Stance appresa: {sdef['nome']}.")
+        for sid in armor.get("stance_attivate", []):
+            sdef = next((x for x in db_stances if x["id"] == sid), None)
+            if sdef is None:
+                continue
+            if all(x["id"] != sid for x in self.stance_conosciute):
+                self.stance_conosciute.append(sdef)
+            if all(x["def"]["id"] != sid for x in self.stance_attive):
+                self.stance_attive.append({"def": sdef, "turni": -1})
+                righe.append(f"Stance {sdef['nome']} attiva (armatura).")
+        righe += self.applica_effetti(armor.get("effetti_nel_tempo", []), db_effetti)
+        return righe
+
+    def equipaggia_protesi(self, protesi, db_attacchi, db_stances, db_effetti):
+        """Sostituisce completamente una locazione: hp/hp_max personalizzati, mai CRIPPLED,
+        debole all'elettrico. Sblocca attacchi/stance come farebbe un potere, ma per sempre."""
+        loc = protesi["locazione"]
+        hp = protesi.get("hp", 100)
+        self.hp[loc] = hp
+        self.hp_max[loc] = hp
+        self.protesi_locazioni.add(loc)
+        righe = [f"{self.nome} monta {protesi['nome']} ({loc}, {hp} hp)."]
+        for aid in protesi.get("attacchi", []):
+            att = next((x for x in db_attacchi if x["id"] == aid), None)
+            if att and all(x["id"] != att["id"] for x in self.attacchi):
+                self.attacchi.append(att)
+                self.attacchi_protesi.add(att["id"])
+                righe.append(f"Sbloccato: {att['nome']}.")
+        for sid in protesi.get("stance", []):
+            sdef = next((x for x in db_stances if x["id"] == sid), None)
+            if sdef and all(x["id"] != sid for x in self.stance_conosciute):
+                self.stance_conosciute.append(sdef)
+                self.stance_protesi.add(sid)
+                righe.append(f"Stance appresa: {sdef['nome']}.")
+        for sid in protesi.get("stance_attivate", []):
+            sdef = next((x for x in db_stances if x["id"] == sid), None)
+            if sdef is None:
+                continue
+            self.stance_protesi.add(sid)
+            if all(x["id"] != sid for x in self.stance_conosciute):
+                self.stance_conosciute.append(sdef)
+            if all(x["def"]["id"] != sid for x in self.stance_attive):
+                self.stance_attive.append({"def": sdef, "turni": -1})
+                righe.append(f"Stance {sdef['nome']} attiva (protesi).")
+        righe += self.applica_effetti(protesi.get("effetti_nel_tempo", []), db_effetti)
+        return righe
+
+    # ---------- EMP ----------
+    def applica_emp(self, turni):
+        """Disattiva gli augment (attivi o passivi) e blocca temporaneamente le mosse/stance
+        sbloccate dalle protesi, per X turni."""
+        self.emp_turni = max(self.emp_turni, turni)
+        righe = [f"{self.nome} è colpito da un EMP! Augment fuori uso per {turni} turni."]
+        for slot in self.augments:
+            if slot["attivo"]:
+                righe += self.disattiva_potere(slot)
+        return righe
+
+    # ---------- augment ----------
+    def stato_augment(self, aug):
+        """Stato persistente (utilizzi) di un augment per questo personaggio."""
+        aid = aug.get("id", id(aug))
+        return self.augment_stato.setdefault(aid, {
+            "usi_rimasti": aug.get("usi_massimi", 1) if aug.get("usi_limitati") else None,
+        })
+
+    def puo_attivare_augment(self, slot):
+        if self.emp_turni > 0:
+            return False  # EMP: gli augment sono fuori uso
+        if not self.puo_attivare_potere(slot):
+            return False
+        stato = self.stato_augment(slot["def"])
+        return stato["usi_rimasti"] is None or stato["usi_rimasti"] > 0
+
+    def attiva_augment(self, slot, db_attacchi, db_stances, db_effetti):
+        """Un augment Attivo è meccanicamente un potere: stesso attiva_potere(), più
+        un tetto di utilizzi e una durata (turni) impostati nell'editor (non dal rango)."""
+        if not self.puo_attivare_augment(slot):
+            return [f"{slot['def']['nome']} non è attivabile ora."]
+        stato = self.stato_augment(slot["def"])
+        if stato["usi_rimasti"] is not None:
+            stato["usi_rimasti"] -= 1
+        righe = self.attiva_potere(slot, db_attacchi, db_stances, db_effetti)
+        durata = slot["def"].get("durata_turni") or 0
+        slot["turni_rimasti"] = durata if durata > 0 else None
         return righe
 
     # ---------- poteri ----------
@@ -806,6 +955,12 @@ def valuta(p):
     """Punteggio di forza approssimativo di un personaggio, per il matchmaking."""
     return (3 * sum(p.stats.values()) + 2 * sum(p.skills.values())
             + 5 * sum(s["rango"] for s in p.poteri))
+
+
+def umanita_max(p):
+    """Umanità totale: (rango mente + rango sociale) * 2. Limita quanta augment/protesi
+    (costo_umanita) si possono installare: non si può mai andare in negativo."""
+    return (p.stats["mente"] + p.stats["sociale"]) * 2
 
 
 def scheda(p, attivo=False, cpu=False):

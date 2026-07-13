@@ -1392,5 +1392,38 @@
     "cooldown_turni": 0,
     "usi_limitati": false,
     "usi_massimi": 1
+  },
+  {
+    "id": 50,
+    "nome": "EMP",
+    "descrizione": "Un impulso elettromagnetico: danni elettrici e mette fuori uso augment e protesi.",
+    "ranged": true,
+    "can_aim": false,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": false,
+    "tipo_danno": "elettrico",
+    "skill_colpire": "controllo",
+    "danno": {
+      "dadi": [
+        {
+          "n": 1,
+          "tipo": "controllo"
+        }
+      ],
+      "flat": 0,
+      "mult": 15
+    },
+    "sostituisce": null,
+    "effetti_applicati": [
+      {
+        "effetto": 16,
+        "turni": 3
+      }
+    ],
+    "cooldown_turni": 4,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "colpi": 1
   }
 ]

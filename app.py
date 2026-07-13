@@ -70,15 +70,37 @@ STATO = carica_stato()
 
 
 # ---------------------------------------------------------------- personaggi persistenti
+MAX_ARMI = 2  # slot arma nell'inventario di un eroe
+
+
 def nuovo_record(p):
     """Personaggio del motore -> record salvabile."""
     return {"id": None, "nome": p.nome, "data_nascita": p.data_nascita,
             "bio": p.bio, "stats": dict(p.stats), "skills": dict(p.skills),
             "poteri": [{"id": s["def"]["id"], "rango": s["rango"]} for s in p.poteri],
             "hp": dict(p.hp), "crippled": sorted(p.crippled),
-            "livello": 1, "xp": 0, "token": 0, "toughness": 0, "equip": [],
+            "livello": 1, "xp": 0, "token": 0, "toughness": 0,
+            "armi": [], "armatura_equip": None, "protesi": [], "augments": [],
             "vittorie": 0, "sconfitte": 0, "morto": False,
             "last_heal": time.time()}
+
+
+def umanita_max_record(c):
+    """(rango mente + rango sociale) * 2 — letto direttamente dal record, senza
+    dover costruire un Personaggio completo solo per due statistiche."""
+    return (c["stats"].get("mente", 1) + c["stats"].get("sociale", 1)) * 2
+
+
+def umanita_usata(c):
+    """Umanità già spesa in protesi/augment installati (il limite è umanita_max())."""
+    tot = 0
+    for pid in c.get("protesi", []):
+        pr = next((x for x in DB["protesi"] if x["id"] == pid), None)
+        tot += (pr or {}).get("costo_umanita", 0)
+    for aid in c.get("augments", []):
+        ag = next((x for x in DB["augments"] if x["id"] == aid), None)
+        tot += (ag or {}).get("costo_umanita", 0)
+    return tot
 
 
 def record_to_pg(c):
@@ -93,13 +115,31 @@ def record_to_pg(c):
         pd = next((x for x in DB["poteri"] if x["id"] == pw["id"]), None)
         if pd:
             p.poteri.append({"def": pd, "rango": pw["rango"], "attivo": False})
-    # gli attacchi sbloccati dall'equipaggiamento posseduto (es. Pistola)
-    for eid in c.get("equip", []):
+    # armi (fino a 2 slot): sbloccano attacchi (es. Pistola). "equip" = vecchi salvataggi.
+    for eid in c.get("armi", c.get("equip", []))[:MAX_ARMI]:
         eq = next((x for x in DB["equip"] if x["id"] == eid), None)
         for aid in (eq or {}).get("attacchi", []):
             att = next((x for x in DB["attacchi"] if x["id"] == aid), None)
             if att and all(x["id"] != att["id"] for x in p.attacchi):
                 p.attacchi.append(att)
+    # armatura (1 slot): hp extra, resistenze, stance — permanente per tutto il duello
+    if c.get("armatura_equip"):
+        arm = next((x for x in DB["armor"] if x["id"] == c["armatura_equip"]), None)
+        if arm:
+            p.equipaggia_armatura(arm, DB["stances"], DB["effetti"])
+    # protesi: sostituiscono la locazione, sbloccano attacchi/stance permanentemente
+    for pid in c.get("protesi", []):
+        pr = next((x for x in DB["protesi"] if x["id"] == pid), None)
+        if pr:
+            p.equipaggia_protesi(pr, DB["attacchi"], DB["stances"], DB["effetti"])
+    # augment: i passivi sono sempre attivi da subito; gli attivi restano pronti da innescare
+    for aid in c.get("augments", []):
+        ad = next((x for x in DB["augments"] if x["id"] == aid), None)
+        if ad:
+            slot = {"def": ad, "rango": 1, "attivo": False}
+            p.augments.append(slot)
+            if not ad.get("attivo", True):
+                p.attiva_potere(slot, DB["attacchi"], DB["stances"], DB["effetti"])
     p.livello = c.get("livello", 1)
     return p
 
@@ -233,7 +273,8 @@ def pannello(p, turno):
     return {
         "nome": p.nome, "turno": turno, "sconfitto": p.sconfitto(),
         "hp": {l: {"val": p.hp[l], "max": p.hp_max[l], "arm": p.armatura.get(l, 0),
-                   "crippled": l in p.crippled} for l in p.hp},
+                   "crippled": l in p.crippled, "protesi": l in p.protesi_locazioni}
+               for l in p.hp},
         "risorse": {"azioni": p.azioni, "n_azioni": p.n_azioni,
                     "bonus": p.bonus, "n_bonus": p.n_bonus,
                     "risposte": p.risposte, "n_risposte": p.n_risposte,
@@ -242,6 +283,9 @@ def pannello(p, turno):
         "stats": {s: p.stats[s] for s in STATS},
         "poteri": [{"id": s["def"]["id"], "nome": s["def"]["nome"],
                     "rango": s["rango"], "attivo": s["attivo"]} for s in p.poteri],
+        "augments": [{"id": s["def"]["id"], "nome": s["def"]["nome"],
+                     "attivo": s["attivo"], "passivo": not s["def"].get("attivo", True)}
+                    for s in p.augments],
         "stance": [{"id": s["id"], "nome": s["nome"],
                     "turni": next((x["turni"] for x in p.stance_attive
                                    if x["def"]["id"] == s["id"]), None),
@@ -250,6 +294,7 @@ def pannello(p, turno):
                    for s in p.stance_conosciute],
         "effetti": [{"nome": e["def"]["nome"], "turni": e["turni"]}
                     for e in p.effetti_attivi],
+        "emp_turni": p.emp_turni,
     }
 
 
@@ -429,10 +474,22 @@ class DuelloWeb:
         self.scriv(f"▸ Turno di {self.attivo.nome}", "turno")
         for r in self.attivo.tick_turno():
             self.scriv("  " + r)
+        self._riattiva_augment_passivi(self.attivo)
         self._traccia_hp_minimo()  # copre anche i danni nel tempo (DoT)
         self.check_sconfitta(self.attivo, self.altro)
         if not self.finito:
             self.fase = "player" if self.attivo is self.p else "cpu"
+
+    def _riattiva_augment_passivi(self, chi):
+        """Un augment Passivo resta sempre acceso: se un EMP l'ha appena spento e
+        ora è finito (emp_turni tornato a 0), lo riaccende in automatico.
+        Idempotente: sugli augment già attivi non fa nulla."""
+        if chi.emp_turni > 0:
+            return
+        for slot in chi.augments:
+            if not slot["def"].get("attivo", True) and not slot["attivo"]:
+                for r in chi.attiva_potere(slot, DB["attacchi"], DB["stances"], DB["effetti"]):
+                    self.scriv("  " + r)
 
     def fine_turno(self):
         if self.idx == 0:
@@ -532,6 +589,17 @@ class DuelloWeb:
             self.usato_potere = True
         self._hype(4)
 
+    def usa_augment(self, chi, slot):
+        if not chi.puo_attivare_augment(slot):
+            self.scriv(f"{slot['def']['nome']} non è attivabile ora.")
+            return
+        chi.azioni -= 1
+        for r in chi.attiva_augment(slot, DB["attacchi"], DB["stances"], DB["effetti"]):
+            self.scriv(r)
+        if chi is self.p:
+            self.usato_potere = True  # un augment è meccanicamente un potere
+        self._hype(4)
+
     def usa_stance(self, chi, sdef, avversario):
         chi.bonus -= 1
         for r in chi.attiva_stance(sdef, avversario, DB["effetti"]):
@@ -544,15 +612,26 @@ class DuelloWeb:
         a.consuma_attacco(att)
         mirata = a.mira if att.get("can_aim") else None
         a.mira = None
-        loc = mirata if mirata in d.hp else random.choice(list(d.hp))
+        colpi = max(1, att.get("colpi", 1))
+        anteprima = mirata if mirata in d.hp else random.choice(list(d.hp))
         self.scriv(f"{a.nome} usa {att['nome']} su {d.nome}"
-                   + (f", mirando a {loc}." if mirata else f" (locazione casuale: {loc})."))
+                   + (f", mirando a {anteprima}." if mirata else f" (locazione casuale: {anteprima}).")
+                   + (f" — {colpi} colpi!" if colpi > 1 else ""))
         # chi è anch'esso in volo raggiunge un bersaglio in volo pure in mischia
         if (not att.get("ranged") and d.ha_flag("immune_melee")
                 and not a.ha_flag("immune_melee")):
             self.scriv(f"{d.nome} è in volo: le mosse non a distanza non lo raggiungono!",
                        "immune")
             return
+        self._tira_colpo(att, mirata, colpi)
+
+    def _tira_colpo(self, att, mirata, colpi_rimasti):
+        """Un tiro per colpire (il primo, o l'ennesimo di un attacco a colpi multipli).
+        Ogni colpo ripete l'intero contrapposto: se il difensore ha già speso le sue
+        risposte su un colpo precedente, i successivi si limitano a "nessuna risposta"
+        e vanno a segno in automatico — colpi multipli premiano chi esaurisce l'avversario."""
+        a, d = self.attivo, self.altro
+        loc = mirata if mirata in d.hp else random.choice(list(d.hp))
         skill = att.get("skill_colpire") or ("armi_distanza" if att.get("ranged")
                                              else "armi_corpo_a_corpo")
         pen_mira = 4 if mirata else 0
@@ -560,7 +639,9 @@ class DuelloWeb:
         ta = a.tira(skill, d) + mod
         td = d.tira("riflessi", a) + pen_mira
         patta = ta == td
-        self.scriv(f"Tiro per colpire: {ta} ({skill}"
+        tot = att.get("colpi", 1)
+        etichetta = f" [colpo {tot - colpi_rimasti + 1}/{tot}]" if tot > 1 else ""
+        self.scriv(f"Tiro per colpire{etichetta}: {ta} ({skill}"
                    + (f", {mod:+d} da stance" if mod else "") + f") contro {td} (riflessi"
                    + (f" +{pen_mira} mira" if pen_mira else "") + ")."
                    + (" Patta!" if patta else ""))
@@ -569,6 +650,7 @@ class DuelloWeb:
             self._hype(-2)
             for r in a.scatta_trigger("manchi", d, DB["effetti"]):
                 self.scriv("  " + r)
+            self._continua_o_fine(att, mirata, colpi_rimasti)
             return
         opzioni = ["nessuna risposta"]
         if d.risposte > 0:
@@ -578,7 +660,7 @@ class DuelloWeb:
             if att.get("can_dodge") and d.puo_schivare():
                 opzioni.append("schivata")
         self.pending = {"att": att, "ta": ta, "pen_mira": pen_mira, "loc": loc,
-                        "opzioni": opzioni}
+                        "opzioni": opzioni, "mirata": mirata, "colpi_rimasti": colpi_rimasti}
         if d is self.cpu:
             # la CPU preferisce difendersi quando può, invece di scegliere a caso
             # (v. feedback "non ha schivato quando poteva farlo")
@@ -596,10 +678,21 @@ class DuelloWeb:
         else:
             self.fase = "risposta"
 
+    def _continua_o_fine(self, att, mirata, colpi_rimasti):
+        """Dopo che un colpo si è risolto (a segno o mancato): se l'attacco ne ha
+        altri in coda tira il prossimo, altrimenti il turno torna disponibile."""
+        if self.finito:
+            return
+        if colpi_rimasti > 1:
+            self._tira_colpo(att, mirata, colpi_rimasti - 1)
+        else:
+            self.fase = "player" if self.attivo is self.p else "cpu"
+
     def risolvi_risposta(self, scelta, loc_parata=None):
         pend, self.pending = self.pending, None
         a, d = self.attivo, self.altro
         att, ta, pen_mira, loc = pend["att"], pend["ta"], pend["pen_mira"], pend["loc"]
+        mirata, colpi_rimasti = pend.get("mirata"), pend.get("colpi_rimasti", 1)
         tipo_danno = att.get("tipo_danno", "contundente")
         colpito = True
         quota_prima = self.quota_attuale() if self.arena_attiva else None
@@ -652,8 +745,7 @@ class DuelloWeb:
                     self.scriv("  " + r)
             self.check_sconfitta(d, a)
         self._traccia_hp_minimo()
-        if not self.finito:
-            self.fase = "player" if self.attivo is self.p else "cpu"
+        self._continua_o_fine(att, mirata, colpi_rimasti)
 
     # ---------- CPU ----------
     # ---------- resa ----------
@@ -827,6 +919,27 @@ class DuelloWeb:
             a.bonus -= 1
             for r in a.disattiva_potere(slot):
                 self.scriv(r)
+        elif tipo == "augment":
+            slot = next((s for s in a.augments
+                         if s["def"]["id"] == dati.get("id") and not s["attivo"]), None)
+            if slot is None:
+                return "augment non disponibile"
+            if a.azioni < 1:
+                return "azioni esaurite"
+            if not a.puo_attivare_augment(slot):
+                return "augment inutilizzabile (EMP o utilizzi esauriti)"
+            self.usa_augment(a, slot)
+        elif tipo == "disattiva_augment":
+            slot = next((s for s in a.augments
+                         if s["def"]["id"] == dati.get("id") and s["attivo"]
+                         and s["def"].get("attivo", True)), None)
+            if slot is None:
+                return "augment non attivo"
+            if a.bonus < 1:
+                return "azioni bonus esaurite"
+            a.bonus -= 1
+            for r in a.disattiva_potere(slot):
+                self.scriv(r)
         elif tipo == "stance":
             sdef = next((s for s in a.stance_conosciute
                          if s["id"] == dati.get("id")
@@ -861,6 +974,15 @@ class DuelloWeb:
             "poteri_attivi": [{"id": s["def"]["id"], "nome": s["def"]["nome"],
                                "rango": s["rango"], "ok": a.bonus >= 1}
                               for s in a.poteri if s["attivo"]],
+            # solo gli augment Attivi compaiono qui: i Passivi non hanno un bottone,
+            # sono sempre accesi (vedi record_to_pg)
+            "augment": [{"id": s["def"]["id"], "nome": s["def"]["nome"],
+                        "ok": a.azioni >= 1 and a.puo_attivare_augment(s)}
+                       for s in a.augments if s["def"].get("attivo", True) and not s["attivo"]],
+            "augment_attivi": [{"id": s["def"]["id"], "nome": s["def"]["nome"],
+                                "turni_rimasti": s.get("turni_rimasti"), "ok": a.bonus >= 1}
+                               for s in a.augments
+                               if s["attivo"] and s["def"].get("attivo", True)],
             "stance": [{"id": s["id"], "nome": s["nome"],
                         "ok": a.bonus >= 1 and a.puo_attivare_stance(s),
                         "cooldown": a.stato_stance(s)["cooldown"],
@@ -1267,10 +1389,17 @@ def personaggio(pid):
         if pd:
             poteri.append({"id": pw["id"], "nome": pd["nome"], "rango": pw["rango"],
                            "descrizione": pd.get("descrizione", "")})
-    equip = [e for e in DB["equip"] if e["id"] in c.get("equip", [])]
+    armi = [e for e in DB["equip"] if e["id"] in c.get("armi", [])]
+    armatura = next((a for a in DB["armor"] if a["id"] == c.get("armatura_equip")), None)
+    protesi = [{"def": pr, "loc": pr["locazione"]} for pr in DB["protesi"]
+              if pr["id"] in c.get("protesi", [])]
+    augments = [a for a in DB["augments"] if a["id"] in c.get("augments", [])]
     return render_template("personaggio.html", c=c, stato=stato_salute(c),
                            recupero=minuti_recupero(c), poteri=poteri,
-                           upgrades=lista_upgrade(c), equip=equip,
+                           upgrades=lista_upgrade(c), armi=armi, armatura=armatura,
+                           protesi=protesi, augments=augments,
+                           umanita_max=umanita_max_record(c),
+                           umanita_usata=umanita_usata(c), MAX_ARMI=MAX_ARMI,
                            soglia=soglia_xp(c.get("livello", 1)),
                            LOCAZIONI=LOCAZIONI, STATS=STATS, SKILLS=SKILLS,
                            DADI=DADI, FALLBACK=FALLBACK)
@@ -1380,29 +1509,91 @@ def negozio():
     curabili = [c for c in STATO["personaggi"]
                 if not c.get("morto") and stato_salute(c) != "pronto"]
     vivi = [c for c in STATO["personaggi"] if not c.get("morto")]
+    umanita = {c["id"]: (umanita_usata(c), umanita_max_record(c)) for c in vivi}
     return render_template("negozio.html", curabili=curabili, vivi=vivi,
-                           equip=DB["equip"], prezzo_medikit=PREZZO_MEDIKIT)
+                           equip=DB["equip"], armor=DB["armor"], protesi=DB["protesi"],
+                           augments=DB["augments"], umanita=umanita,
+                           max_armi=MAX_ARMI, prezzo_medikit=PREZZO_MEDIKIT)
 
 
 @app.route("/negozio/equip", methods=["POST"])
 def negozio_equip():
+    """Acquista ed equipaggia arma/armatura/protesi/augment (categoria nel form)."""
     pid = request.form.get("pid", type=int)
-    eid = request.form.get("eid", type=int)
+    categoria = request.form.get("categoria")
+    iid = request.form.get("iid", type=int)
     c = trova_record(pid)
-    eq = next((x for x in DB["equip"] if x["id"] == eid), None)
-    if c is None or c.get("morto") or eq is None:
+    catalogo = {"arma": DB["equip"], "armatura": DB["armor"],
+               "protesi": DB["protesi"], "augment": DB["augments"]}.get(categoria)
+    if c is None or c.get("morto") or catalogo is None:
         flash("Acquisto non valido.")
         return redirect(url_for("negozio"))
-    if eid in c.get("equip", []):
-        flash(f"{c['nome']} possiede già {eq['nome']}.")
+    item = next((x for x in catalogo if x["id"] == iid), None)
+    if item is None:
+        flash("Oggetto non valido.")
         return redirect(url_for("negozio"))
-    if STATO["crediti"] < eq.get("valore", 0):
+    if STATO["crediti"] < item.get("valore", 0):
         flash("Crediti insufficienti.")
         return redirect(url_for("negozio"))
-    STATO["crediti"] -= eq.get("valore", 0)
-    c.setdefault("equip", []).append(eid)
+
+    if categoria == "arma":
+        if iid in c.get("armi", []):
+            flash(f"{c['nome']} possiede già {item['nome']}.")
+            return redirect(url_for("negozio"))
+        if len(c.get("armi", [])) >= MAX_ARMI:
+            flash(f"{c['nome']} ha già {MAX_ARMI} armi equipaggiate: rimuovine una prima.")
+            return redirect(url_for("negozio"))
+        c.setdefault("armi", []).append(iid)
+    elif categoria == "armatura":
+        c["armatura_equip"] = iid  # sostituisce quella indossata, se c'era (nessun rimborso)
+    elif categoria == "protesi":
+        occupata = next((p for p in DB["protesi"] if p["id"] in c.get("protesi", [])
+                         and p["locazione"] == item["locazione"]), None)
+        if occupata:
+            flash(f"{c['nome']} ha già una protesi su {item['locazione']}.")
+            return redirect(url_for("negozio"))
+        if umanita_usata(c) + item.get("costo_umanita", 0) > umanita_max_record(c):
+            flash("Umanità insufficiente.")
+            return redirect(url_for("negozio"))
+        c.setdefault("protesi", []).append(iid)
+    else:  # augment
+        if iid in c.get("augments", []):
+            flash(f"{c['nome']} ha già {item['nome']}.")
+            return redirect(url_for("negozio"))
+        if umanita_usata(c) + item.get("costo_umanita", 0) > umanita_max_record(c):
+            flash("Umanità insufficiente.")
+            return redirect(url_for("negozio"))
+        c.setdefault("augments", []).append(iid)
+
+    STATO["crediti"] -= item.get("valore", 0)
     salva_stato()
-    flash(f"{eq['nome']} consegnata a {c['nome']}.")
+    flash(f"{item['nome']} consegnata a {c['nome']}.")
+    return redirect(url_for("negozio"))
+
+
+@app.route("/negozio/disequip", methods=["POST"])
+def negozio_disequip():
+    """Rimuove arma/armatura/protesi/augment equipaggiati. Nessun rimborso."""
+    pid = request.form.get("pid", type=int)
+    categoria = request.form.get("categoria")
+    iid = request.form.get("iid", type=int)
+    c = trova_record(pid)
+    if c is None:
+        flash("Personaggio non valido.")
+        return redirect(url_for("negozio"))
+    if categoria == "arma":
+        c["armi"] = [x for x in c.get("armi", []) if x != iid]
+    elif categoria == "armatura":
+        c["armatura_equip"] = None
+    elif categoria == "protesi":
+        c["protesi"] = [x for x in c.get("protesi", []) if x != iid]
+    elif categoria == "augment":
+        c["augments"] = [x for x in c.get("augments", []) if x != iid]
+    else:
+        flash("Categoria non valida.")
+        return redirect(url_for("negozio"))
+    salva_stato()
+    flash("Rimosso.")
     return redirect(url_for("negozio"))
 
 

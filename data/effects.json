@@ -271,5 +271,38 @@
         "flat": -1
       }
     ]
+  },
+  {
+    "id": 15,
+    "nome": "Stamina_mod",
+    "descrizione": "Modifica la stamina di un delta (negativo = la toglie, positivo = la ricarica).",
+    "tipo": "modificatore",
+    "tipo_danno": "",
+    "split": false,
+    "formula": {
+      "dadi": [],
+      "flat": 0,
+      "mult": 1
+    },
+    "modificatori": [
+      {
+        "tipo": "stamina_mod",
+        "delta": -2
+      }
+    ]
+  },
+  {
+    "id": 16,
+    "nome": "EMP",
+    "descrizione": "Disattiva gli augment (attivi o passivi) e blocca le mosse/stance delle protesi.",
+    "tipo": "emp",
+    "tipo_danno": "",
+    "split": false,
+    "formula": {
+      "dadi": [],
+      "flat": 0,
+      "mult": 1
+    },
+    "modificatori": []
   }
 ]

@@ -136,10 +136,12 @@ async function piazzaScommessa() {
 function renderPannello(dove, p, mira_su) {
   const hp = Object.entries(p.hp).map(([loc, h]) => {
     const pct = Math.max(0, Math.round(h.val * 100 / h.max));
-    const cls = pct > 60 ? "pct-hi" : pct > 30 ? "pct-mid" : "pct-low";
+    // le locazioni con protesi hanno sempre la barra blu (sono cibernetiche,
+    // il colore non segue la tiera hi/mid/low come per la carne)
+    const cls = h.protesi ? "pct-protesi" : pct > 60 ? "pct-hi" : pct > 30 ? "pct-mid" : "pct-low";
     const mirato = loc === mira_su;
     return `<div class="pan-loc${mirato ? " mirato" : ""}">
-      <span>${mirato ? "🎯 " : ""}${loc.replace(/_/g, " ")}${h.crippled ? ' <span class="chip-crip">CR</span>' : ""}</span>
+      <span>${mirato ? "🎯 " : ""}${h.protesi ? "⚙ " : ""}${loc.replace(/_/g, " ")}${h.crippled ? ' <span class="chip-crip">CR</span>' : ""}</span>
       <div class="hpbar"><div class="hpbar-fill ${cls}" style="width:${pct}%"></div></div>
       <span class="val">${h.val}${h.arm ? `<span class="chip-arm">+${h.arm}</span>` : ""}</span>
     </div>`;
@@ -148,6 +150,9 @@ function renderPannello(dove, p, mira_su) {
   const r = p.risorse;
   const poteri = p.poteri.map(x =>
     `<div>${x.nome} r${x.rango} ${x.attivo ? '<span class="tag-attiva">ATTIVO</span>' : ""}</div>`).join("");
+  const augments = p.augments.map(x =>
+    `<div>${x.nome} ${x.passivo ? '<span class="muted">[passivo]</span>' :
+      (x.attivo ? '<span class="tag-attiva">ATTIVO</span>' : "")}</div>`).join("");
   const stance = p.stance.map(x =>
     `<div>${x.nome} ${x.turni != null ? `<span class="tag-attiva">${x.turni < 0 ? "PERMANENTE" : x.turni + " turni"}</span>` : ""}</div>`).join("");
   const effetti = p.effetti.map(x =>
@@ -161,9 +166,11 @@ function renderPannello(dove, p, mira_su) {
       <span>RISP ${r.risposte}/${r.n_risposte}</span>
       ${staminaBar(r)}
       ${p.mira ? `<span>MIRA: ${p.mira}</span>` : ""}
+      ${p.emp_turni > 0 ? `<span class="chip-crip">⚡EMP: ${p.emp_turni}t</span>` : ""}
     </div>
     <div class="pan-sec"><h4>Locazioni</h4>${hp}</div>
     ${poteri ? `<div class="pan-sec pan-lista"><h4>Poteri</h4>${poteri}</div>` : ""}
+    ${augments ? `<div class="pan-sec pan-lista"><h4>Augment</h4>${augments}</div>` : ""}
     ${stance ? `<div class="pan-sec pan-lista"><h4>Stance</h4>${stance}</div>` : ""}
     ${dove === "pan-player" ? renderArena() : ""}
     ${effetti ? `<div class="pan-sec pan-lista"><h4>Effetti</h4>${effetti}</div>` : ""}
@@ -256,6 +263,15 @@ function renderAzioni() {
       m.poteri_attivi.map(p => bottone(`Disattiva: ${p.nome} r${p.rango} (1 az. bonus)`,
         `invia({tipo:"disattiva_potere",id:${p.id}})`, "btn-azione", !p.ok)).join("") +
       bottone("← Indietro", "menu=null;render()", "btn-ghost");
+  } else if (menu === "augment") {
+    box.innerHTML = `<div class="titolo-menu">Augment</div>` +
+      m.augment.map(a => bottone(`Attiva: ${a.nome} (1 azione)`,
+        `invia({tipo:"augment",id:${a.id}})`, "btn-azione", !a.ok)).join("") +
+      m.augment_attivi.map(a => bottone(`Disattiva: ${a.nome}` +
+        (a.turni_rimasti != null ? ` <span class="muted">[${a.turni_rimasti}t rimasti]</span>` : "") +
+        ` (1 az. bonus)`,
+        `invia({tipo:"disattiva_augment",id:${a.id}})`, "btn-azione", !a.ok)).join("") +
+      bottone("← Indietro", "menu=null;render()", "btn-ghost");
   } else if (menu === "stance") {
     box.innerHTML = `<div class="titolo-menu">Stance</div>` +
       m.stance.map(s => {
@@ -269,10 +285,12 @@ function renderAzioni() {
   } else {
     const haAttacchi = m.attacchi.some(a => a.ok) || m.mira;
     const haPoteri = m.poteri.some(p => p.ok) || m.poteri_attivi.some(p => p.ok);
+    const haAugment = m.augment.some(a => a.ok) || m.augment_attivi.some(a => a.ok);
     const haStance = m.stance.some(s => s.ok);
     box.innerHTML = `<div class="titolo-menu">Il tuo turno</div>` +
       bottone("⚔ Attacchi", 'menu="attacchi";render()', "btn-azione", !haAttacchi) +
       bottone("✦ Poteri", 'menu="poteri";render()', "btn-azione", !haPoteri) +
+      bottone("⚙ Augment", 'menu="augment";render()', "btn-azione", !haAugment) +
       bottone("♦ Stance", 'menu="stance";render()', "btn-azione", !haStance) +
       bottone("Fine turno →", 'invia({tipo:"fine_turno"})', "btn-volt") +
       (S.torneo ? "" :

@@ -990,6 +990,226 @@ def main():
 
     webapp.salva_stato = _salva3
 
+    # ================= umanità, armatura, protesi, augment, EMP, colpi multipli =================
+    from engine import umanita_max, dotazione_base
+    db_e = webapp.DB
+    armor_gilet = next(a for a in db_e["armor"] if a["nome"] == "Giubbotto antiproiettile")
+    armor_combat = next(a for a in db_e["armor"] if a["nome"] == "Armatura da combattimento")
+    protesi_braccio = next(p for p in db_e["protesi"] if p["nome"] == "Braccio prostetico")
+    protesi_gamba = next(p for p in db_e["protesi"] if p["nome"] == "Gamba prostetica")
+    aug_attivo = next(a for a in db_e["augments"] if a["nome"] == "Iniettore di Adrenalina")
+    aug_passivo = next(a for a in db_e["augments"] if a["nome"] == "Placche Sottocutanee")
+
+    # umanità: (rango mente + rango sociale) * 2
+    pu = Personaggio("Umano")
+    pu.stats["mente"], pu.stats["sociale"] = 3, 2
+    assert umanita_max(pu) == 10
+
+    # armatura: hp extra sulle locazioni coperte, resistenze, stance sbloccate
+    pa = Personaggio("Corazzato")
+    pa.equipaggia_armatura(armor_gilet, db_e["stances"], db_e["effetti"])
+    assert pa.armatura["busto"] == 40 and pa.armatura["testa"] == 0
+    assert pa.resistenza_tot("perforante") == 10
+    pa2 = Personaggio("Corazzato2")
+    pa2.equipaggia_armatura(armor_combat, db_e["stances"], db_e["effetti"])
+    assert all(pa2.armatura[l] == 25 for l in LOCAZIONI)
+    assert any(s["id"] == 17 for s in pa2.stance_conosciute)  # Corazza sbloccata
+
+    # protesi: hp/hp_max sostituiti, mai CRIPPLED, +10 vs elettrico, sblocca un attacco
+    pp = Personaggio("Cyborg")
+    pp.equipaggia_protesi(protesi_braccio, db_e["attacchi"], db_e["stances"], db_e["effetti"])
+    assert pp.hp["braccio_dx"] == 230 and pp.hp_max["braccio_dx"] == 230
+    assert "braccio_dx" in pp.protesi_locazioni
+    assert any(a["id"] == 6 for a in pp.attacchi)  # Pugno rinforzato
+    pp.hp["braccio_dx"] = -999
+    pp.applica_danno("busto", 1)  # una chiamata qualsiasi rifà il check crippled
+    assert "braccio_dx" not in pp.crippled
+    pp.hp["braccio_dx"] = 100
+    hp_prima = pp.hp["braccio_dx"]
+    pp.applica_danno("braccio_dx", 20, "elettrico")
+    assert hp_prima - pp.hp["braccio_dx"] == 30  # 20 + 10 di debolezza elettrica della protesi
+    hp_prima2 = pp.hp["braccio_sx"]  # locazione normale: nessun bonus elettrico
+    pp.applica_danno("braccio_sx", 20, "elettrico")
+    assert hp_prima2 - pp.hp["braccio_sx"] == 20
+
+    # augment ATTIVO: meccanicamente un potere (riusa attiva_potere), ma vive fuori da
+    # self.poteri (non conta per MAX_POTERI), costo stamina/durata/usi propri
+    pg = Personaggio("Augmentato")
+    pg.stats["controllo"] = 4
+    pg.init_stamina()
+    slot_att = {"def": aug_attivo, "rango": 1, "attivo": False}
+    pg.augments = [slot_att]
+    assert not pg.poteri
+    assert pg.puo_attivare_augment(slot_att)
+    pg.attiva_augment(slot_att, db_e["attacchi"], db_e["stances"], db_e["effetti"])
+    assert slot_att["attivo"] and pg.n_azioni == 2  # +1 azione dall'iniettore
+    assert not pg.poteri  # non è finito tra i poteri: MAX_POTERI resta intatto
+    assert pg.stato_augment(aug_attivo)["usi_rimasti"] == 1  # usi_massimi=2, uno consumato
+
+    # durata_turni: si spegne da solo dopo N turni (2, per l'iniettore)
+    pg.tick_turno()
+    assert slot_att["attivo"]
+    pg.tick_turno()
+    assert not slot_att["attivo"]
+
+    # augment PASSIVO: sempre attivo, permanente, non costa stamina
+    pg2 = Personaggio("Passivo")
+    pg2.init_stamina()
+    slot_pass = {"def": aug_passivo, "rango": 1, "attivo": False}
+    pg2.attiva_potere(slot_pass, db_e["attacchi"], db_e["stances"], db_e["effetti"])
+    pg2.augments = [slot_pass]
+    assert slot_pass["attivo"] and pg2.resistenza_tot("contundente") == 10
+    stam_prima = pg2.stamina
+    pg2.tick_turno()
+    assert pg2.stamina == stam_prima  # un augment passivo non drena stamina
+
+    # EMP: spegne gli augment attivi/passivi e blocca mosse/stance sbloccate da una protesi
+    pe = Personaggio("BersaglioEMP")
+    pe.equipaggia_protesi(protesi_gamba, db_e["attacchi"], db_e["stances"], db_e["effetti"])
+    stance_gamba = next(s for s in db_e["stances"] if s["id"] == protesi_gamba["stance"][0])
+    slot_e = {"def": aug_passivo, "rango": 1, "attivo": False}
+    pe.attiva_potere(slot_e, db_e["attacchi"], db_e["stances"], db_e["effetti"])
+    pe.augments = [slot_e]
+    assert pe.puo_attivare_stance(stance_gamba)
+    pe.applica_emp(2)
+    assert not slot_e["attivo"]              # l'augment passivo si è spento
+    assert not pe.puo_attivare_stance(stance_gamba)  # EMP blocca la stance da protesi
+    pe.tick_turno()
+    assert pe.emp_turni == 1 and not pe.puo_attivare_stance(stance_gamba)
+    pe.tick_turno()
+    assert pe.emp_turni == 0 and pe.puo_attivare_stance(stance_gamba)  # EMP finito
+
+    # EMP: l'attacco vero applica l'effetto tramite la pipeline normale (nessuna
+    # logica "speciale" dedicata: e' solo un effetti_applicati come Cancella_stance)
+    emp_attacco = next(a for a in db_e["attacchi"] if a["nome"] == "EMP")
+    assert emp_attacco["effetti_applicati"][0]["effetto"] == \
+        next(e for e in db_e["effetti"] if e["nome"] == "EMP")["id"]
+
+    # recupero via DuelloWeb: un augment passivo spento dall'EMP si riaccende da solo
+    # al turno successivo, una volta che l'EMP è scaduto (repair in inizia_turno)
+    pe2 = Personaggio("EMPRecupero")
+    slot_e2 = {"def": aug_passivo, "rango": 1, "attivo": False}
+    pe2.attiva_potere(slot_e2, db_e["attacchi"], db_e["stances"], db_e["effetti"])
+    pe2.augments = [slot_e2]
+    avv_e2 = Personaggio("AvvEMP")
+    dotazione_base(pe2, db_e["attacchi"], db_e["stances"])
+    dotazione_base(avv_e2, db_e["attacchi"], db_e["stances"])
+    d_emp = webapp.DuelloWeb(pg=pe2, avversario=avv_e2)
+    pe2.applica_emp(1)
+    assert not slot_e2["attivo"]
+    d_emp.attivo, d_emp.altro = pe2, avv_e2
+    d_emp.inizia_turno()  # tick_turno porta emp_turni a 0, poi il repair lo riaccende
+    assert pe2.emp_turni == 0
+    assert slot_e2["attivo"]
+
+    # ---- attacchi multipli (colpi > 1): il tiro contrapposto si ripete N volte;
+    # se il difensore esaurisce le risposte su un colpo, i successivi vanno a segno da soli ----
+    import engine as _eng_engine
+    _tira_orig = _eng_engine.Personaggio.tira
+
+    def _tira_controllata(self, tipo, avversario=None):
+        if tipo == "riflessi":
+            return 1      # il difensore ha sempre riflessi bassissimi
+        if tipo == "acrobatica":
+            return 200    # se tenta la schivata, riesce sempre
+        return 100         # l'attaccante colpisce sempre (skill/controllo)
+
+    _eng_engine.Personaggio.tira = _tira_controllata
+    try:
+        pm = Personaggio("Raffica")
+        dm = Personaggio("Difensore")
+        dotazione_base(pm, db_e["attacchi"], db_e["stances"])
+        dotazione_base(dm, db_e["attacchi"], db_e["stances"])
+        dm.risposte = 1  # una sola risposta per tutto il round
+        att3 = {"id": 90001, "nome": "Raffica di prova", "colpi": 3, "can_dodge": True,
+                "can_aim": False, "ranged": False, "tipo_danno": "contundente",
+                "danno": {"dadi": [], "flat": 10, "mult": 1}, "effetti_applicati": []}
+        # dm gioca il ruolo di "self.p" (umano): controllo io la sua risposta al 1° colpo,
+        # pm (self.cpu) è l'attaccante che scatena la raffica
+        d_multi = webapp.DuelloWeb(pg=dm, avversario=pm)
+        d_multi.attivo, d_multi.altro = pm, dm
+        hp_tot_prima = sum(dm.hp.values())
+        d_multi.usa_attacco(att3)
+        assert d_multi.fase == "risposta"  # colpo 1/3: dm ha la schivata disponibile
+        n_tiri_dopo_1 = sum(1 for r in d_multi.log if "Tiro per colpire" in r["t"])
+        assert n_tiri_dopo_1 == 1
+        d_multi.risolvi_risposta("schivata")  # schiva il primo, esaurendo le risposte
+        # i colpi 2 e 3 si sono risolti automaticamente in cascata: nessuna risposta rimasta
+        n_tiri_finale = sum(1 for r in d_multi.log if "Tiro per colpire" in r["t"])
+        assert n_tiri_finale == 3, n_tiri_finale
+        danno_subito = hp_tot_prima - sum(dm.hp.values())
+        assert danno_subito == 20, danno_subito  # 2 colpi a segno (10 flat l'uno), 1 schivato
+        assert dm.risposte == 0
+    finally:
+        _eng_engine.Personaggio.tira = _tira_orig
+
+    # ================= app.py: inventario a slot, negozio, umanità nel negozio =================
+    _salva4 = webapp.salva_stato
+    webapp.salva_stato = lambda: None
+    webapp.STATO["crediti"] = 100000
+    rec_inv = webapp.nuovo_record(Personaggio("Inventario"))
+    rec_inv["id"] = 777
+    rec_inv["stats"]["mente"] = rec_inv["stats"]["sociale"] = 2  # umanità = 8
+    webapp.STATO["personaggi"].append(rec_inv)
+
+    pistola = next(e for e in db_e["equip"] if e["nome"] == "Pistola")
+    spada = next(e for e in db_e["equip"] if e["nome"] == "Spada")
+
+    # arma: si equipaggiano fino a MAX_ARMI (il catalogo ha solo Pistola e Spada,
+    # quindi il tetto di 2 slot è già esercitato equipaggiandole entrambe)
+    client = webapp.app.test_client()
+    r1 = client.post("/negozio/equip", data={"categoria": "arma", "iid": pistola["id"], "pid": 777})
+    assert r1.status_code in (302, 303)
+    client.post("/negozio/equip", data={"categoria": "arma", "iid": spada["id"], "pid": 777})
+    assert rec_inv["armi"] == [pistola["id"], spada["id"]]
+    # doppione della stessa arma: rifiutato
+    client.post("/negozio/equip", data={"categoria": "arma", "iid": pistola["id"], "pid": 777})
+    assert rec_inv["armi"].count(pistola["id"]) == 1
+    # disequip libera lo slot
+    client.post("/negozio/disequip", data={"categoria": "arma", "iid": pistola["id"], "pid": 777})
+    assert rec_inv["armi"] == [spada["id"]]
+
+    # armatura: 1 slot, equipaggiarne una seconda sostituisce la prima
+    client.post("/negozio/equip", data={"categoria": "armatura", "iid": armor_gilet["id"], "pid": 777})
+    assert rec_inv["armatura_equip"] == armor_gilet["id"]
+    client.post("/negozio/equip", data={"categoria": "armatura", "iid": armor_combat["id"], "pid": 777})
+    assert rec_inv["armatura_equip"] == armor_combat["id"]
+    client.post("/negozio/disequip", data={"categoria": "armatura", "pid": 777})
+    assert rec_inv["armatura_equip"] is None
+    client.post("/negozio/equip", data={"categoria": "armatura", "iid": armor_combat["id"], "pid": 777})
+    assert rec_inv["armatura_equip"] == armor_combat["id"]
+
+    # protesi: una sola per locazione, e il costo in umanità è vincolante
+    client.post("/negozio/equip", data={"categoria": "protesi", "iid": protesi_braccio["id"], "pid": 777})
+    assert rec_inv["protesi"] == [protesi_braccio["id"]]
+    prima_prot = len(rec_inv["protesi"])
+    client.post("/negozio/equip", data={"categoria": "protesi", "iid": protesi_braccio["id"], "pid": 777})
+    assert len(rec_inv["protesi"]) == prima_prot  # stessa locazione braccio_dx: rifiutata
+    # umanità disponibile = 8; braccio (3) + gamba (2) = 5, resta margine: deve passare
+    client.post("/negozio/equip", data={"categoria": "protesi", "iid": protesi_gamba["id"], "pid": 777})
+    assert protesi_gamba["id"] in rec_inv["protesi"]
+    assert webapp.umanita_usata(rec_inv) == 5
+
+    # augment: rifiutato se sfora l'umanità rimasta (8 - 5 = 3 disponibili; Placche ne costa 3: passa,
+    # un secondo tentativo di qualsiasi altro augment con costo extra deve sforare e fallire)
+    client.post("/negozio/equip", data={"categoria": "augment", "iid": aug_passivo["id"], "pid": 777})
+    assert aug_passivo["id"] in rec_inv["augments"]
+    assert webapp.umanita_usata(rec_inv) == 8  # umanità esaurita
+    r_sfora = client.post("/negozio/equip",
+                          data={"categoria": "augment", "iid": aug_attivo["id"], "pid": 777})
+    assert aug_attivo["id"] not in rec_inv["augments"]  # avrebbe sforato: rifiutato
+
+    # record_to_pg: tutto l'inventario si applica correttamente a un Personaggio vero
+    p_inv = webapp.record_to_pg(rec_inv)
+    assert any(a["id"] in spada["attacchi"] for a in p_inv.attacchi)
+    assert p_inv.armatura["testa"] == 25  # Armatura da combattimento, tutte le locazioni
+    assert "braccio_dx" in p_inv.protesi_locazioni and "gamba_sx" in p_inv.protesi_locazioni
+    assert p_inv.hp["braccio_dx"] == protesi_braccio["hp"]
+    assert any(s["def"] is aug_passivo and s["attivo"] for s in p_inv.augments)  # passivo già attivo
+
+    webapp.STATO["personaggi"].remove(rec_inv)
+    webapp.salva_stato = _salva4
+
     print("OK — tutti i check passati")
 
 

@@ -1,0 +1,99 @@
+[
+  {
+    "id": 1,
+    "nome": "Iniettore di Adrenalina",
+    "descrizione": "Impianto attivabile: una scarica di adrenalina sintetica dà un'azione extra.",
+    "valore": 400,
+    "costo_umanita": 2,
+    "attivo": true,
+    "costo_stamina": 3,
+    "durata_turni": 2,
+    "usi_limitati": true,
+    "usi_massimi": 2,
+    "effetti": {
+      "1": [
+        {
+          "tipo": "azioni",
+          "azioni": 1,
+          "bonus": 0,
+          "risposte": 0
+        }
+      ],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "effetti_nel_tempo": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance_attivate": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    }
+  },
+  {
+    "id": 2,
+    "nome": "Placche Sottocutanee",
+    "descrizione": "Impianto passivo: placche di lega sotto la pelle, sempre attive.",
+    "valore": 350,
+    "costo_umanita": 3,
+    "attivo": false,
+    "costo_stamina": 0,
+    "durata_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "effetti": {
+      "1": [
+        {
+          "tipo": "resistenza",
+          "tipo_danno": "contundente",
+          "valore": 10
+        }
+      ],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "effetti_nel_tempo": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance_attivate": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    }
+  }
+]

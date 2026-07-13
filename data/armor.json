@@ -1,0 +1,47 @@
+[
+  {
+    "id": 1,
+    "nome": "Giubbotto antiproiettile",
+    "descrizione": "Protegge il busto dai proiettili.",
+    "valore": 200,
+    "locazioni": [
+      "busto"
+    ],
+    "armatura_hp": 40,
+    "resistenze": [
+      {
+        "tipo_danno": "perforante",
+        "valore": 10
+      }
+    ],
+    "stance": [],
+    "stance_attivate": [],
+    "effetti_nel_tempo": []
+  },
+  {
+    "id": 2,
+    "nome": "Armatura da combattimento",
+    "descrizione": "Corazza pesante che copre tutto il corpo.",
+    "valore": 600,
+    "locazioni": [
+      "testa",
+      "busto",
+      "braccio_sx",
+      "braccio_dx",
+      "gamba_sx",
+      "gamba_dx"
+    ],
+    "armatura_hp": 25,
+    "resistenze": [
+      {
+        "tipo_danno": "contundente",
+        "valore": 5
+      }
+    ],
+    "stance": [
+      17
+    ],
+    "stance_attivate": [],
+    "effetti_nel_tempo": []
+  }
+]

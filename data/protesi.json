@@ -1,0 +1,32 @@
+[
+  {
+    "id": 1,
+    "nome": "Braccio prostetico",
+    "descrizione": "Sostituisce completamente il braccio: più resistente, colpisce più forte.",
+    "valore": 500,
+    "locazione": "braccio_dx",
+    "hp": 230,
+    "costo_umanita": 3,
+    "attacchi": [
+      6
+    ],
+    "stance": [],
+    "stance_attivate": [],
+    "effetti_nel_tempo": []
+  },
+  {
+    "id": 2,
+    "nome": "Gamba prostetica",
+    "descrizione": "Sostituisce completamente la gamba: servomotori per riflessi più rapidi.",
+    "valore": 450,
+    "locazione": "gamba_sx",
+    "hp": 200,
+    "costo_umanita": 2,
+    "attacchi": [],
+    "stance": [
+      11
+    ],
+    "stance_attivate": [],
+    "effetti_nel_tempo": []
+  }
+]

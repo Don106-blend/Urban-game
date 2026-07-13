@@ -12,7 +12,8 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(BASE, "data")
 FILES = {k: os.path.join(DATA, f"{v}.json") for k, v in
          {"attacchi": "attacks", "poteri": "powers", "skill": "skills",
-          "stance": "stances", "effetti": "effects", "equip": "equipment"}.items()}
+          "stance": "stances", "effetti": "effects", "equip": "equipment",
+          "armatura": "armor", "protesi": "protesi", "augment": "augments"}.items()}
 
 STATS = ["fisico", "riflessi", "mente", "sociale", "controllo"]
 TIPI_DANNO = ["contundente", "perforante", "taglio", "fuoco", "elettrico",
@@ -25,9 +26,11 @@ TIPI_MODIFICATORE = ["colpire_proprio", "colpire_avversario", "parata_sempre",
                      "mod_rango", "immune_melee", "armatura"]
 TARGET_MOD = ["self", "avversario"]
 TRIGGER_STANCE = ["attivo", "attiva", "vieni_colpito", "manchi", "subisci_danni", "fai_danni"]
-TIPI_MOD_EFFETTO = ["mod_rango", "flat_risultato", "colpire", "azioni", "debolezza"]
+TIPI_MOD_EFFETTO = ["mod_rango", "flat_risultato", "colpire", "azioni", "debolezza",
+                    "stamina_mod"]
 LOCAZIONI_STANCE = ["tutte", "testa", "busto", "braccio_sx", "braccio_dx",
                     "gamba_sx", "gamba_dx"]
+LOCAZIONI_BASE = LOCAZIONI_STANCE[1:]  # le 6 locazioni reali, senza "tutte" (per protesi/armatura)
 DADI_FISSI = ["d4", "d6", "d8", "d10", "d12", "d20"]  # dadi a taglia fissa, es. 2d6*30
 
 AIUTO_STANCE = """STANCE — guida rapida
@@ -408,7 +411,8 @@ class RigheModEffetto(RigheDinamiche):
         linea1.pack(anchor="w")
         campo(linea1, "Tipo", combo(linea1, tv, lambda: TIPI_MOD_EFFETTO, 15))
         campo(linea1, "Statistica", combo(linea1, sv, self.get_tipi, 17))
-        campo(linea1, "Delta / valore", ttk.Entry(linea1, textvariable=vv, width=7))
+        campo(linea1, "Delta / valore (anche stamina_mod)",
+              ttk.Entry(linea1, textvariable=vv, width=7))
         campo(linea1, "Tipo danno (debolezza)", combo(linea1, dnv, lambda: TIPI_DANNO, 13))
 
         linea2 = ttk.Frame(corpo)
@@ -432,10 +436,32 @@ class RigheModEffetto(RigheDinamiche):
                 out.append({"tipo": t, "flat": num(cv)})
             elif t == "debolezza":
                 out.append({"tipo": t, "tipo_danno": dnv.get()})
+            elif t == "stamina_mod":
+                out.append({"tipo": t, "delta": num(vv)})
             elif t == "azioni":
                 out.append({"tipo": t, "azioni": num(azv), "bonus": num(bov),
                             "risposte": num(riv)})
         return out
+
+
+class RigheResistenze(RigheDinamiche):
+    """Righe 'tipo danno | valore' — resistenze fisse concesse da armatura/protesi."""
+
+    def __init__(self, parent):
+        super().__init__(parent, "+ resistenza")
+
+    def aggiungi(self, item=None):
+        item = item or {}
+        riga = ttk.Frame(self.frame)
+        tv = tk.StringVar(value=item.get("tipo_danno", "contundente"))
+        vv = tk.StringVar(value=str(item.get("valore", 5)))
+        combo(riga, tv, lambda: TIPI_DANNO, 13).pack(side="left")
+        ttk.Label(riga, text="valore").pack(side="left", padx=(6, 2))
+        ttk.Entry(riga, textvariable=vv, width=5).pack(side="left")
+        self._registra(riga, (tv, vv))
+
+    def get(self):
+        return [{"tipo_danno": tv.get(), "valore": num(vv, 0)} for _, (tv, vv) in self.righe]
 
 
 class CrudTab(ttk.Frame):
@@ -653,6 +679,14 @@ class TabAttacchi(CrudTab):
         self.spin_usi = tk.Spinbox(r5, from_=1, to=99, width=4, textvariable=self.usi_massimi)
         self.spin_usi.pack(side="left", padx=6)
         self.toggle_usi()
+        r6 = ttk.Frame(form)
+        r6.pack(anchor="w", pady=2)
+        ttk.Label(r6, text="Colpi per uso (il tiro contrapposto si ripete N volte: "
+                           "se il bersaglio finisce le risposte, i colpi successivi vanno "
+                           "a segno in automatico)").pack(side="left")
+        self.colpi = tk.StringVar(value="1")
+        tk.Spinbox(r6, from_=1, to=9, width=4, textvariable=self.colpi).pack(
+            side="left", padx=6)
         lf = ttk.LabelFrame(form, text="Effetti applicati al bersaglio (se a segno)", padding=4)
         lf.pack(anchor="w", fill="x", pady=6)
         self.eff_applicati = RigheEffettiApplicati(lf, self.get_effetti)
@@ -680,6 +714,7 @@ class TabAttacchi(CrudTab):
         self.usi_limitati.set(a.get("usi_limitati", False))
         self.usi_massimi.set(str(a.get("usi_massimi", 1)))
         self.toggle_usi()
+        self.colpi.set(str(a.get("colpi", 1)))
         self.eff_applicati.set(a.get("effetti_applicati", []))
 
     def toggle_usi(self):
@@ -707,6 +742,7 @@ class TabAttacchi(CrudTab):
             "cooldown_turni": num(self.cooldown_turni),
             "usi_limitati": self.usi_limitati.get(),
             "usi_massimi": num(self.usi_massimi, 1),
+            "colpi": num(self.colpi, 1),
             "effetti_applicati": self.eff_applicati.get(),
         }
 
@@ -1095,6 +1131,316 @@ class TabEquip(CrudTab):
         }
 
 
+class TabArmatura(CrudTab):
+    file = FILES["armatura"]
+    titolo = "Armatura"
+
+    def costruisci_form(self, form):
+        self.nome = tk.StringVar()
+        self.valore = tk.StringVar(value="100")
+        self.armatura_hp = tk.StringVar(value="20")
+
+        r1 = ttk.Frame(form)
+        r1.pack(anchor="w")
+        ttk.Label(r1, text="Nome").pack(side="left")
+        ttk.Entry(r1, textvariable=self.nome, width=34).pack(side="left", padx=6)
+        ttk.Label(r1, text="Valore (crediti)").pack(side="left")
+        ttk.Entry(r1, textvariable=self.valore, width=8).pack(side="left", padx=6)
+        ttk.Label(form, text="Descrizione").pack(anchor="w", pady=(6, 0))
+        self.descr = tk.Text(form, width=60, height=3)
+        self.descr.pack(anchor="w", pady=2)
+
+        lf_loc = ttk.LabelFrame(form, text="Locazioni coperte (hp extra su ognuna)", padding=4)
+        lf_loc.pack(anchor="w", fill="x", pady=6)
+        self.loc_vars = {loc: tk.BooleanVar() for loc in LOCAZIONI_BASE}
+        for loc in LOCAZIONI_BASE:
+            ttk.Checkbutton(lf_loc, text=loc, variable=self.loc_vars[loc]).pack(side="left", padx=4)
+        ttk.Label(lf_loc, text="  Armatura (hp) per locazione coperta").pack(side="left", padx=(12, 2))
+        tk.Spinbox(lf_loc, from_=0, to=200, width=5, textvariable=self.armatura_hp).pack(side="left")
+
+        lf_res = ttk.LabelFrame(form, text="Resistenze fisse", padding=4)
+        lf_res.pack(anchor="w", fill="x", pady=6)
+        self.resistenze = RigheResistenze(lf_res)
+        self.resistenze.frame.pack(anchor="w")
+
+        sblocchi = ttk.Frame(form)
+        sblocchi.pack(anchor="w", pady=4)
+        lf1 = ttk.LabelFrame(sblocchi, text="Stance sbloccate (manuali)", padding=4)
+        lf1.grid(row=0, column=0, sticky="nw", padx=4)
+        self.sel_stance = SelettoreRighe(lf1, self.get_stances)
+        self.sel_stance.frame.pack(anchor="w")
+        lf2 = ttk.LabelFrame(sblocchi, text="Stance attive finché indossata", padding=4)
+        lf2.grid(row=0, column=1, sticky="nw", padx=4)
+        self.sel_stance_auto = SelettoreRighe(lf2, self.get_stances)
+        self.sel_stance_auto.frame.pack(anchor="w")
+
+        lf3 = ttk.LabelFrame(form, text="Effetti nel tempo su chi la indossa", padding=4)
+        lf3.pack(anchor="w", fill="x", pady=6)
+        self.eff_tempo = RigheEffettiApplicati(lf3, self.get_effetti)
+        self.eff_tempo.frame.pack(anchor="w")
+
+    def form_da_item(self, e):
+        self.nome.set(e.get("nome", ""))
+        self.valore.set(str(e.get("valore", 100)))
+        self.descr.delete("1.0", "end")
+        self.descr.insert("1.0", e.get("descrizione", ""))
+        coperte = e.get("locazioni", [])
+        for loc, v in self.loc_vars.items():
+            v.set(loc in coperte)
+        self.armatura_hp.set(str(e.get("armatura_hp", 20)))
+        self.resistenze.set(e.get("resistenze", []))
+        self.sel_stance.set_ids(e.get("stance", []))
+        self.sel_stance_auto.set_ids(e.get("stance_attivate", []))
+        self.eff_tempo.set(e.get("effetti_nel_tempo", []))
+
+    def item_da_form(self):
+        nome = self.chiedi_nome()
+        if not nome:
+            return None
+        return {
+            "nome": nome,
+            "descrizione": self.descr.get("1.0", "end").strip(),
+            "valore": num(self.valore, 100),
+            "locazioni": [loc for loc, v in self.loc_vars.items() if v.get()],
+            "armatura_hp": num(self.armatura_hp, 0),
+            "resistenze": self.resistenze.get(),
+            "stance": self.sel_stance.get(),
+            "stance_attivate": self.sel_stance_auto.get(),
+            "effetti_nel_tempo": self.eff_tempo.get(),
+        }
+
+    def refresh_selettori(self):
+        self.sel_stance.refresh_valori()
+        self.sel_stance_auto.refresh_valori()
+
+
+class TabProtesi(CrudTab):
+    file = FILES["protesi"]
+    titolo = "Protesi"
+
+    def costruisci_form(self, form):
+        self.nome = tk.StringVar()
+        self.valore = tk.StringVar(value="300")
+        self.costo_umanita = tk.StringVar(value="2")
+        self.locazione = tk.StringVar(value=LOCAZIONI_BASE[0])
+        self.hp = tk.StringVar(value="150")
+
+        r1 = ttk.Frame(form)
+        r1.pack(anchor="w")
+        ttk.Label(r1, text="Nome").pack(side="left")
+        ttk.Entry(r1, textvariable=self.nome, width=30).pack(side="left", padx=6)
+        ttk.Label(r1, text="Valore (crediti)").pack(side="left")
+        ttk.Entry(r1, textvariable=self.valore, width=8).pack(side="left", padx=6)
+        ttk.Label(r1, text="Costo umanità").pack(side="left")
+        tk.Spinbox(r1, from_=0, to=20, width=4, textvariable=self.costo_umanita).pack(
+            side="left", padx=6)
+        ttk.Label(form, text="Descrizione").pack(anchor="w", pady=(6, 0))
+        self.descr = tk.Text(form, width=60, height=3)
+        self.descr.pack(anchor="w", pady=2)
+
+        r2 = ttk.Frame(form)
+        r2.pack(anchor="w", pady=4)
+        ttk.Label(r2, text="Locazione sostituita").pack(side="left")
+        combo(r2, self.locazione, lambda: LOCAZIONI_BASE, 14).pack(side="left", padx=6)
+        ttk.Label(r2, text="HP della protesi").pack(side="left")
+        tk.Spinbox(r2, from_=1, to=999, width=5, textvariable=self.hp).pack(side="left", padx=6)
+        ttk.Label(form, text="La locazione sostituita non va mai CRIPPLED, ma prende +10 "
+                             "danni dagli attacchi elettrici.", foreground="#888").pack(anchor="w")
+
+        sblocchi = ttk.Frame(form)
+        sblocchi.pack(anchor="w", pady=4)
+        lf1 = ttk.LabelFrame(sblocchi, text="Attacchi sbloccati", padding=4)
+        lf1.grid(row=0, column=0, sticky="nw", padx=4)
+        self.sel_attacchi = SelettoreRighe(lf1, self.get_attacchi)
+        self.sel_attacchi.frame.pack(anchor="w")
+        lf2 = ttk.LabelFrame(sblocchi, text="Stance sbloccate (manuali)", padding=4)
+        lf2.grid(row=0, column=1, sticky="nw", padx=4)
+        self.sel_stance = SelettoreRighe(lf2, self.get_stances)
+        self.sel_stance.frame.pack(anchor="w")
+        lf3 = ttk.LabelFrame(sblocchi, text="Stance attive finché montata", padding=4)
+        lf3.grid(row=0, column=2, sticky="nw", padx=4)
+        self.sel_stance_auto = SelettoreRighe(lf3, self.get_stances)
+        self.sel_stance_auto.frame.pack(anchor="w")
+
+        lf4 = ttk.LabelFrame(form, text="Effetti nel tempo su chi la monta", padding=4)
+        lf4.pack(anchor="w", fill="x", pady=6)
+        self.eff_tempo = RigheEffettiApplicati(lf4, self.get_effetti)
+        self.eff_tempo.frame.pack(anchor="w")
+
+    def form_da_item(self, e):
+        self.nome.set(e.get("nome", ""))
+        self.valore.set(str(e.get("valore", 300)))
+        self.costo_umanita.set(str(e.get("costo_umanita", 2)))
+        self.descr.delete("1.0", "end")
+        self.descr.insert("1.0", e.get("descrizione", ""))
+        self.locazione.set(e.get("locazione", LOCAZIONI_BASE[0]))
+        self.hp.set(str(e.get("hp", 150)))
+        self.sel_attacchi.set_ids(e.get("attacchi", []))
+        self.sel_stance.set_ids(e.get("stance", []))
+        self.sel_stance_auto.set_ids(e.get("stance_attivate", []))
+        self.eff_tempo.set(e.get("effetti_nel_tempo", []))
+
+    def item_da_form(self):
+        nome = self.chiedi_nome()
+        if not nome:
+            return None
+        return {
+            "nome": nome,
+            "descrizione": self.descr.get("1.0", "end").strip(),
+            "valore": num(self.valore, 300),
+            "costo_umanita": num(self.costo_umanita, 0),
+            "locazione": self.locazione.get(),
+            "hp": num(self.hp, 100),
+            "attacchi": self.sel_attacchi.get(),
+            "stance": self.sel_stance.get(),
+            "stance_attivate": self.sel_stance_auto.get(),
+            "effetti_nel_tempo": self.eff_tempo.get(),
+        }
+
+    def refresh_selettori(self):
+        self.sel_attacchi.refresh_valori()
+        self.sel_stance.refresh_valori()
+        self.sel_stance_auto.refresh_valori()
+
+
+class TabAugment(CrudTab):
+    file = FILES["augment"]
+    titolo = "Augment"
+
+    def costruisci_form(self, form):
+        self.nome = tk.StringVar()
+        self.valore = tk.StringVar(value="300")
+        self.costo_umanita = tk.StringVar(value="2")
+        self.attivo = tk.BooleanVar(value=True)
+        self.costo_stamina = tk.StringVar(value="2")
+        self.durata_turni = tk.StringVar(value="0")
+        self.usi_limitati = tk.BooleanVar()
+        self.usi_massimi = tk.StringVar(value="1")
+
+        r1 = ttk.Frame(form)
+        r1.pack(anchor="w")
+        ttk.Label(r1, text="Nome").pack(side="left")
+        ttk.Entry(r1, textvariable=self.nome, width=30).pack(side="left", padx=6)
+        ttk.Label(r1, text="Valore (crediti)").pack(side="left")
+        ttk.Entry(r1, textvariable=self.valore, width=8).pack(side="left", padx=6)
+        ttk.Label(r1, text="Costo umanità").pack(side="left")
+        tk.Spinbox(r1, from_=0, to=20, width=4, textvariable=self.costo_umanita).pack(
+            side="left", padx=6)
+        ttk.Label(form, text="Descrizione").pack(anchor="w", pady=(6, 0))
+        self.descr = tk.Text(form, width=60, height=3)
+        self.descr.pack(anchor="w", pady=2)
+
+        r2 = ttk.Frame(form)
+        r2.pack(anchor="w", pady=4)
+        ttk.Radiobutton(r2, text="Attivo (va innescato in combattimento)",
+                        variable=self.attivo, value=True,
+                        command=self.toggle_attivo).pack(side="left")
+        ttk.Radiobutton(r2, text="Passivo (sempre acceso)",
+                        variable=self.attivo, value=False,
+                        command=self.toggle_attivo).pack(side="left", padx=12)
+
+        self.box_attivo = ttk.LabelFrame(form, text="Solo se Attivo", padding=4)
+        self.box_attivo.pack(anchor="w", fill="x", pady=4)
+        ttk.Label(self.box_attivo, text="Costo stamina").pack(side="left")
+        self.spin_stamina = tk.Spinbox(self.box_attivo, from_=0, to=20, width=4,
+                                       textvariable=self.costo_stamina)
+        self.spin_stamina.pack(side="left", padx=(4, 16))
+        ttk.Label(self.box_attivo, text="Durata (turni, 0 = finché non lo disattivi)").pack(
+            side="left")
+        self.spin_durata = tk.Spinbox(self.box_attivo, from_=0, to=99, width=4,
+                                      textvariable=self.durata_turni)
+        self.spin_durata.pack(side="left", padx=(4, 16))
+        self.chk_usi = ttk.Checkbutton(self.box_attivo, text="Numero massimo di attivazioni",
+                                       variable=self.usi_limitati, command=self.toggle_usi)
+        self.chk_usi.pack(side="left")
+        self.spin_usi = tk.Spinbox(self.box_attivo, from_=1, to=99, width=4,
+                                   textvariable=self.usi_massimi)
+        self.spin_usi.pack(side="left", padx=6)
+        self.toggle_usi()
+
+        lf1 = ttk.LabelFrame(form, text="Effetti istantanei all'attivazione (o permanenti "
+                                        "se Passivo)", padding=4)
+        lf1.pack(anchor="w", fill="x", pady=6)
+        self.effetti = RigheEffettiPotere(lf1, self.get_tipi)
+        self.effetti.frame.pack(anchor="w")
+
+        lf2 = ttk.LabelFrame(form, text="Effetti nel tempo (su se stessi)", padding=4)
+        lf2.pack(anchor="w", fill="x", pady=6)
+        self.eff_tempo = RigheEffettiApplicati(lf2, self.get_effetti)
+        self.eff_tempo.frame.pack(anchor="w")
+
+        sblocchi = ttk.Frame(form)
+        sblocchi.pack(anchor="w", pady=4)
+        lf3 = ttk.LabelFrame(sblocchi, text="Attacchi sbloccati", padding=4)
+        lf3.grid(row=0, column=0, sticky="nw", padx=4)
+        self.sel_attacchi = SelettoreRighe(lf3, self.get_attacchi)
+        self.sel_attacchi.frame.pack(anchor="w")
+        lf4 = ttk.LabelFrame(sblocchi, text="Stance sbloccate (manuali)", padding=4)
+        lf4.grid(row=0, column=1, sticky="nw", padx=4)
+        self.sel_stance = SelettoreRighe(lf4, self.get_stances)
+        self.sel_stance.frame.pack(anchor="w")
+        lf5 = ttk.LabelFrame(sblocchi, text="Stance attivate insieme all'augment", padding=4)
+        lf5.grid(row=0, column=2, sticky="nw", padx=4)
+        self.sel_stance_auto = SelettoreRighe(lf5, self.get_stances)
+        self.sel_stance_auto.frame.pack(anchor="w")
+
+    def toggle_attivo(self):
+        stato = "normal" if self.attivo.get() else "disabled"
+        for w in (self.spin_stamina, self.spin_durata, self.chk_usi):
+            w.configure(state=stato)
+        self.spin_usi.configure(state=stato if self.usi_limitati.get() and stato == "normal"
+                                else "disabled")
+
+    def toggle_usi(self):
+        self.spin_usi.configure(state="normal" if self.usi_limitati.get() else "disabled")
+        self.toggle_attivo()
+
+    def form_da_item(self, a):
+        self.nome.set(a.get("nome", ""))
+        self.valore.set(str(a.get("valore", 300)))
+        self.costo_umanita.set(str(a.get("costo_umanita", 2)))
+        self.descr.delete("1.0", "end")
+        self.descr.insert("1.0", a.get("descrizione", ""))
+        self.attivo.set(a.get("attivo", True))
+        self.costo_stamina.set(str(a.get("costo_stamina", 2)))
+        self.durata_turni.set(str(a.get("durata_turni", 0)))
+        self.usi_limitati.set(a.get("usi_limitati", False))
+        self.usi_massimi.set(str(a.get("usi_massimi", 1)))
+        self.toggle_usi()
+        self.effetti.set(a.get("effetti", {}).get("1", []))
+        self.eff_tempo.set(a.get("effetti_nel_tempo", {}).get("1", []))
+        self.sel_attacchi.set_ids(a.get("attacchi", {}).get("1", []))
+        self.sel_stance.set_ids(a.get("stance", {}).get("1", []))
+        self.sel_stance_auto.set_ids(a.get("stance_attivate", {}).get("1", []))
+
+    def item_da_form(self):
+        nome = self.chiedi_nome()
+        if not nome:
+            return None
+        vuoto = {"2": [], "3": [], "4": []}
+        return {
+            "nome": nome,
+            "descrizione": self.descr.get("1.0", "end").strip(),
+            "valore": num(self.valore, 300),
+            "costo_umanita": num(self.costo_umanita, 0),
+            "attivo": self.attivo.get(),
+            "costo_stamina": num(self.costo_stamina, 0),
+            "durata_turni": num(self.durata_turni, 0),
+            "usi_limitati": self.usi_limitati.get(),
+            "usi_massimi": num(self.usi_massimi, 1),
+            "effetti": {"1": self.effetti.get(), **vuoto},
+            "effetti_nel_tempo": {"1": self.eff_tempo.get(), **vuoto},
+            "attacchi": {"1": self.sel_attacchi.get(), **vuoto},
+            "stance": {"1": self.sel_stance.get(), **vuoto},
+            "stance_attivate": {"1": self.sel_stance_auto.get(), **vuoto},
+        }
+
+    def refresh_selettori(self):
+        self.sel_attacchi.refresh_valori()
+        self.sel_stance.refresh_valori()
+        self.sel_stance_auto.refresh_valori()
+
+
 def main():
     root = tk.Tk()
     root.title("Urban RPG — Editor")
@@ -1114,13 +1460,24 @@ def main():
                      get_attacchi=lambda: tatt.etichette(),
                      get_stances=lambda: tstance.etichette())
     tequip = TabEquip(nb, get_attacchi=lambda: tatt.etichette())
+    tarm = TabArmatura(nb, get_stances=lambda: tstance.etichette(), get_effetti=get_effetti)
+    tprot = TabProtesi(nb, get_attacchi=lambda: tatt.etichette(),
+                       get_stances=lambda: tstance.etichette(), get_effetti=get_effetti)
+    taug = TabAugment(nb, get_tipi=get_tipi, get_effetti=get_effetti,
+                      get_attacchi=lambda: tatt.etichette(),
+                      get_stances=lambda: tstance.etichette())
     nb.add(tatt, text="Attacchi")
     nb.add(tpot, text="Poteri")
-    nb.add(tequip, text="Equipaggiamento")
+    nb.add(tequip, text="Armi")
+    nb.add(tarm, text="Armatura")
+    nb.add(tprot, text="Protesi")
+    nb.add(taug, text="Augment")
     nb.add(tskill, text="Skill")
     nb.add(tstance, text="Stance")
     nb.add(teff, text="Effetti")
-    nb.bind("<<NotebookTabChanged>>", lambda e: tpot.refresh_selettori())
+    tutte_le_tab = (tpot, tarm, tprot, taug)
+    nb.bind("<<NotebookTabChanged>>",
+           lambda e: [t.refresh_selettori() for t in tutte_le_tab])
     nb.pack(fill="both", expand=True)
     root.mainloop()
 

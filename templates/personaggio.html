@@ -17,6 +17,9 @@
       <span class="token-sfera">🧬</span>
       <span>Token: <b>{{ c.token or 0 }}</b></span>
     </div>
+    <div class="umanita-box" title="Augment e protesi non possono farla scendere sotto 0">
+      <span>⚕ Umanità: <b>{{ umanita_max - umanita_usata }}</b> / {{ umanita_max }}</span>
+    </div>
 
     <dl class="cv-anagrafica">
       <dt>Data di nascita</dt><dd>{{ c.data_nascita or "—" }}</dd>
@@ -39,6 +42,7 @@
       {% set pct = ((hp if hp > 0 else 0) * 100 / mx)|round|int %}
       <div class="loc-row">
         <span class="loc-nome">{{ loc.replace('_', ' ') }}
+          {% if protesi|selectattr('loc', 'equalto', loc)|list %}<span class="tag-attiva">⚙ PROTESI</span>{% endif %}
           {% if loc in c.crippled %}<span class="danger">CRIPPLED</span>{% endif %}
         </span>
         <div class="hpbar">
@@ -93,15 +97,82 @@
       </div>
     {% endif %}
 
-    <h2>Equipaggiamento</h2>
-    {% if not equip %}
-      <p class="muted">Nessun oggetto. Passa dal <a href="{{ url_for('negozio') }}">negozio</a>.</p>
+    <h2>Armi <span class="muted">({{ armi|length }}/{{ MAX_ARMI }} slot)</span></h2>
+    {% if not armi %}
+      <p class="muted">Nessuna arma. Passa dal <a href="{{ url_for('negozio') }}">negozio</a>.</p>
     {% else %}
       <div class="poteri-list">
-        {% for e in equip %}
+        {% for e in armi %}
         <div class="potere-row">
           <span class="potere-nome">{{ e.nome }}</span>
           <p class="muted">{{ e.descrizione }}</p>
+          <form method="post" action="{{ url_for('negozio_disequip') }}">
+            <input type="hidden" name="pid" value="{{ c.id }}">
+            <input type="hidden" name="categoria" value="arma">
+            <input type="hidden" name="iid" value="{{ e.id }}">
+            <button class="btn btn-ghost danger-btn">✕ Rimuovi</button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <h2>Armatura</h2>
+    {% if not armatura %}
+      <p class="muted">Nessuna armatura indossata.</p>
+    {% else %}
+      <div class="poteri-list">
+        <div class="potere-row">
+          <span class="potere-nome">{{ armatura.nome }}</span>
+          <span class="badge badge-rango">+{{ armatura.armatura_hp }} hp su {{ armatura.locazioni|join(', ') }}</span>
+          <p class="muted">{{ armatura.descrizione }}</p>
+          <form method="post" action="{{ url_for('negozio_disequip') }}">
+            <input type="hidden" name="pid" value="{{ c.id }}">
+            <input type="hidden" name="categoria" value="armatura">
+            <button class="btn btn-ghost danger-btn">✕ Rimuovi</button>
+          </form>
+        </div>
+      </div>
+    {% endif %}
+
+    <h2>Protesi</h2>
+    {% if not protesi %}
+      <p class="muted">Nessuna protesi montata.</p>
+    {% else %}
+      <div class="poteri-list">
+        {% for pr in protesi %}
+        <div class="potere-row">
+          <span class="potere-nome">{{ pr.def.nome }}</span>
+          <span class="badge badge-rango">{{ pr.loc }} · {{ pr.def.hp }} hp</span>
+          <p class="muted">{{ pr.def.descrizione }}</p>
+          <form method="post" action="{{ url_for('negozio_disequip') }}">
+            <input type="hidden" name="pid" value="{{ c.id }}">
+            <input type="hidden" name="categoria" value="protesi">
+            <input type="hidden" name="iid" value="{{ pr.def.id }}">
+            <button class="btn btn-ghost danger-btn">✕ Rimuovi</button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <h2>Augment</h2>
+    {% if not augments %}
+      <p class="muted">Nessun augment installato.</p>
+    {% else %}
+      <div class="poteri-list">
+        {% for ag in augments %}
+        <div class="potere-row">
+          <span class="potere-nome">{{ ag.nome }}</span>
+          <span class="badge badge-rango">{{ 'Attivo' if ag.attivo else 'Passivo' }} ·
+            umanità {{ ag.costo_umanita }}</span>
+          <p class="muted">{{ ag.descrizione }}</p>
+          <form method="post" action="{{ url_for('negozio_disequip') }}">
+            <input type="hidden" name="pid" value="{{ c.id }}">
+            <input type="hidden" name="categoria" value="augment">
+            <input type="hidden" name="iid" value="{{ ag.id }}">
+            <button class="btn btn-ghost danger-btn">✕ Rimuovi</button>
+          </form>
         </div>
         {% endfor %}
       </div>

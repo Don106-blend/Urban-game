@@ -35,10 +35,11 @@
       <span class="fc-nome">🗡 {{ e.nome }}</span>
       <span class="costo">¤ {{ e.valore }}</span>
     </div>
-    <p class="muted">{{ e.descrizione or "Equipaggiamento." }}</p>
+    <p class="muted">{{ e.descrizione or "Arma." }} (max {{ max_armi }} armi per eroe)</p>
     {% if vivi %}
     <form method="post" action="{{ url_for('negozio_equip') }}">
-      <input type="hidden" name="eid" value="{{ e.id }}">
+      <input type="hidden" name="categoria" value="arma">
+      <input type="hidden" name="iid" value="{{ e.id }}">
       <select name="pid" class="select">
         {% for c in vivi %}
         <option value="{{ c.id }}">{{ c.nome }}</option>
@@ -46,6 +47,89 @@
       </select>
       <button class="btn btn-volt full" {{ 'disabled' if crediti < e.valore }}>
         {{ 'Compra' if crediti >= e.valore else 'Crediti insufficienti' }}
+      </button>
+    </form>
+    {% else %}
+    <p class="muted">Nessun eroe nel box.</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+  {% for a in armor %}
+  <div class="fighter-card shop-item">
+    <div class="fc-top">
+      <span class="fc-nome">🛡 {{ a.nome }}</span>
+      <span class="costo">¤ {{ a.valore }}</span>
+    </div>
+    <p class="muted">{{ a.descrizione or "Armatura." }}
+      +{{ a.armatura_hp }} hp su {{ a.locazioni|join(', ') }} (1 slot, sostituisce quella indossata)</p>
+    {% if vivi %}
+    <form method="post" action="{{ url_for('negozio_equip') }}">
+      <input type="hidden" name="categoria" value="armatura">
+      <input type="hidden" name="iid" value="{{ a.id }}">
+      <select name="pid" class="select">
+        {% for c in vivi %}
+        <option value="{{ c.id }}">{{ c.nome }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-volt full" {{ 'disabled' if crediti < a.valore }}>
+        {{ 'Compra' if crediti >= a.valore else 'Crediti insufficienti' }}
+      </button>
+    </form>
+    {% else %}
+    <p class="muted">Nessun eroe nel box.</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+  {% for p in protesi %}
+  <div class="fighter-card shop-item">
+    <div class="fc-top">
+      <span class="fc-nome">⚙ {{ p.nome }}</span>
+      <span class="costo">¤ {{ p.valore }}</span>
+    </div>
+    <p class="muted">{{ p.descrizione or "Protesi." }}
+      Sostituisce {{ p.locazione.replace('_', ' ') }} ({{ p.hp }} hp) — costo umanità {{ p.costo_umanita }}</p>
+    {% if vivi %}
+    <form method="post" action="{{ url_for('negozio_equip') }}">
+      <input type="hidden" name="categoria" value="protesi">
+      <input type="hidden" name="iid" value="{{ p.id }}">
+      <select name="pid" class="select">
+        {% for c in vivi %}
+        <option value="{{ c.id }}">{{ c.nome }}
+          (umanità {{ umanita[c.id][1] - umanita[c.id][0] }}/{{ umanita[c.id][1] }})</option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-volt full" {{ 'disabled' if crediti < p.valore }}>
+        {{ 'Compra' if crediti >= p.valore else 'Crediti insufficienti' }}
+      </button>
+    </form>
+    {% else %}
+    <p class="muted">Nessun eroe nel box.</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+  {% for ag in augments %}
+  <div class="fighter-card shop-item">
+    <div class="fc-top">
+      <span class="fc-nome">🔩 {{ ag.nome }}</span>
+      <span class="costo">¤ {{ ag.valore }}</span>
+    </div>
+    <p class="muted">{{ ag.descrizione or "Augment." }}
+      {{ 'Attivo' if ag.attivo else 'Passivo (sempre acceso)' }} — costo umanità {{ ag.costo_umanita }}</p>
+    {% if vivi %}
+    <form method="post" action="{{ url_for('negozio_equip') }}">
+      <input type="hidden" name="categoria" value="augment">
+      <input type="hidden" name="iid" value="{{ ag.id }}">
+      <select name="pid" class="select">
+        {% for c in vivi %}
+        <option value="{{ c.id }}">{{ c.nome }}
+          (umanità {{ umanita[c.id][1] - umanita[c.id][0] }}/{{ umanita[c.id][1] }})</option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-volt full" {{ 'disabled' if crediti < ag.valore }}>
+        {{ 'Compra' if crediti >= ag.valore else 'Crediti insufficienti' }}
       </button>
     </form>
     {% else %}
