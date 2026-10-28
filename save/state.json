@@ -1,5 +1,5 @@
 {
- "crediti": 1000062,
+ "crediti": 994240,
  "personaggi": [
   {
    "id": 7,
@@ -15,7 +15,7 @@
    },
    "skills": {
     "armi_distanza": 1,
-    "armi_corpo_a_corpo": 1,
+    "armi_corpo_a_corpo": 2,
     "acrobatica": 1,
     "tattica": 1
    },
@@ -34,17 +34,28 @@
     "gamba_dx": 100
    },
    "crippled": [],
-   "livello": 2,
-   "xp": 750,
+   "livello": 3,
+   "xp": 225,
    "token": 0,
-   "toughness": 12,
+   "toughness": 20,
    "equip": [
     1
    ],
-   "vittorie": 2,
-   "sconfitte": 9,
+   "vittorie": 3,
+   "sconfitte": 10,
    "morto": false,
-   "last_heal": 1783856113.0249057
+   "last_heal": 1784037392.883455,
+   "armi": [
+    2
+   ],
+   "augments": [
+    4,
+    1
+   ],
+   "protesi": [
+    3
+   ],
+   "armatura_equip": 1
   },
   {
    "id": 9,
@@ -72,7 +83,7 @@
    ],
    "hp": {
     "testa": 50,
-    "busto": -110,
+    "busto": 150,
     "braccio_sx": 100,
     "braccio_dx": 100,
     "gamba_sx": 100,
@@ -80,14 +91,18 @@
    },
    "crippled": [],
    "livello": 2,
-   "xp": 250,
+   "xp": 1025,
    "token": 0,
-   "toughness": 13,
+   "toughness": 18,
    "equip": [],
-   "vittorie": 1,
-   "sconfitte": 8,
+   "vittorie": 2,
+   "sconfitte": 11,
    "morto": false,
-   "last_heal": 1783856084.0702357
+   "last_heal": 1784037392.883455,
+   "armatura_equip": 2,
+   "protesi": [
+    1
+   ]
   },
   {
    "id": 17,
@@ -130,7 +145,7 @@
    "vittorie": 0,
    "sconfitte": 2,
    "morto": false,
-   "last_heal": 1783856113.0249057
+   "last_heal": 1784037392.883455
   },
   {
    "id": 21,
@@ -173,20 +188,239 @@
    "vittorie": 0,
    "sconfitte": 1,
    "morto": false,
-   "last_heal": 1783856113.0249057
+   "last_heal": 1784037392.883455
+  },
+  {
+   "id": 34,
+   "nome": "Irene Iwata",
+   "data_nascita": "18/07/1998",
+   "bio": "",
+   "stats": {
+    "fisico": 1,
+    "riflessi": 1,
+    "mente": 2,
+    "sociale": 1,
+    "controllo": 1
+   },
+   "skills": {
+    "armi_distanza": 1,
+    "armi_corpo_a_corpo": 1,
+    "acrobatica": 1,
+    "tattica": 1
+   },
+   "poteri": [
+    {
+     "id": 9,
+     "rango": 1
+    }
+   ],
+   "hp": {
+    "testa": 50,
+    "busto": 150,
+    "braccio_sx": 100,
+    "braccio_dx": 100,
+    "gamba_sx": 100,
+    "gamba_dx": 100
+   },
+   "crippled": [],
+   "livello": 1,
+   "xp": 0,
+   "token": 0,
+   "toughness": 0,
+   "armi": [],
+   "armatura_equip": null,
+   "protesi": [],
+   "augments": [],
+   "vittorie": 0,
+   "sconfitte": 0,
+   "morto": false,
+   "last_heal": 1784037392.883455
+  },
+  {
+   "id": 35,
+   "nome": "Bruno Riva",
+   "data_nascita": "24/09/1971",
+   "bio": "Campione del Torneo Evo.",
+   "stats": {
+    "fisico": 3,
+    "riflessi": 1,
+    "mente": 3,
+    "sociale": 1,
+    "controllo": 4
+   },
+   "skills": {
+    "armi_distanza": 1,
+    "armi_corpo_a_corpo": 1,
+    "acrobatica": 1,
+    "tattica": 1
+   },
+   "poteri": [
+    {
+     "id": 3,
+     "rango": 1
+    },
+    {
+     "id": 1,
+     "rango": 2
+    },
+    {
+     "id": 20,
+     "rango": 3
+    },
+    {
+     "id": 6,
+     "rango": 4
+    }
+   ],
+   "hp": {
+    "testa": 50,
+    "busto": 150,
+    "braccio_sx": 100,
+    "braccio_dx": 100,
+    "gamba_sx": 100,
+    "gamba_dx": 100
+   },
+   "crippled": [],
+   "livello": 5,
+   "xp": 1050,
+   "token": 0,
+   "toughness": 4,
+   "armi": [
+    1
+   ],
+   "armatura_equip": 2,
+   "protesi": [],
+   "augments": [
+    1,
+    6
+   ],
+   "vittorie": 2,
+   "sconfitte": 1,
+   "morto": false,
+   "last_heal": 1784037392.883455
+  },
+  {
+   "id": 36,
+   "nome": "Greta Serra",
+   "data_nascita": "01/05/1997",
+   "bio": "Campione del Torneo Evo.",
+   "stats": {
+    "fisico": 2,
+    "riflessi": 2,
+    "mente": 3,
+    "sociale": 1,
+    "controllo": 4
+   },
+   "skills": {
+    "armi_distanza": 1,
+    "armi_corpo_a_corpo": 1,
+    "acrobatica": 1,
+    "tattica": 1
+   },
+   "poteri": [
+    {
+     "id": 13,
+     "rango": 1
+    },
+    {
+     "id": 17,
+     "rango": 2
+    },
+    {
+     "id": 1,
+     "rango": 3
+    },
+    {
+     "id": 14,
+     "rango": 4
+    }
+   ],
+   "hp": {
+    "testa": 50,
+    "busto": 131,
+    "braccio_sx": 100,
+    "braccio_dx": 100,
+    "gamba_sx": 100,
+    "gamba_dx": 39
+   },
+   "crippled": [],
+   "livello": 5,
+   "xp": 525,
+   "token": 0,
+   "toughness": 1,
+   "armi": [],
+   "armatura_equip": 2,
+   "protesi": [
+    3
+   ],
+   "augments": [
+    6,
+    3
+   ],
+   "vittorie": 1,
+   "sconfitte": 0,
+   "morto": false,
+   "last_heal": 1784037387.440647
   }
  ],
- "prossimo_id": 29,
+ "prossimo_id": 37,
  "contratti": [
   {
    "id": null,
-   "nome": "Kai Rasmussen",
-   "data_nascita": "12/07/1972",
+   "nome": "Alba Riva",
+   "data_nascita": "23/10/1991",
    "bio": "",
    "stats": {
-    "fisico": 2,
+    "fisico": 1,
     "riflessi": 1,
-    "mente": 1,
+    "mente": 2,
+    "sociale": 1,
+    "controllo": 1
+   },
+   "skills": {
+    "armi_distanza": 1,
+    "armi_corpo_a_corpo": 1,
+    "acrobatica": 1,
+    "tattica": 1
+   },
+   "poteri": [
+    {
+     "id": 20,
+     "rango": 1
+    }
+   ],
+   "hp": {
+    "testa": 50,
+    "busto": 150,
+    "braccio_sx": 100,
+    "braccio_dx": 100,
+    "gamba_sx": 100,
+    "gamba_dx": 100
+   },
+   "crippled": [],
+   "livello": 1,
+   "xp": 0,
+   "token": 0,
+   "toughness": 0,
+   "armi": [],
+   "armatura_equip": null,
+   "protesi": [],
+   "augments": [],
+   "vittorie": 0,
+   "sconfitte": 0,
+   "morto": false,
+   "last_heal": 1784033089.422246,
+   "costo": 200
+  },
+  {
+   "id": null,
+   "nome": "Maya Marchetti",
+   "data_nascita": "25/09/2002",
+   "bio": "",
+   "stats": {
+    "fisico": 1,
+    "riflessi": 1,
+    "mente": 2,
     "sociale": 1,
     "controllo": 1
    },
@@ -215,55 +449,14 @@
    "xp": 0,
    "token": 0,
    "toughness": 0,
-   "equip": [],
+   "armi": [],
+   "armatura_equip": null,
+   "protesi": [],
+   "augments": [],
    "vittorie": 0,
    "sconfitte": 0,
    "morto": false,
-   "last_heal": 1783855710.6777477,
-   "costo": 200
-  },
-  {
-   "id": null,
-   "nome": "Leo Anand",
-   "data_nascita": "10/11/2003",
-   "bio": "",
-   "stats": {
-    "fisico": 1,
-    "riflessi": 1,
-    "mente": 2,
-    "sociale": 1,
-    "controllo": 1
-   },
-   "skills": {
-    "armi_distanza": 1,
-    "armi_corpo_a_corpo": 1,
-    "acrobatica": 1,
-    "tattica": 1
-   },
-   "poteri": [
-    {
-     "id": 1,
-     "rango": 1
-    }
-   ],
-   "hp": {
-    "testa": 50,
-    "busto": 150,
-    "braccio_sx": 100,
-    "braccio_dx": 100,
-    "gamba_sx": 100,
-    "gamba_dx": 100
-   },
-   "crippled": [],
-   "livello": 1,
-   "xp": 0,
-   "token": 0,
-   "toughness": 0,
-   "equip": [],
-   "vittorie": 0,
-   "sconfitte": 0,
-   "morto": false,
-   "last_heal": 1783855710.6777637,
+   "last_heal": 1784033089.4222715,
    "costo": 200
   }
  ]

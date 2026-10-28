@@ -9,14 +9,9 @@
     "attivo_default": true,
     "tipo_danno": "contundente",
     "danno": {
-      "dadi": [
-        {
-          "n": 1,
-          "tipo": "d6"
-        }
-      ],
-      "flat": 0,
-      "mult": 10
+      "dadi": [],
+      "flat": 35,
+      "mult": 1
     },
     "sostituisce": null,
     "effetti_applicati": [],
@@ -24,11 +19,12 @@
     "skill_colpire": null,
     "cooldown_turni": 0,
     "usi_limitati": false,
-    "usi_massimi": 1
+    "usi_massimi": 1,
+    "colpi": 1
   },
   {
     "nome": "Spara la pistola",
-    "descrizione": "Un colpo di pistola.\n\n2d6*20",
+    "descrizione": "Un colpo di pistola.\n\nDanno base: 180",
     "ranged": true,
     "can_aim": true,
     "can_dodge": true,
@@ -37,21 +33,17 @@
     "tipo_danno": "perforante",
     "skill_colpire": null,
     "danno": {
-      "dadi": [
-        {
-          "n": 2,
-          "tipo": "d8"
-        }
-      ],
-      "flat": 0,
-      "mult": 20
+      "dadi": [],
+      "flat": 180,
+      "mult": 1
     },
     "sostituisce": null,
     "effetti_applicati": [],
     "id": 2,
     "cooldown_turni": 0,
     "usi_limitati": true,
-    "usi_massimi": 7
+    "usi_massimi": 7,
+    "colpi": 1
   },
   {
     "nome": "Colpo Devastante",
@@ -64,22 +56,17 @@
     "tipo_danno": "contundente",
     "skill_colpire": "controllo",
     "danno": {
-      "dadi": [
-        {
-          "n": 1,
-          "tipo": "fisico"
-        },
-        {
-          "n": 1,
-          "tipo": "controllo"
-        }
-      ],
-      "flat": 0,
-      "mult": 20
+      "dadi": [],
+      "flat": 85,
+      "mult": 1
     },
     "sostituisce": 1,
     "effetti_applicati": [],
-    "id": 3
+    "id": 3,
+    "cooldown_turni": 2,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "colpi": 1
   },
   {
     "nome": "Palla di fuoco",
@@ -92,18 +79,23 @@
     "tipo_danno": "fuoco",
     "skill_colpire": "controllo",
     "danno": {
-      "dadi": [
-        {
-          "n": 1,
-          "tipo": "controllo"
-        }
-      ],
-      "flat": 0,
-      "mult": 30
+      "dadi": [],
+      "flat": 90,
+      "mult": 1
     },
     "sostituisce": 9,
-    "effetti_applicati": [],
-    "id": 4
+    "effetti_applicati": [
+      {
+        "effetto": 1,
+        "turni": 1,
+        "persistente": false
+      }
+    ],
+    "id": 4,
+    "cooldown_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "colpi": 1
   },
   {
     "nome": "Lanciafiamme",
@@ -116,23 +108,23 @@
     "tipo_danno": "fuoco",
     "skill_colpire": "controllo",
     "danno": {
-      "dadi": [
-        {
-          "n": 1,
-          "tipo": "controllo"
-        }
-      ],
-      "flat": 0,
-      "mult": 50
+      "dadi": [],
+      "flat": 425,
+      "mult": 1
     },
     "sostituisce": null,
     "effetti_applicati": [
       {
         "effetto": 1,
-        "turni": 2
+        "turni": 2,
+        "persistente": false
       }
     ],
-    "id": 5
+    "id": 5,
+    "cooldown_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "colpi": 1
   },
   {
     "nome": "Pugno rinforzato",
@@ -145,14 +137,9 @@
     "tipo_danno": "contundente",
     "skill_colpire": "fisico",
     "danno": {
-      "dadi": [
-        {
-          "n": 1,
-          "tipo": "fisico"
-        }
-      ],
-      "flat": 0,
-      "mult": 20
+      "dadi": [],
+      "flat": 170,
+      "mult": 1
     },
     "sostituisce": 1,
     "effetti_applicati": [],
@@ -169,18 +156,17 @@
     "tipo_danno": "perforante",
     "skill_colpire": "controllo",
     "danno": {
-      "dadi": [
-        {
-          "n": 1,
-          "tipo": "controllo"
-        }
-      ],
-      "flat": 0,
-      "mult": 20
+      "dadi": [],
+      "flat": 170,
+      "mult": 1
     },
     "sostituisce": null,
     "effetti_applicati": [],
-    "id": 7
+    "id": 7,
+    "cooldown_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "colpi": 1
   },
   {
     "nome": "Scarica elettrica",
@@ -193,18 +179,17 @@
     "tipo_danno": "elettrico",
     "skill_colpire": "controllo",
     "danno": {
-      "dadi": [
-        {
-          "n": 1,
-          "tipo": "controllo"
-        }
-      ],
-      "flat": 0,
-      "mult": 20
+      "dadi": [],
+      "flat": 145,
+      "mult": 1
     },
     "sostituisce": 9,
     "effetti_applicati": [],
-    "id": 8
+    "id": 8,
+    "cooldown_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "colpi": 1
   },
   {
     "nome": "scintilla",
@@ -217,21 +202,17 @@
     "tipo_danno": "fuoco",
     "skill_colpire": "controllo",
     "danno": {
-      "dadi": [
-        {
-          "n": 1,
-          "tipo": "controllo"
-        }
-      ],
-      "flat": 0,
-      "mult": 5
+      "dadi": [],
+      "flat": 42,
+      "mult": 1
     },
     "sostituisce": null,
     "effetti_applicati": [],
     "id": 9,
     "cooldown_turni": 0,
     "usi_limitati": false,
-    "usi_massimi": 1
+    "usi_massimi": 1,
+    "colpi": 1
   },
   {
     "nome": "Fulmine",
@@ -245,12 +226,22 @@
     "skill_colpire": "controllo",
     "danno": {
       "dadi": [],
-      "flat": 0,
-      "mult": 100
+      "flat": 280,
+      "mult": 1
     },
     "sostituisce": null,
-    "effetti_applicati": [],
-    "id": 10
+    "effetti_applicati": [
+      {
+        "effetto": 7,
+        "turni": 1,
+        "persistente": false
+      }
+    ],
+    "id": 10,
+    "cooldown_turni": 3,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "colpi": 1
   },
   {
     "nome": "Artigli Affilati",
@@ -263,14 +254,9 @@
     "tipo_danno": "taglio",
     "skill_colpire": "fisico",
     "danno": {
-      "dadi": [
-        {
-          "n": 1,
-          "tipo": "fisico"
-        }
-      ],
-      "flat": 0,
-      "mult": 15
+      "dadi": [],
+      "flat": 128,
+      "mult": 1
     },
     "sostituisce": 1,
     "effetti_applicati": [
@@ -292,23 +278,23 @@
     "tipo_danno": "taglio",
     "skill_colpire": "controllo",
     "danno": {
-      "dadi": [
-        {
-          "n": 1,
-          "tipo": "controllo"
-        }
-      ],
-      "flat": 0,
-      "mult": 20
+      "dadi": [],
+      "flat": 170,
+      "mult": 1
     },
     "sostituisce": 11,
     "effetti_applicati": [
       {
         "effetto": 3,
-        "turni": 3
+        "turni": 3,
+        "persistente": false
       }
     ],
-    "id": 12
+    "id": 12,
+    "cooldown_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "colpi": 1
   },
   {
     "nome": "Braccio Lama",
@@ -321,14 +307,9 @@
     "tipo_danno": "taglio",
     "skill_colpire": null,
     "danno": {
-      "dadi": [
-        {
-          "n": 2,
-          "tipo": "d6"
-        }
-      ],
-      "flat": 0,
-      "mult": 10
+      "dadi": [],
+      "flat": 70,
+      "mult": 1
     },
     "sostituisce": 12,
     "effetti_applicati": [
@@ -353,14 +334,9 @@
     "tipo_danno": "psionico",
     "skill_colpire": "controllo",
     "danno": {
-      "dadi": [
-        {
-          "n": 1,
-          "tipo": "controllo"
-        }
-      ],
-      "flat": 0,
-      "mult": 10
+      "dadi": [],
+      "flat": 85,
+      "mult": 1
     },
     "sostituisce": null,
     "effetti_applicati": [
@@ -436,27 +412,28 @@
     "tipo_danno": "psionico",
     "skill_colpire": "controllo",
     "danno": {
-      "dadi": [
-        {
-          "n": 1,
-          "tipo": "controllo"
-        }
-      ],
-      "flat": 0,
-      "mult": 20
+      "dadi": [],
+      "flat": 170,
+      "mult": 1
     },
     "sostituisce": 14,
     "effetti_applicati": [
       {
         "effetto": 4,
-        "turni": 1
+        "turni": 1,
+        "persistente": false
       },
       {
         "effetto": 3,
-        "turni": 2
+        "turni": 2,
+        "persistente": false
       }
     ],
-    "id": 17
+    "id": 17,
+    "cooldown_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "colpi": 1
   },
   {
     "nome": "Attacco Rapido",
@@ -469,14 +446,9 @@
     "tipo_danno": "contundente",
     "skill_colpire": null,
     "danno": {
-      "dadi": [
-        {
-          "n": 1,
-          "tipo": "fisico"
-        }
-      ],
-      "flat": 0,
-      "mult": 10
+      "dadi": [],
+      "flat": 85,
+      "mult": 1
     },
     "sostituisce": null,
     "effetti_applicati": [],
@@ -484,7 +456,7 @@
   },
   {
     "nome": "Bocca di fuoco assemblata",
-    "descrizione": "2d6*20",
+    "descrizione": "Danno base: 140",
     "ranged": true,
     "can_aim": true,
     "can_dodge": true,
@@ -493,14 +465,9 @@
     "tipo_danno": "contundente",
     "skill_colpire": "armi_distanza",
     "danno": {
-      "dadi": [
-        {
-          "n": 2,
-          "tipo": "d6"
-        }
-      ],
-      "flat": 0,
-      "mult": 20
+      "dadi": [],
+      "flat": 140,
+      "mult": 1
     },
     "sostituisce": null,
     "effetti_applicati": [],
@@ -511,7 +478,7 @@
   },
   {
     "nome": "Colpo di lama assemblata",
-    "descrizione": "2d6",
+    "descrizione": "Danno base: 7",
     "ranged": false,
     "can_aim": true,
     "can_dodge": true,
@@ -520,30 +487,27 @@
     "tipo_danno": "taglio",
     "skill_colpire": "armi_corpo_a_corpo",
     "danno": {
-      "dadi": [
-        {
-          "n": 2,
-          "tipo": "d6"
-        }
-      ],
-      "flat": 0,
+      "dadi": [],
+      "flat": 7,
       "mult": 1
     },
     "sostituisce": null,
     "effetti_applicati": [
       {
         "effetto": 3,
-        "turni": 2
+        "turni": 2,
+        "persistente": false
       }
     ],
     "id": 20,
     "cooldown_turni": 0,
     "usi_limitati": false,
-    "usi_massimi": 1
+    "usi_massimi": 1,
+    "colpi": 1
   },
   {
     "nome": "Fucile automatico assemblato",
-    "descrizione": "3d4x30",
+    "descrizione": "Danno base: 225",
     "ranged": true,
     "can_aim": true,
     "can_dodge": true,
@@ -552,14 +516,9 @@
     "tipo_danno": "perforante",
     "skill_colpire": "armi_distanza",
     "danno": {
-      "dadi": [
-        {
-          "n": 3,
-          "tipo": "d4"
-        }
-      ],
-      "flat": 0,
-      "mult": 30
+      "dadi": [],
+      "flat": 225,
+      "mult": 1
     },
     "sostituisce": null,
     "effetti_applicati": [],
@@ -570,7 +529,7 @@
   },
   {
     "nome": "Lanciarazzi assemblato",
-    "descrizione": "1d12*50",
+    "descrizione": "Danno base: 325",
     "ranged": true,
     "can_aim": false,
     "can_dodge": true,
@@ -579,25 +538,21 @@
     "tipo_danno": "fuoco",
     "skill_colpire": "armi_distanza",
     "danno": {
-      "dadi": [
-        {
-          "n": 1,
-          "tipo": "d12"
-        }
-      ],
-      "flat": 0,
-      "mult": 50
+      "dadi": [],
+      "flat": 325,
+      "mult": 1
     },
     "sostituisce": null,
     "effetti_applicati": [],
     "id": 22,
     "cooldown_turni": 5,
     "usi_limitati": false,
-    "usi_massimi": 1
+    "usi_massimi": 1,
+    "colpi": 1
   },
   {
     "nome": "Granata stordente assemblata",
-    "descrizione": "2d4*30",
+    "descrizione": "Danno base: 150",
     "ranged": true,
     "can_aim": false,
     "can_dodge": true,
@@ -606,14 +561,9 @@
     "tipo_danno": "contundente",
     "skill_colpire": null,
     "danno": {
-      "dadi": [
-        {
-          "n": 2,
-          "tipo": "d4"
-        }
-      ],
-      "flat": 0,
-      "mult": 30
+      "dadi": [],
+      "flat": 150,
+      "mult": 1
     },
     "sostituisce": null,
     "effetti_applicati": [
@@ -649,7 +599,8 @@
     "sostituisce": null,
     "speciale": "assorbi_caratteristica",
     "speciale_turni": 3,
-    "effetti_applicati": []
+    "effetti_applicati": [],
+    "colpi": 1
   },
   {
     "nome": "Battito d'ala",
@@ -662,13 +613,8 @@
     "tipo_danno": "contundente",
     "skill_colpire": "controllo",
     "danno": {
-      "dadi": [
-        {
-          "n": 2,
-          "tipo": "d10"
-        }
-      ],
-      "flat": 0,
+      "dadi": [],
+      "flat": 11,
       "mult": 1
     },
     "sostituisce": null,
@@ -676,7 +622,8 @@
     "usi_limitati": false,
     "usi_massimi": 1,
     "effetti_applicati": [],
-    "id": 25
+    "id": 25,
+    "colpi": 1
   },
   {
     "nome": "Folata Impetuosa",
@@ -689,14 +636,9 @@
     "tipo_danno": "contundente",
     "skill_colpire": "controllo",
     "danno": {
-      "dadi": [
-        {
-          "n": 2,
-          "tipo": "d10"
-        }
-      ],
-      "flat": 0,
-      "mult": 10
+      "dadi": [],
+      "flat": 110,
+      "mult": 1
     },
     "sostituisce": 25,
     "cooldown_turni": 0,
@@ -705,10 +647,12 @@
     "effetti_applicati": [
       {
         "effetto": 7,
-        "turni": 1
+        "turni": 1,
+        "persistente": false
       }
     ],
-    "id": 26
+    "id": 26,
+    "colpi": 1
   },
   {
     "nome": "Colpo di scudo",
@@ -721,21 +665,17 @@
     "tipo_danno": "contundente",
     "skill_colpire": null,
     "danno": {
-      "dadi": [
-        {
-          "n": 1,
-          "tipo": "d6"
-        }
-      ],
-      "flat": 0,
-      "mult": 10
+      "dadi": [],
+      "flat": 35,
+      "mult": 1
     },
     "sostituisce": null,
     "cooldown_turni": 0,
     "usi_limitati": false,
     "usi_massimi": 1,
     "effetti_applicati": [],
-    "id": 27
+    "id": 27,
+    "colpi": 1
   },
   {
     "id": 28,
@@ -749,14 +689,9 @@
     "tipo_danno": "gelo",
     "skill_colpire": "controllo",
     "danno": {
-      "dadi": [
-        {
-          "n": 1,
-          "tipo": "controllo"
-        }
-      ],
-      "flat": 0,
-      "mult": 12
+      "dadi": [],
+      "flat": 102,
+      "mult": 1
     },
     "sostituisce": null,
     "effetti_applicati": [],
@@ -776,14 +711,9 @@
     "tipo_danno": "gelo",
     "skill_colpire": "controllo",
     "danno": {
-      "dadi": [
-        {
-          "n": 1,
-          "tipo": "controllo"
-        }
-      ],
-      "flat": 0,
-      "mult": 18
+      "dadi": [],
+      "flat": 153,
+      "mult": 1
     },
     "sostituisce": null,
     "effetti_applicati": [
@@ -808,14 +738,9 @@
     "tipo_danno": "gelo",
     "skill_colpire": "controllo",
     "danno": {
-      "dadi": [
-        {
-          "n": 1,
-          "tipo": "controllo"
-        }
-      ],
-      "flat": 0,
-      "mult": 30
+      "dadi": [],
+      "flat": 255,
+      "mult": 1
     },
     "sostituisce": null,
     "effetti_applicati": [],
@@ -835,25 +760,22 @@
     "tipo_danno": "acido",
     "skill_colpire": "controllo",
     "danno": {
-      "dadi": [
-        {
-          "n": 1,
-          "tipo": "controllo"
-        }
-      ],
-      "flat": 0,
-      "mult": 10
+      "dadi": [],
+      "flat": 85,
+      "mult": 1
     },
     "sostituisce": null,
     "effetti_applicati": [
       {
         "effetto": 12,
-        "turni": 2
+        "turni": 2,
+        "persistente": false
       }
     ],
     "cooldown_turni": 0,
     "usi_limitati": false,
-    "usi_massimi": 1
+    "usi_massimi": 1,
+    "colpi": 1
   },
   {
     "id": 32,
@@ -867,14 +789,9 @@
     "tipo_danno": "acido",
     "skill_colpire": "controllo",
     "danno": {
-      "dadi": [
-        {
-          "n": 1,
-          "tipo": "controllo"
-        }
-      ],
-      "flat": 0,
-      "mult": 20
+      "dadi": [],
+      "flat": 170,
+      "mult": 1
     },
     "sostituisce": null,
     "effetti_applicati": [
@@ -899,25 +816,22 @@
     "tipo_danno": "acido",
     "skill_colpire": "controllo",
     "danno": {
-      "dadi": [
-        {
-          "n": 1,
-          "tipo": "controllo"
-        }
-      ],
-      "flat": 0,
-      "mult": 28
+      "dadi": [],
+      "flat": 238,
+      "mult": 1
     },
     "sostituisce": null,
     "effetti_applicati": [
       {
         "effetto": 12,
-        "turni": 2
+        "turni": 2,
+        "persistente": false
       }
     ],
     "cooldown_turni": 2,
     "usi_limitati": false,
-    "usi_massimi": 1
+    "usi_massimi": 1,
+    "colpi": 1
   },
   {
     "id": 34,
@@ -931,14 +845,9 @@
     "tipo_danno": "psionico",
     "skill_colpire": "controllo",
     "danno": {
-      "dadi": [
-        {
-          "n": 1,
-          "tipo": "controllo"
-        }
-      ],
-      "flat": 0,
-      "mult": 15
+      "dadi": [],
+      "flat": 128,
+      "mult": 1
     },
     "sostituisce": null,
     "effetti_applicati": [],
@@ -958,14 +867,9 @@
     "tipo_danno": "psionico",
     "skill_colpire": "controllo",
     "danno": {
-      "dadi": [
-        {
-          "n": 1,
-          "tipo": "controllo"
-        }
-      ],
-      "flat": 0,
-      "mult": 10
+      "dadi": [],
+      "flat": 85,
+      "mult": 1
     },
     "sostituisce": null,
     "effetti_applicati": [
@@ -990,14 +894,9 @@
     "tipo_danno": "psionico",
     "skill_colpire": "controllo",
     "danno": {
-      "dadi": [
-        {
-          "n": 1,
-          "tipo": "controllo"
-        }
-      ],
-      "flat": 0,
-      "mult": 30
+      "dadi": [],
+      "flat": 255,
+      "mult": 1
     },
     "sostituisce": null,
     "effetti_applicati": [
@@ -1022,14 +921,9 @@
     "tipo_danno": "magico",
     "skill_colpire": "controllo",
     "danno": {
-      "dadi": [
-        {
-          "n": 1,
-          "tipo": "controllo"
-        }
-      ],
-      "flat": 0,
-      "mult": 14
+      "dadi": [],
+      "flat": 119,
+      "mult": 1
     },
     "sostituisce": null,
     "effetti_applicati": [
@@ -1054,14 +948,9 @@
     "tipo_danno": "magico",
     "skill_colpire": "controllo",
     "danno": {
-      "dadi": [
-        {
-          "n": 1,
-          "tipo": "controllo"
-        }
-      ],
-      "flat": 0,
-      "mult": 22
+      "dadi": [],
+      "flat": 187,
+      "mult": 1
     },
     "sostituisce": null,
     "effetti_applicati": [
@@ -1086,14 +975,9 @@
     "tipo_danno": "magico",
     "skill_colpire": "controllo",
     "danno": {
-      "dadi": [
-        {
-          "n": 1,
-          "tipo": "controllo"
-        }
-      ],
-      "flat": 0,
-      "mult": 35
+      "dadi": [],
+      "flat": 298,
+      "mult": 1
     },
     "sostituisce": null,
     "effetti_applicati": [
@@ -1118,20 +1002,16 @@
     "tipo_danno": "contundente",
     "skill_colpire": "fisico",
     "danno": {
-      "dadi": [
-        {
-          "n": 1,
-          "tipo": "fisico"
-        }
-      ],
-      "flat": 0,
-      "mult": 15
+      "dadi": [],
+      "flat": 85,
+      "mult": 1
     },
     "sostituisce": null,
     "effetti_applicati": [],
     "cooldown_turni": 0,
     "usi_limitati": false,
-    "usi_massimi": 1
+    "usi_massimi": 1,
+    "colpi": 1
   },
   {
     "id": 41,
@@ -1145,20 +1025,16 @@
     "tipo_danno": "contundente",
     "skill_colpire": "fisico",
     "danno": {
-      "dadi": [
-        {
-          "n": 1,
-          "tipo": "fisico"
-        }
-      ],
-      "flat": 0,
-      "mult": 15
+      "dadi": [],
+      "flat": 128,
+      "mult": 1
     },
     "sostituisce": null,
     "effetti_applicati": [],
     "cooldown_turni": 1,
     "usi_limitati": false,
-    "usi_massimi": 1
+    "usi_massimi": 1,
+    "colpi": 1
   },
   {
     "id": 42,
@@ -1172,20 +1048,16 @@
     "tipo_danno": "contundente",
     "skill_colpire": "fisico",
     "danno": {
-      "dadi": [
-        {
-          "n": 1,
-          "tipo": "fisico"
-        }
-      ],
-      "flat": 0,
-      "mult": 30
+      "dadi": [],
+      "flat": 255,
+      "mult": 1
     },
     "sostituisce": null,
     "effetti_applicati": [],
     "cooldown_turni": 3,
     "usi_limitati": false,
-    "usi_massimi": 1
+    "usi_massimi": 1,
+    "colpi": 1
   },
   {
     "id": 43,
@@ -1199,14 +1071,9 @@
     "tipo_danno": "fuoco",
     "skill_colpire": "controllo",
     "danno": {
-      "dadi": [
-        {
-          "n": 1,
-          "tipo": "controllo"
-        }
-      ],
-      "flat": 0,
-      "mult": 35
+      "dadi": [],
+      "flat": 298,
+      "mult": 1
     },
     "sostituisce": null,
     "effetti_applicati": [
@@ -1231,14 +1098,9 @@
     "tipo_danno": "contundente",
     "skill_colpire": "fisico",
     "danno": {
-      "dadi": [
-        {
-          "n": 1,
-          "tipo": "fisico"
-        }
-      ],
-      "flat": 0,
-      "mult": 18
+      "dadi": [],
+      "flat": 153,
+      "mult": 1
     },
     "sostituisce": null,
     "effetti_applicati": [],
@@ -1258,14 +1120,9 @@
     "tipo_danno": "contundente",
     "skill_colpire": "controllo",
     "danno": {
-      "dadi": [
-        {
-          "n": 1,
-          "tipo": "controllo"
-        }
-      ],
-      "flat": 0,
-      "mult": 12
+      "dadi": [],
+      "flat": 102,
+      "mult": 1
     },
     "sostituisce": null,
     "effetti_applicati": [],
@@ -1285,14 +1142,9 @@
     "tipo_danno": "contundente",
     "skill_colpire": "controllo",
     "danno": {
-      "dadi": [
-        {
-          "n": 1,
-          "tipo": "controllo"
-        }
-      ],
-      "flat": 0,
-      "mult": 18
+      "dadi": [],
+      "flat": 153,
+      "mult": 1
     },
     "sostituisce": null,
     "effetti_applicati": [],
@@ -1312,24 +1164,20 @@
     "tipo_danno": "contundente",
     "skill_colpire": "controllo",
     "danno": {
-      "dadi": [
-        {
-          "n": 1,
-          "tipo": "controllo"
-        }
-      ],
-      "flat": 0,
-      "mult": 30
+      "dadi": [],
+      "flat": 255,
+      "mult": 1
     },
     "sostituisce": null,
     "effetti_applicati": [],
     "cooldown_turni": 2,
     "usi_limitati": false,
-    "usi_massimi": 1
+    "usi_massimi": 1,
+    "colpi": 1
   },
   {
     "nome": "Colpo di lama",
-    "descrizione": "2d6",
+    "descrizione": "Danno base: 7",
     "ranged": false,
     "can_aim": true,
     "can_dodge": true,
@@ -1338,13 +1186,8 @@
     "tipo_danno": "taglio",
     "skill_colpire": "armi_corpo_a_corpo",
     "danno": {
-      "dadi": [
-        {
-          "n": 2,
-          "tipo": "d6"
-        }
-      ],
-      "flat": 0,
+      "dadi": [],
+      "flat": 7,
       "mult": 1
     },
     "sostituisce": null,
@@ -1362,7 +1205,7 @@
   },
   {
     "nome": "affondo di lama",
-    "descrizione": "2d6",
+    "descrizione": "Danno base: 7",
     "ranged": false,
     "can_aim": true,
     "can_dodge": true,
@@ -1371,13 +1214,8 @@
     "tipo_danno": "perforante",
     "skill_colpire": "armi_corpo_a_corpo",
     "danno": {
-      "dadi": [
-        {
-          "n": 2,
-          "tipo": "d6"
-        }
-      ],
-      "flat": 0,
+      "dadi": [],
+      "flat": 7,
       "mult": 1
     },
     "sostituisce": null,
@@ -1405,14 +1243,9 @@
     "tipo_danno": "elettrico",
     "skill_colpire": "controllo",
     "danno": {
-      "dadi": [
-        {
-          "n": 1,
-          "tipo": "controllo"
-        }
-      ],
-      "flat": 0,
-      "mult": 15
+      "dadi": [],
+      "flat": 128,
+      "mult": 1
     },
     "sostituisce": null,
     "effetti_applicati": [

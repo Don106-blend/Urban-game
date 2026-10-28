@@ -239,7 +239,10 @@
     ],
     "effetti_applicati": [],
     "effetti_avversario": [],
-    "id": 11
+    "id": 11,
+    "cooldown_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1
   },
   {
     "nome": "Riflessi Fulminei",

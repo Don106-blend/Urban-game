@@ -9,8 +9,16 @@ import random
 BASE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(BASE, "data")
 
-DADI = {1: 6, 2: 8, 3: 10, 4: 20}
+# Ogni tiro rango-dipendente usa lo stesso dado; il rango dà un bonus fisso invece di un
+# dado più grande — così la varianza resta costante e il vantaggio di rango è affidabile
+# invece di sommergersi nel proprio stesso dado più ballerino (v. overhaul combattimento).
+DADO_BASE = 10
+BONUS_RANGO = {1: 0, 2: 3, 3: 6, 4: 9}
 DADI_FISSI = {"d4": 4, "d6": 6, "d8": 8, "d10": 10, "d12": 12, "d20": 20}
+# margine (ta - td) oltre al colpo semplice: quanto pesa un tiro vinto largo sul danno,
+# di fatto il sostituto dei "critici" — cappato per non far esplodere i tiri estremi.
+MARGINE_CAP = 8
+MARGINE_FATTORE = 2
 MAX_POTERI = 4
 LOCAZIONI = {"testa": 50, "busto": 150, "braccio_sx": 100, "braccio_dx": 100,
              "gamba_sx": 100, "gamba_dx": 100}
@@ -193,8 +201,8 @@ class Personaggio:
         if tipo in DADI_FISSI:  # dado a taglia fissa (es. "d6"), non legato a statistiche
             return random.randint(1, DADI_FISSI[tipo])
         rango, malus_floor = self._calcola_rango(tipo, avversario)
-        flat = malus_floor + self._flat_risultato(tipo)
-        return random.randint(1, DADI[rango]) + flat
+        flat = malus_floor + self._flat_risultato(tipo) + BONUS_RANGO[rango]
+        return random.randint(1, DADO_BASE) + flat
 
     def tira_formula(self, f, avversario=None):
         """(somma dadi + flat) * mult — usata per danni ed effetti."""
@@ -981,7 +989,7 @@ def scheda(p, attivo=False, cpu=False):
         r.append(f"  {loc:<11}{p.hp[loc]:>5}/{mx}{extra}{cr}")
     r += ["", "Statistiche:"]
     for s in STATS:
-        r.append(f"  {s:<10} {p.stats[s]} (D{DADI[p.stats[s]]})")
+        r.append(f"  {s:<10} {p.stats[s]} (D{DADO_BASE}+{BONUS_RANGO[p.stats[s]]})")
     r.append(f"  movimento  {p.movimento}")
     r += ["", "Skill:"]
     for s in SKILLS:

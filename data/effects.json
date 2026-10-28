@@ -274,7 +274,7 @@
   },
   {
     "id": 15,
-    "nome": "Stamina_mod",
+    "nome": "Stamina_sottrai",
     "descrizione": "Modifica la stamina di un delta (negativo = la toglie, positivo = la ricarica).",
     "tipo": "modificatore",
     "tipo_danno": "",
@@ -304,5 +304,24 @@
       "mult": 1
     },
     "modificatori": []
+  },
+  {
+    "id": 17,
+    "nome": "Stamina_aggiungi",
+    "descrizione": "Modifica la stamina di un delta (negativo = la toglie, positivo = la ricarica).",
+    "tipo": "modificatore",
+    "tipo_danno": "",
+    "split": false,
+    "formula": {
+      "dadi": [],
+      "flat": 0,
+      "mult": 1
+    },
+    "modificatori": [
+      {
+        "tipo": "stamina_mod",
+        "delta": 2
+      }
+    ]
   }
 ]

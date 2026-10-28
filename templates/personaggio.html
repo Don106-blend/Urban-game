@@ -62,7 +62,7 @@
         <div class="pips">
           {% for i in range(1, 5) %}<span class="pip {{ 'full' if i <= c.stats[s] }}"></span>{% endfor %}
         </div>
-        <div class="stat-dado">D{{ DADI[c.stats[s]] }}</div>
+        <div class="stat-dado">D10 +{{ BONUS_RANGO[c.stats[s]] }}</div>
       </div>
       {% endfor %}
     </div>
@@ -76,7 +76,7 @@
           {% for i in range(1, 5) %}<span class="pip {{ 'full' if i <= c.skills.get(s, 0) }}"></span>{% endfor %}
         </div>
         <div class="stat-dado muted">
-          {% if c.skills.get(s, 0) %}D{{ DADI[c.skills[s]] }}{% else %}usa {{ FALLBACK.get(s, 'fisico') }}{% endif %}
+          {% if c.skills.get(s, 0) %}D10 +{{ BONUS_RANGO[c.skills[s]] }}{% else %}usa {{ FALLBACK.get(s, 'fisico') }}{% endif %}
         </div>
       </div>
       {% endfor %}

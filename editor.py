@@ -260,13 +260,9 @@ class RigheEffettiPotere(RigheDinamiche):
 
     def aggiungi(self, item=None):
         item = item or {}
-        dado = (item.get("dadi") or [{}])[0]
         riga = ttk.Frame(self.frame, relief="groove", borderwidth=1, padding=6)
         tv = tk.StringVar(value=item.get("tipo", "armatura"))
-        nv = tk.StringVar(value=str(dado.get("n", 1)))
-        dv = tk.StringVar(value=dado.get("tipo", "controllo"))
         fv = tk.StringVar(value=str(item.get("flat", 0)))
-        mv = tk.StringVar(value=str(item.get("mult", 1)))
         sv = tk.StringVar(value=item.get("statistica", "fisico"))
         ev = tk.StringVar(value=str(item.get("delta", item.get("valore", item.get("hp", 1)))))
         dnv = tk.StringVar(value=item.get("tipo_danno", "contundente"))
@@ -280,11 +276,7 @@ class RigheEffettiPotere(RigheDinamiche):
         linea1 = ttk.Frame(corpo)
         linea1.pack(anchor="w")
         campo(linea1, "Tipo", combo(linea1, tv, lambda: TIPI_EFFETTO_POTERE, 15))
-        campo(linea1, "N dadi (arm/cura)", tk.Spinbox(linea1, from_=0, to=20, width=4,
-                                                      textvariable=nv))
-        campo(linea1, "Dado", combo(linea1, dv, self.get_tipi, 17))
-        campo(linea1, "Flat", ttk.Entry(linea1, textvariable=fv, width=6))
-        campo(linea1, "Molt.", ttk.Entry(linea1, textvariable=mv, width=6))
+        campo(linea1, "Valore (armatura/cura)", ttk.Entry(linea1, textvariable=fv, width=7))
         campo(linea1, "Nome locazione extra", ttk.Entry(linea1, textvariable=lv, width=14))
 
         linea2 = ttk.Frame(corpo)
@@ -296,12 +288,12 @@ class RigheEffettiPotere(RigheDinamiche):
         campo(linea2, "Bonus", tk.Spinbox(linea2, from_=-9, to=9, width=4, textvariable=bov))
         campo(linea2, "Risposte", tk.Spinbox(linea2, from_=-9, to=9, width=4, textvariable=riv))
 
-        self._registra(riga, (tv, nv, dv, fv, mv, sv, ev, dnv, azv, bov, riv, lv))
+        self._registra(riga, (tv, fv, sv, ev, dnv, azv, bov, riv, lv))
         riga.pack_configure(pady=4)
 
     def get(self):
         out = []
-        for _, (tv, nv, dv, fv, mv, sv, ev, dnv, azv, bov, riv, lv) in self.righe:
+        for _, (tv, fv, sv, ev, dnv, azv, bov, riv, lv) in self.righe:
             t = tv.get()
             if t == "mod_statistica":
                 out.append({"tipo": t, "statistica": sv.get(), "delta": num(ev)})
@@ -317,9 +309,8 @@ class RigheEffettiPotere(RigheDinamiche):
             elif t == "azioni":
                 out.append({"tipo": t, "azioni": num(azv), "bonus": num(bov),
                             "risposte": num(riv)})
-            else:
-                out.append({"tipo": t, "dadi": [{"n": num(nv, 1), "tipo": dv.get()}],
-                            "flat": num(fv), "mult": num(mv, 1)})
+            else:  # armatura/cura: valore piatto, niente più dadi moltiplicati
+                out.append({"tipo": t, "dadi": [], "flat": num(fv), "mult": 1})
         return out
 
 
@@ -624,7 +615,6 @@ class TabAttacchi(CrudTab):
         self.tipo_danno = tk.StringVar(value="contundente")
         self.skill_colpire = tk.StringVar(value="(default)")
         self.flat = tk.StringVar(value="0")
-        self.mult = tk.StringVar(value="1")
         self.sostituisce = tk.StringVar(value="(nessuna)")
         self.cooldown_turni = tk.StringVar(value="0")
         self.usi_limitati = tk.BooleanVar()
@@ -654,15 +644,12 @@ class TabAttacchi(CrudTab):
             side="left", padx=6)
         ttk.Label(form, text="(default: armi_distanza se ranged, armi_corpo_a_corpo altrimenti; "
                              "molti attacchi dei poteri usano controllo)").pack(anchor="w")
-        ttk.Label(form, text="Dadi danno").pack(anchor="w", pady=(6, 0))
-        self.dadi = RigheDadi(form, self.get_tipi)
-        self.dadi.frame.pack(anchor="w")
         r3 = ttk.Frame(form)
         r3.pack(anchor="w", pady=2)
-        ttk.Label(r3, text="Danno flat").pack(side="left")
+        ttk.Label(r3, text="Danno base").pack(side="left")
         ttk.Entry(r3, textvariable=self.flat, width=6).pack(side="left", padx=6)
-        ttk.Label(r3, text="Moltiplicatore").pack(side="left")
-        ttk.Entry(r3, textvariable=self.mult, width=6).pack(side="left", padx=6)
+        ttk.Label(r3, text="(il margine del tiro per colpire aggiunge danno extra "
+                           "in automatico: qui va solo la base)").pack(side="left", padx=6)
         r4 = ttk.Frame(form)
         r4.pack(anchor="w", pady=2)
         ttk.Label(r4, text="Sostituisce azione").pack(side="left")
@@ -704,9 +691,7 @@ class TabAttacchi(CrudTab):
         self.tipo_danno.set(a.get("tipo_danno", "contundente"))
         self.skill_colpire.set(a.get("skill_colpire") or "(default)")
         danno = a.get("danno", {})
-        self.dadi.set(danno.get("dadi", []))
         self.flat.set(str(danno.get("flat", 0)))
-        self.mult.set(str(danno.get("mult", 1)))
         sost = a.get("sostituisce")
         self.sostituisce.set(next((e for e in self.etichette()
                                    if e.startswith(f"{sost} - ")), "(nessuna)"))
@@ -736,8 +721,7 @@ class TabAttacchi(CrudTab):
             "tipo_danno": self.tipo_danno.get(),
             "skill_colpire": (self.skill_colpire.get()
                               if self.skill_colpire.get() != "(default)" else None),
-            "danno": {"dadi": self.dadi.get(), "flat": num(self.flat),
-                      "mult": num(self.mult, 1)},
+            "danno": {"dadi": [], "flat": num(self.flat), "mult": 1},
             "sostituisce": id_da_etichetta(sost) if sost != "(nessuna)" else None,
             "cooldown_turni": num(self.cooldown_turni),
             "usi_limitati": self.usi_limitati.get(),

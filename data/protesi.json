@@ -28,5 +28,20 @@
     ],
     "stance_attivate": [],
     "effetti_nel_tempo": []
+  },
+  {
+    "nome": "Retina Cybernetica",
+    "descrizione": "",
+    "valore": 300,
+    "costo_umanita": 1,
+    "locazione": "testa",
+    "hp": 50,
+    "attacchi": [],
+    "stance": [],
+    "stance_attivate": [
+      29
+    ],
+    "effetti_nel_tempo": [],
+    "id": 3
   }
 ]

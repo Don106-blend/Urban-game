@@ -43,5 +43,24 @@
     ],
     "stance_attivate": [],
     "effetti_nel_tempo": []
+  },
+  {
+    "nome": "Casco da lotta",
+    "descrizione": "",
+    "valore": 50,
+    "locazioni": [
+      "testa"
+    ],
+    "armatura_hp": 25,
+    "resistenze": [
+      {
+        "tipo_danno": "contundente",
+        "valore": 25
+      }
+    ],
+    "stance": [],
+    "stance_attivate": [],
+    "effetti_nel_tempo": [],
+    "id": 3
   }
 ]

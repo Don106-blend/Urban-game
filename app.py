@@ -10,7 +10,8 @@ import time
 from flask import (Flask, render_template, redirect, url_for, request,
                    jsonify, flash)
 
-from engine import (DADI, LOCAZIONI, STATS, SKILLS, FALLBACK, MAX_POTERI,
+from engine import (BONUS_RANGO, LOCAZIONI, STATS, SKILLS, FALLBACK, MAX_POTERI,
+                    MARGINE_CAP, MARGINE_FATTORE, umanita_max,
                     Personaggio, personaggio_casuale, eroe_base, carica_db,
                     bonus_colpire, dotazione_base, valuta, costo_upgrade)
 
@@ -74,13 +75,20 @@ MAX_ARMI = 2  # slot arma nell'inventario di un eroe
 
 
 def nuovo_record(p):
-    """Personaggio del motore -> record salvabile."""
+    """Personaggio del motore -> record salvabile. Cattura anche l'equip eventualmente
+    già presente sul Personaggio (es. un campione del Torneo Evo che ha raccolto item
+    durante il torneo): per un eroe appena creato questi campi sono comunque vuoti."""
+    protesi_ids = [pr["id"] for loc in p.protesi_locazioni
+                   for pr in DB["protesi"] if pr["locazione"] == loc]
     return {"id": None, "nome": p.nome, "data_nascita": p.data_nascita,
             "bio": p.bio, "stats": dict(p.stats), "skills": dict(p.skills),
             "poteri": [{"id": s["def"]["id"], "rango": s["rango"]} for s in p.poteri],
             "hp": dict(p.hp), "crippled": sorted(p.crippled),
             "livello": 1, "xp": 0, "token": 0, "toughness": 0,
-            "armi": [], "armatura_equip": None, "protesi": [], "augments": [],
+            "armi": list(getattr(p, "armi_equip", []))[:MAX_ARMI],
+            "armatura_equip": getattr(p, "armatura_equip_id", None),
+            "protesi": protesi_ids,
+            "augments": [s["def"]["id"] for s in p.augments],
             "vittorie": 0, "sconfitte": 0, "morto": False,
             "last_heal": time.time()}
 
@@ -377,6 +385,60 @@ def _spendi_token_cpu(c, token):
             ogg["rango"] += 1
 
 
+def _applica_item_a(p, categoria, item):
+    """Equipaggia arma/armatura/augment su un Personaggio vivo (CPU o eroe del Torneo
+    Evo): stessa applicazione di record_to_pg, ma senza passare da un record salvato."""
+    if categoria == "arma":
+        if not hasattr(p, "armi_equip"):
+            p.armi_equip = []
+        p.armi_equip.append(item["id"])
+        for aid in item.get("attacchi", []):
+            att = next((x for x in DB["attacchi"] if x["id"] == aid), None)
+            if att and all(x["id"] != att["id"] for x in p.attacchi):
+                p.attacchi.append(att)
+    elif categoria == "armatura":
+        p.equipaggia_armatura(item, DB["stances"], DB["effetti"])
+        p.armatura_equip_id = item["id"]  # per ricostruire il record, v. nuovo_record
+    else:  # augment
+        slot = {"def": item, "rango": 1, "attivo": False}
+        p.augments.append(slot)
+        if not item.get("attivo", True):  # passivo: attivo da subito, per sempre
+            p.attiva_potere(slot, DB["attacchi"], DB["stances"], DB["effetti"])
+
+
+def _equipaggia_cpu(c, livello):
+    """Dota la CPU di equip scalato al livello (stesse regole di slot/umanità di un
+    giocatore vero): più il livello cresce, più è probabile che porti armi, armatura,
+    protesi e augment invece di combattere a mani nude — un giocatore allo stesso
+    livello ha sia i Token spesi (già simulati sopra) sia quello che si è comprato."""
+    c.armi_equip = []
+    p_arma = min(0.75, 0.12 * livello)
+    p_armatura = min(0.65, 0.10 * livello)
+    p_extra = min(0.55, 0.08 * livello)
+
+    for eq in random.sample(DB["equip"], k=min(MAX_ARMI, len(DB["equip"]))):
+        if len(c.armi_equip) < MAX_ARMI and random.random() < p_arma:
+            _applica_item_a(c, "arma", eq)
+
+    if DB["armor"] and random.random() < p_armatura:
+        _applica_item_a(c, "armatura", random.choice(DB["armor"]))
+
+    umanita_libera = umanita_max(c)
+    extra = list(DB["protesi"]) + list(DB["augments"])
+    random.shuffle(extra)
+    for item in extra:
+        costo = item.get("costo_umanita", 0)
+        if costo > umanita_libera or random.random() >= p_extra:
+            continue
+        if "locazione" in item:  # protesi: una sola per locazione
+            if item["locazione"] in c.protesi_locazioni:
+                continue
+            c.equipaggia_protesi(item, DB["attacchi"], DB["stances"], DB["effetti"])
+        else:
+            _applica_item_a(c, "augment", item)
+        umanita_libera -= costo
+
+
 def cpu_bilanciata(giocatore):
     """Matchmaking: la CPU è un eroe base cresciuto fino al livello del giocatore
     (più il bias imparato dai survey), con la stessa economia di Token."""
@@ -392,6 +454,7 @@ def cpu_bilanciata(giocatore):
             if nuovi:
                 c.poteri.append({"def": random.choice(nuovi), "rango": 1, "attivo": False})
     _spendi_token_cpu(c, token)
+    _equipaggia_cpu(c, livello)
     return c
 
 
@@ -613,9 +676,12 @@ class DuelloWeb:
         mirata = a.mira if att.get("can_aim") else None
         a.mira = None
         colpi = max(1, att.get("colpi", 1))
-        anteprima = mirata if mirata in d.hp else random.choice(list(d.hp))
+        # la locazione si decide una volta sola per l'intero attacco (anche multi-colpo):
+        # è quella annunciata qui, e resta la stessa fino alla risoluzione del danno —
+        # niente più un secondo tiro casuale indipendente più avanti che la contraddice
+        loc = mirata if mirata in d.hp else random.choice(list(d.hp))
         self.scriv(f"{a.nome} usa {att['nome']} su {d.nome}"
-                   + (f", mirando a {anteprima}." if mirata else f" (locazione casuale: {anteprima}).")
+                   + (f", mirando a {loc}." if mirata else f" (locazione casuale: {loc}).")
                    + (f" — {colpi} colpi!" if colpi > 1 else ""))
         # chi è anch'esso in volo raggiunge un bersaglio in volo pure in mischia
         if (not att.get("ranged") and d.ha_flag("immune_melee")
@@ -623,39 +689,30 @@ class DuelloWeb:
             self.scriv(f"{d.nome} è in volo: le mosse non a distanza non lo raggiungono!",
                        "immune")
             return
-        self._tira_colpo(att, mirata, colpi)
+        self._tira_colpo(att, mirata, loc, colpi)
 
-    def _tira_colpo(self, att, mirata, colpi_rimasti):
+    def _tira_colpo(self, att, mirata, loc, colpi_rimasti):
         """Un tiro per colpire (il primo, o l'ennesimo di un attacco a colpi multipli).
-        Ogni colpo ripete l'intero contrapposto: se il difensore ha già speso le sue
-        risposte su un colpo precedente, i successivi si limitano a "nessuna risposta"
-        e vanno a segno in automatico — colpi multipli premiano chi esaurisce l'avversario."""
+        Un solo tiro contrapposto decide il colpo: la scelta del difensore (gratis o a
+        costo di una risposta) determina quale skill tira, non se il colpo va tirato.
+        Quando le risposte finiscono, i colpi successivi ricadono su "nessuna risposta"
+        (riflessi, gratis ma debole) — un tiro vero, non un auto-hit."""
         a, d = self.attivo, self.altro
-        loc = mirata if mirata in d.hp else random.choice(list(d.hp))
         skill = att.get("skill_colpire") or ("armi_distanza" if att.get("ranged")
                                              else "armi_corpo_a_corpo")
         pen_mira = 4 if mirata else 0
         mod = bonus_colpire(a, d)
         ta = a.tira(skill, d) + mod
-        td = d.tira("riflessi", a) + pen_mira
-        patta = ta == td
         tot = att.get("colpi", 1)
         etichetta = f" [colpo {tot - colpi_rimasti + 1}/{tot}]" if tot > 1 else ""
-        self.scriv(f"Tiro per colpire{etichetta}: {ta} ({skill}"
-                   + (f", {mod:+d} da stance" if mod else "") + f") contro {td} (riflessi"
-                   + (f" +{pen_mira} mira" if pen_mira else "") + ")."
-                   + (" Patta!" if patta else ""))
-        if ta < td:
-            self.scriv(f"{a.nome} manca il colpo.", "miss")
-            self._hype(-2)
-            for r in a.scatta_trigger("manchi", d, DB["effetti"]):
-                self.scriv("  " + r)
-            self._continua_o_fine(att, mirata, colpi_rimasti)
-            return
+        self.scriv(f"{a.nome} tira per colpire{etichetta}: {ta} ({skill}"
+                   + (f", {mod:+d} da stance" if mod else "") + ").")
         opzioni = ["nessuna risposta"]
         if d.risposte > 0:
-            # parata solo corpo a corpo e solo in patta; "parata_sempre" ignora entrambi
-            if (patta and not att.get("ranged")) or d.ha_flag("parata_sempre"):
+            # parata: mischia (o "parata_sempre"), sempre disponibile come alternativa
+            # a basso rischio — nel modello a un solo tiro non c'è più un pareggio a
+            # monte da richiedere per sbloccarla
+            if not att.get("ranged") or d.ha_flag("parata_sempre"):
                 opzioni.append("parata")
             if att.get("can_dodge") and d.puo_schivare():
                 opzioni.append("schivata")
@@ -678,45 +735,68 @@ class DuelloWeb:
         else:
             self.fase = "risposta"
 
-    def _continua_o_fine(self, att, mirata, colpi_rimasti):
+    def _continua_o_fine(self, att, mirata, loc, colpi_rimasti):
         """Dopo che un colpo si è risolto (a segno o mancato): se l'attacco ne ha
-        altri in coda tira il prossimo, altrimenti il turno torna disponibile."""
+        altri in coda tira il prossimo (stessa locazione annunciata all'inizio),
+        altrimenti il turno torna disponibile."""
         if self.finito:
             return
         if colpi_rimasti > 1:
-            self._tira_colpo(att, mirata, colpi_rimasti - 1)
+            self._tira_colpo(att, mirata, loc, colpi_rimasti - 1)
         else:
             self.fase = "player" if self.attivo is self.p else "cpu"
 
     def risolvi_risposta(self, scelta, loc_parata=None):
         pend, self.pending = self.pending, None
         a, d = self.attivo, self.altro
-        att, ta, pen_mira, loc = pend["att"], pend["ta"], pend["pen_mira"], pend["loc"]
+        att, ta, pen_mira = pend["att"], pend["ta"], pend["pen_mira"]
+        loc_attacco = pend["loc"]  # locazione annunciata a inizio attacco: non cambia hit dopo hit
+        loc = loc_attacco
         mirata, colpi_rimasti = pend.get("mirata"), pend.get("colpi_rimasti", 1)
         tipo_danno = att.get("tipo_danno", "contundente")
-        colpito = True
         quota_prima = self.quota_attuale() if self.arena_attiva else None
+        mitiga_meta = False
         if scelta == "parata":
             d.risposte -= 1
+            # solo la parata sceglie con cosa assorbire QUESTO colpo: non è la locazione
+            # dell'attacco, resta locale a questa risoluzione (i colpi successivi tornano
+            # a mirare loc_attacco)
             loc = loc_parata if loc_parata in d.hp else random.choice(list(d.hp))
-            self.scriv(f"{d.nome} para e incassa su {loc}.")
-            self._hype(3)
+            td = d.tira("armi_corpo_a_corpo", a) + pen_mira
+            self.scriv(f"{d.nome} para: {td} (armi corpo a corpo"
+                       + (f" +{pen_mira} mira" if pen_mira else "") + f") contro {ta}.")
+            colpito = td < ta
+            if colpito:
+                mitiga_meta = True  # la parata non nega, ma attutisce sempre a metà
+                self.scriv(f"{d.nome} non blocca del tutto: colpo attutito.")
+            else:
+                self.scriv(f"{d.nome} para il colpo!", "miss")
         elif scelta == "schivata":
             d.risposte -= 1
             mg = d.malus_gambe()
-            td2 = d.tira("acrobatica", a) + pen_mira + mg
-            self.scriv(f"{d.nome} tenta la schivata: {td2} (acrobatica"
+            td = d.tira("acrobatica", a) + pen_mira + mg
+            self.scriv(f"{d.nome} tenta la schivata: {td} (acrobatica"
                        + (f" +{pen_mira} mira" if pen_mira else "")
                        + (f" {mg} gambe ferite" if mg else "") + f") contro {ta}.")
-            colpito = td2 < ta
+            colpito = td < ta
             if not colpito:
                 self.scriv(f"{d.nome} schiva!", "miss")
-                self._hype(6)
+        else:
+            td = d.tira("riflessi", a) + pen_mira
+            self.scriv(f"{d.nome} regge sui riflessi: {td} (riflessi"
+                       + (f" +{pen_mira} mira" if pen_mira else "") + f") contro {ta}.")
+            colpito = td < ta
+            if not colpito:
+                self.scriv(f"{d.nome} schiva d'istinto!", "miss")
         if not colpito:
+            self._hype({"schivata": 6, "parata": 4}.get(scelta, -2))
             for r in a.scatta_trigger("manchi", d, DB["effetti"]):
                 self.scriv("  " + r)
         else:
-            danno = a.tira_formula(att["danno"], d)
+            margine = min(max(ta - td, 0), MARGINE_CAP) * MARGINE_FATTORE
+            danno = a.tira_formula(att["danno"], d) + margine
+            if mitiga_meta:
+                danno //= 2
             split = att.get("split_danni", False)
             self.scriv(f"Colpito! {danno} danni ({tipo_danno})"
                        + (" suddivisi su tutto il corpo." if split else f" a {loc}."), "hit")
@@ -745,7 +825,7 @@ class DuelloWeb:
                     self.scriv("  " + r)
             self.check_sconfitta(d, a)
         self._traccia_hp_minimo()
-        self._continua_o_fine(att, mirata, colpi_rimasti)
+        self._continua_o_fine(att, mirata, loc_attacco, colpi_rimasti)
 
     # ---------- CPU ----------
     # ---------- resa ----------
@@ -774,11 +854,14 @@ class DuelloWeb:
         if self._cpu_vuole_arrendersi():
             self.resa(self.cpu)
             return
-        # gestione stamina: se il drain sta per prosciugarla, spegne il potere più costoso
-        attivi = [s for s in a.poteri if s["attivo"]]
-        drain = sum(s["rango"] for s in attivi)
+        # gestione stamina: se il drain sta per prosciugarla, spegne il più costoso
+        # (poteri e augment Attivi pesano sullo stesso pool, v. Personaggio._costo_stamina)
+        attivi = [(s, True) for s in a.poteri if s["attivo"]] + \
+                 [(s, False) for s in a.augments
+                  if s["attivo"] and s["def"].get("attivo", True)]
+        drain = sum(a._costo_stamina(s, ep) for s, ep in attivi)
         if attivi and a.bonus > 0 and a.stamina is not None and a.stamina < drain * 2:
-            peggiore = max(attivi, key=lambda s: s["rango"])
+            peggiore, _ = max(attivi, key=lambda t: a._costo_stamina(*t))
             a.bonus -= 1
             self.scriv(f"{a.nome} risparmia le forze.")
             for r in a.disattiva_potere(peggiore):
@@ -795,11 +878,17 @@ class DuelloWeb:
             self.scriv(f"{a.nome} prende la mira su {a.mira}.")
             return
         if a.azioni > 0:
-            # attiva i poteri solo se la stamina li sostiene per qualche turno
-            sostenibili = [s for s in a.poteri if not s["attivo"] and a.puo_attivare_potere(s)
-                           and (a.stamina or 0) >= (drain + s["rango"]) * 2]
+            # attiva poteri/augment solo se la stamina li sostiene per qualche turno
+            sostenibili = [(s, self.usa_potere) for s in a.poteri
+                           if not s["attivo"] and a.puo_attivare_potere(s)
+                           and (a.stamina or 0) >= (drain + s["rango"]) * 2] + \
+                          [(s, self.usa_augment) for s in a.augments
+                           if s["def"].get("attivo", True) and not s["attivo"]
+                           and a.puo_attivare_augment(s)
+                           and (a.stamina or 0) >= (drain + s["def"].get("costo_stamina", 1)) * 2]
             if sostenibili and random.random() < PROFILO["potere_subito"]:
-                self.usa_potere(a, random.choice(sostenibili))
+                slot, azione = random.choice(sostenibili)
+                azione(a, slot)
                 return
             usabili = [x for x in a.attacchi if a.puo_usare_attacco(x)]
             if usabili:
@@ -1027,6 +1116,7 @@ class TorneoEvo:
         for _ in range(16):
             e = eroe_base(DB["attacchi"], DB["poteri"], DB["stances"], usati)
             usati.add(e.nome)
+            e.armi_equip = []  # slot armi del torneo: vive sull'eroe, non su un record
             self.eroi.append(e)
         self.io = random.randrange(16)
         ordine = list(range(16))
@@ -1034,8 +1124,9 @@ class TorneoEvo:
         self.turni = [[{"a": ordine[i], "b": ordine[i + 1], "win": None}
                        for i in range(0, 16, 2)]]
         self.round = 0
-        self.fase = "intro"  # intro | pronto | duello | risultato | vittoria | eliminato
+        self.fase = "intro"  # intro | pronto | duello | risultato | oggetto | vittoria | eliminato
         self.scelte = None
+        self.scelte_item = None
         self.campione = None
         # arena: le vincite di scommesse/sponsor di ogni round si accumulano qui e si
         # riscattano in crediti reali solo se si diventa campioni; altrimenti vanno perse
@@ -1068,12 +1159,31 @@ class TorneoEvo:
         for slot in e.poteri:
             if slot.get("attivo"):
                 e.disattiva_potere(slot)
+        for slot in e.augments:
+            # solo gli Attivi innescati a mano: i Passivi restano sempre accesi
+            if slot["attivo"] and slot["def"].get("attivo", True):
+                e.disattiva_potere(slot)
         e.effetti_attivi = []
         e.stance_attive = []
         e.stance_stato = {}
         e.attacco_stato = {}
         e.swap_attivi = []
         e.mira = None
+        e.emp_turni = 0
+
+    # ---------- equipaggiamento (armi/armatura/augment, pool condivisa col negozio) ----------
+    def _pool_item_validi(self, e):
+        """Item che l'eroe può ancora ricevere ora: stesso vincolo di slot/umanità di
+        un personaggio vero (niente doppioni, niente sforare l'umanità disponibile)."""
+        pool = [("arma", eq) for eq in DB["equip"]
+                if len(e.armi_equip) < MAX_ARMI and eq["id"] not in e.armi_equip]
+        pool += [("armatura", a) for a in DB["armor"]]
+        umanita_libera = umanita_max(e) - sum(s["def"].get("costo_umanita", 0)
+                                              for s in e.augments)
+        pool += [("augment", ag) for ag in DB["augments"]
+                if ag.get("costo_umanita", 0) <= umanita_libera
+                and all(s["def"]["id"] != ag["id"] for s in e.augments)]
+        return pool
 
     def _evolvi_cpu(self, e, rango_nuovo):
         """Le CPU vincitrici crescono come il giocatore, ma con scelte casuali."""
@@ -1087,6 +1197,10 @@ class TorneoEvo:
         su = [s for s in self.STATS_POTENZIABILI if e.stats[s] < 4]
         if su:
             e.stats[random.choice(su)] += 1
+        pool_item = self._pool_item_validi(e)
+        if pool_item and random.random() < 0.5:  # come il giocatore, non sempre trova qualcosa
+            categoria, item = random.choice(pool_item)
+            _applica_item_a(e, categoria, item)
         self._cura75(e)
 
     # ---------- arena: le vincite si accumulano, si riscattano solo da campioni ----------
@@ -1156,6 +1270,9 @@ class TorneoEvo:
         su = [s for s in self.STATS_POTENZIABILI if e.stats[s] < 4]
         random.shuffle(su)
         self.scelte = {"rango": rango_nuovo, "poteri": pool[:3], "stats": su[:2]}
+        pool_item = self._pool_item_validi(e)
+        random.shuffle(pool_item)
+        self.scelte_item = pool_item[:3] or None
         self.turni.append([{"a": vincitori[i], "b": vincitori[i + 1], "win": None}
                            for i in range(0, len(vincitori), 2)])
         self.round += 1
@@ -1174,6 +1291,25 @@ class TorneoEvo:
         if stat in self.scelte["stats"]:
             e.stats[stat] = min(4, e.stats[stat] + 1)
         self.scelte = None
+        self.fase = "oggetto" if self.scelte_item else "pronto"
+        return None
+
+    def scegli_item(self, categoria, item_id):
+        if self.fase != "oggetto" or not self.scelte_item:
+            return "nessuna scelta di equipaggiamento in corso"
+        item = next((it for cat, it in self.scelte_item
+                    if cat == categoria and it["id"] == item_id), None)
+        if item is None:
+            return "scelta non valida"
+        _applica_item_a(self.eroi[self.io], categoria, item)
+        self.scelte_item = None
+        self.fase = "pronto"
+        return None
+
+    def salta_item(self):
+        if self.fase != "oggetto":
+            return "nessuna scelta di equipaggiamento in corso"
+        self.scelte_item = None
         self.fase = "pronto"
         return None
 
@@ -1205,7 +1341,11 @@ class TorneoEvo:
             "eroe": {"nome": self.eroi[self.io].nome,
                      "stats": dict(self.eroi[self.io].stats),
                      "poteri": [{"nome": s["def"]["nome"], "rango": s["rango"]}
-                                for s in self.eroi[self.io].poteri]},
+                                for s in self.eroi[self.io].poteri],
+                     "armi": [eq["nome"] for eq in DB["equip"]
+                              if eq["id"] in self.eroi[self.io].armi_equip],
+                     "armatura_hp": sum(self.eroi[self.io].armatura.values()),
+                     "augments": [s["def"]["nome"] for s in self.eroi[self.io].augments]},
             "avversario": (self.eroi[self.avversario_idx()].nome
                            if self.fase in ("pronto", "duello") and self.mio_match() else None),
             "scelte": ({"rango": self.scelte["rango"],
@@ -1213,8 +1353,12 @@ class TorneoEvo:
                                     "descrizione": p.get("descrizione", "")}
                                    for p in self.scelte["poteri"]],
                         "stats": self.scelte["stats"]} if self.scelte else None),
+            "scelte_item": ([{"categoria": cat, "id": it["id"], "nome": it["nome"],
+                              "descrizione": it.get("descrizione", "")}
+                             for cat, it in self.scelte_item] if self.scelte_item else None),
             "campione": self.campione,
             "pool_nomi": [p["nome"] for p in DB["poteri"]],
+            "pool_nomi_item": [it["nome"] for it in DB["equip"] + DB["armor"] + DB["augments"]],
             "bonus_accumulato": self.bonus_accumulato,
             "log_arena": self.log_arena[-6:],
         }
@@ -1361,6 +1505,14 @@ def api_torneo_azione():
         err = TORNEO.scegli(dati.get("potere"), dati.get("stat"))
         if err:
             return jsonify({"errore": err}), 400
+    elif tipo == "scegli_item":
+        err = TORNEO.scegli_item(dati.get("categoria"), dati.get("id"))
+        if err:
+            return jsonify({"errore": err}), 400
+    elif tipo == "salta_item":
+        err = TORNEO.salta_item()
+        if err:
+            return jsonify({"errore": err}), 400
     elif tipo == "chiudi" and TORNEO.fase in ("vittoria", "eliminato"):
         TORNEO = None
         return jsonify({"attivo": False})
@@ -1402,7 +1554,7 @@ def personaggio(pid):
                            umanita_usata=umanita_usata(c), MAX_ARMI=MAX_ARMI,
                            soglia=soglia_xp(c.get("livello", 1)),
                            LOCAZIONI=LOCAZIONI, STATS=STATS, SKILLS=SKILLS,
-                           DADI=DADI, FALLBACK=FALLBACK)
+                           BONUS_RANGO=BONUS_RANGO, FALLBACK=FALLBACK)
 
 
 def lista_upgrade(c):

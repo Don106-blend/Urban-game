@@ -4,6 +4,7 @@ let vista = null;      // override locale: "scelte" dopo la schermata risultato
 let slotTimer = [];
 let sceltaPotere = null;
 let sceltaStat = null;
+let sceltaItem = null; // {categoria, id} dell'item selezionato in fase "oggetto"
 
 const el = id => document.getElementById(id);
 const app = () => el("evo-app");
@@ -79,11 +80,17 @@ function eroeCard() {
     `<div class="evo-stat"><span>${s}</span><b>${"●".repeat(r)}${"○".repeat(4 - r)}</b></div>`).join("");
   const poteri = e.poteri.map(p => `<div>⚡ ${p.nome} <b>r${p.rango}</b></div>`).join("")
     || '<div class="muted">nessun potere</div>';
+  const equip = [
+    ...e.armi.map(n => `<div>🗡 ${n}</div>`),
+    ...(e.armatura_hp ? [`<div>🛡 +${e.armatura_hp} hp armatura</div>`] : []),
+    ...e.augments.map(n => `<div>🔩 ${n}</div>`),
+  ].join("");
   return `<div class="evo-eroe">
     <div class="evo-eroe-nome">${e.nome}</div>
     <div class="evo-eroe-sub">IL TUO CAMPIONE</div>
     <div class="evo-stats">${stats}</div>
     <div class="evo-poteri">${poteri}</div>
+    ${equip ? `<div class="evo-poteri">${equip}</div>` : ""}
   </div>`;
 }
 
@@ -94,7 +101,7 @@ function render() {
   if (!S.attivo) return renderLanding();
   if (vista === "scelte") return renderScelte();
   ({intro: renderIntro, pronto: renderPronto, duello: renderDuello,
-    risultato: renderRisultato, vittoria: renderVittoria,
+    risultato: renderRisultato, oggetto: renderOggetto, vittoria: renderVittoria,
     eliminato: renderEliminato})[S.fase]();
 }
 
@@ -220,6 +227,68 @@ function aggiornaConferma() {
 
 function confermaScelta() {
   azione({tipo: "scegli", potere: sceltaPotere, stat: sceltaStat});
+}
+
+const ICONA_ITEM = {arma: "🗡", armatura: "🛡", augment: "🔩"};
+
+function renderOggetto() {
+  sceltaItem = null;
+  const item = S.scelte_item;
+  app().innerHTML = `
+    <div class="evo-intro">
+      <div class="evo-kicker">BOTTINO</div>
+      <h2 class="evo-vs">Scegli un equipaggiamento</h2>
+      <div class="evo-slots">
+        ${item.map((it, i) => `
+          <div class="slot-card" id="item-${i}" onclick="selezionaItem(${i})">
+            <div class="slot-nome">???</div>
+            <div class="slot-desc"></div>
+          </div>`).join("")}
+      </div>
+      <div class="evo-azioni-finali">
+        <button class="btn btn-volt evo-cta" id="evo-conferma-item" disabled
+                onclick="confermaItem()">EQUIPAGGIA</button>
+        <button class="btn btn-ghost" onclick="saltaItem()">Nessuno dei tre</button>
+      </div>
+    </div>`;
+  avviaSlotItem();
+}
+
+function avviaSlotItem() {
+  const pool = S.pool_nomi_item;
+  S.scelte_item.forEach((it, i) => {
+    const card = el("item-" + i);
+    const nome = card.querySelector(".slot-nome");
+    const giro = setInterval(() => {
+      nome.textContent = pool[Math.floor(Math.random() * pool.length)];
+    }, 65);
+    slotTimer.push(setTimeout(() => {
+      clearInterval(giro);
+      nome.textContent = `${ICONA_ITEM[it.categoria]} ${it.nome}`;
+      card.querySelector(".slot-desc").textContent = it.descrizione;
+      card.classList.add("fermo");
+    }, 900 + i * 700));
+    slotTimer.push(giro);
+  });
+}
+
+function selezionaItem(i) {
+  const card = el("item-" + i);
+  if (!card.classList.contains("fermo")) return; // la slot sta ancora girando
+  document.querySelectorAll(".slot-card").forEach(c => c.classList.remove("scelto"));
+  card.classList.add("scelto");
+  const it = S.scelte_item[i];
+  sceltaItem = {categoria: it.categoria, id: it.id};
+  el("evo-conferma-item").disabled = false;
+}
+
+function confermaItem() {
+  if (!sceltaItem) return;
+  azione({tipo: "scegli_item", categoria: sceltaItem.categoria, id: sceltaItem.id});
+}
+
+function saltaItem() {
+  azione({tipo: "salta_item"});
 }
 
 function renderVittoria() {

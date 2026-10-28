@@ -95,5 +95,252 @@
       "3": [],
       "4": []
     }
+  },
+  {
+    "nome": "Stabilizzatore di genoma",
+    "descrizione": "Stabilizza il corpo, ricaricandone la stamina",
+    "valore": 300,
+    "costo_umanita": 1,
+    "attivo": true,
+    "costo_stamina": 0,
+    "durata_turni": 1,
+    "usi_limitati": true,
+    "usi_massimi": 1,
+    "effetti": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "effetti_nel_tempo": {
+      "1": [
+        {
+          "effetto": 17,
+          "turni": 1,
+          "persistente": true
+        }
+      ],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance_attivate": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "id": 3
+  },
+  {
+    "nome": "Generatore di scudi Mk-1",
+    "descrizione": "",
+    "valore": 500,
+    "costo_umanita": 1,
+    "attivo": true,
+    "costo_stamina": 0,
+    "durata_turni": 4,
+    "usi_limitati": true,
+    "usi_massimi": 1,
+    "effetti": {
+      "1": [
+        {
+          "tipo": "armatura",
+          "dadi": [],
+          "flat": 20,
+          "mult": 1
+        }
+      ],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "effetti_nel_tempo": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance_attivate": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "id": 4
+  },
+  {
+    "nome": "spine celate",
+    "descrizione": "",
+    "valore": 100,
+    "costo_umanita": 1,
+    "attivo": true,
+    "costo_stamina": 2,
+    "durata_turni": 0,
+    "usi_limitati": true,
+    "usi_massimi": 2,
+    "effetti": {
+      "1": [
+        {
+          "tipo": "armatura",
+          "dadi": [],
+          "flat": 15,
+          "mult": 1
+        }
+      ],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "effetti_nel_tempo": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance_attivate": {
+      "1": [
+        10
+      ],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "id": 5
+  },
+  {
+    "nome": "Reattore A.R.K",
+    "descrizione": "Un grosso e pesante reattore incastonato nel petto",
+    "valore": 3000,
+    "costo_umanita": 6,
+    "attivo": true,
+    "costo_stamina": 2,
+    "durata_turni": 0,
+    "usi_limitati": true,
+    "usi_massimi": 1,
+    "effetti": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "effetti_nel_tempo": {
+      "1": [
+        {
+          "effetto": 17,
+          "turni": 1,
+          "persistente": true
+        },
+        {
+          "effetto": 17,
+          "turni": 1,
+          "persistente": true
+        }
+      ],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [
+        10
+      ],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance_attivate": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "id": 6
+  },
+  {
+    "nome": "E.M.P",
+    "descrizione": "",
+    "valore": 900,
+    "costo_umanita": 3,
+    "attivo": true,
+    "costo_stamina": 4,
+    "durata_turni": 1,
+    "usi_limitati": true,
+    "usi_massimi": 1,
+    "effetti": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "effetti_nel_tempo": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [
+        50
+      ],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance_attivate": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "id": 7
   }
 ]

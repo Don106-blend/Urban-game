@@ -50,10 +50,10 @@ def main():
     assert bonus_colpire(a, d) == 0  # +1 e -1 si annullano
     assert not a.ha_flag("parata_sempre")
 
-    # formula: (dadi + flat) * mult — fisico rango 1 = D6
+    # formula: (dadi + flat) * mult — ogni tiro di statistica è 1d10 + bonus di rango
     p4 = Personaggio("Test4")
     dmg = p4.tira_formula({"dadi": [{"n": 1, "tipo": "fisico"}], "flat": 2, "mult": 10})
-    assert dmg % 10 == 0 and 30 <= dmg <= 80
+    assert dmg % 10 == 0 and 30 <= dmg <= 120
 
     # skill a 0 usa la statistica di ripiego (da skills.json)
     assert p4.rango_dado("armi_corpo_a_corpo") == p4.stats["fisico"]
@@ -692,7 +692,11 @@ def main():
     prima = e.stats[st0]
     assert t.scegli(t.scelte["poteri"][0]["id"], st0) is None
     assert len(e.poteri) == 2 and e.poteri[1]["rango"] == 2
-    assert e.stats[st0] == prima + 1 and t.fase == "pronto"
+    assert e.stats[st0] == prima + 1
+    assert t.fase in ("oggetto", "pronto")  # "oggetto": bottino di un item su 3, poi "pronto"
+    if t.fase == "oggetto":
+        assert t.salta_item() is None
+    assert t.fase == "pronto"
     # sconfitta: eliminato, bracket completato in simulazione con un campione
     t.fase = "duello"
     t.risolvi_duello(False)
@@ -1097,7 +1101,9 @@ def main():
     d_emp = webapp.DuelloWeb(pg=pe2, avversario=avv_e2)
     pe2.applica_emp(1)
     assert not slot_e2["attivo"]
-    d_emp.attivo, d_emp.altro = pe2, avv_e2
+    # inizia_turno() ricalcola attivo/altro da ordine[idx]: un override diretto di
+    # attivo/altro verrebbe scartato subito, va forzato l'ordine sottostante
+    d_emp.ordine, d_emp.idx = [pe2, avv_e2], 0
     d_emp.inizia_turno()  # tick_turno porta emp_turni a 0, poi il repair lo riaccende
     assert pe2.emp_turni == 0
     assert slot_e2["attivo"]
@@ -1109,7 +1115,10 @@ def main():
 
     def _tira_controllata(self, tipo, avversario=None):
         if tipo == "riflessi":
-            return 1      # il difensore ha sempre riflessi bassissimi
+            # dm sempre basso (nessuna risposta si connette); pm alto e diverso, altrimenti
+            # il tiro di iniziativa nel costruttore di DuelloWeb (ripete finché non
+            # differiscono) resterebbe in loop infinito con due valori identici
+            return 1 if self is dm else 999
         if tipo == "acrobatica":
             return 200    # se tenta la schivata, riesce sempre
         return 100         # l'attaccante colpisce sempre (skill/controllo)
@@ -1131,14 +1140,17 @@ def main():
         hp_tot_prima = sum(dm.hp.values())
         d_multi.usa_attacco(att3)
         assert d_multi.fase == "risposta"  # colpo 1/3: dm ha la schivata disponibile
-        n_tiri_dopo_1 = sum(1 for r in d_multi.log if "Tiro per colpire" in r["t"])
+        n_tiri_dopo_1 = sum(1 for r in d_multi.log if "tira per colpire" in r["t"])
         assert n_tiri_dopo_1 == 1
         d_multi.risolvi_risposta("schivata")  # schiva il primo, esaurendo le risposte
         # i colpi 2 e 3 si sono risolti automaticamente in cascata: nessuna risposta rimasta
-        n_tiri_finale = sum(1 for r in d_multi.log if "Tiro per colpire" in r["t"])
+        n_tiri_finale = sum(1 for r in d_multi.log if "tira per colpire" in r["t"])
         assert n_tiri_finale == 3, n_tiri_finale
+        # 2 colpi a segno (1 schivato): ognuno è danno base (10) + margine (ta-td=99,
+        # cappato a MARGINE_CAP=8) * MARGINE_FATTORE=2 -> 10 + 16 = 26 l'uno
+        danno_atteso = 2 * (10 + _eng_engine.MARGINE_CAP * _eng_engine.MARGINE_FATTORE)
         danno_subito = hp_tot_prima - sum(dm.hp.values())
-        assert danno_subito == 20, danno_subito  # 2 colpi a segno (10 flat l'uno), 1 schivato
+        assert danno_subito == danno_atteso, danno_subito
         assert dm.risposte == 0
     finally:
         _eng_engine.Personaggio.tira = _tira_orig
@@ -1209,6 +1221,137 @@ def main():
 
     webapp.STATO["personaggi"].remove(rec_inv)
     webapp.salva_stato = _salva4
+
+    # ================= overhaul combattimento: rango->bonus fisso, parata, locazione =================
+    from engine import DADO_BASE, BONUS_RANGO, MARGINE_CAP, MARGINE_FATTORE
+
+    # il dado è sempre lo stesso (d10): il rango dà solo un bonus fisso, mai un range più ampio
+    ptira = Personaggio("Tira")
+    for rango in (1, 2, 3, 4):
+        ptira.stats["fisico"] = rango
+        valori = [ptira.tira("fisico") for _ in range(60)]
+        assert min(valori) >= 1 + BONUS_RANGO[rango]
+        assert max(valori) <= DADO_BASE + BONUS_RANGO[rango]
+
+    # bug fix: la locazione annunciata a inizio attacco è la stessa che subisce il danno
+    # (prima veniva ri-estratta a caso una seconda volta dentro _tira_colpo, e poteva differire)
+    pa3 = Personaggio("Annuncio")
+    pd3 = Personaggio("Bersaglio")
+    dotazione_base(pa3, db_e["attacchi"], db_e["stances"])
+    dotazione_base(pd3, db_e["attacchi"], db_e["stances"])
+    pugno = next(a for a in db_e["attacchi"] if a["nome"] == "Pugno")
+    _tira_orig3 = _eng_engine.Personaggio.tira
+
+    def _tira_colpisce_sempre(self, tipo, avversario=None):
+        if tipo == "riflessi":
+            # pd3 sempre basso (ta batte sempre td: nessuna risposta -> a segno); pa3
+            # diverso, altrimenti il tiro di iniziativa del costruttore (che ripete finché
+            # i due valori non differiscono) resterebbe in loop infinito
+            return 1 if self is pd3 else 999
+        return 10
+    _eng_engine.Personaggio.tira = _tira_colpisce_sempre
+    try:
+        for _ in range(15):
+            pd3.hp = dict(pd3.hp_max)  # a piena vita: un arto già a 0 farebbe splash altrove
+            d_loc = webapp.DuelloWeb(pg=pd3, avversario=pa3)
+            d_loc.attivo, d_loc.altro = pa3, pd3
+            hp_prima_loc = dict(pd3.hp)
+            d_loc.usa_attacco(pugno)
+            loc_annunciata = d_loc.pending["loc"]
+            assert loc_annunciata in pd3.hp
+            d_loc.risolvi_risposta("nessuna risposta")
+            variate = [l for l in pd3.hp if pd3.hp[l] != hp_prima_loc[l]]
+            assert variate == [loc_annunciata], (loc_annunciata, variate)
+    finally:
+        _eng_engine.Personaggio.tira = _tira_orig3
+
+    # parata: sempre disponibile in mischia (non serve più un pareggio), blocco totale se
+    # vince il confronto, danno comunque dimezzato (per difetto) se lo perde
+    attp = {"id": 90002, "nome": "Colpo di prova", "colpi": 1, "can_dodge": True,
+            "can_aim": False, "ranged": False, "tipo_danno": "contundente",
+            "skill_colpire": "controllo",
+            "danno": {"dadi": [], "flat": 40, "mult": 1}, "effetti_applicati": []}
+
+    def _tira_parata(vince):
+        def f(self, tipo, avversario=None):
+            if tipo == "controllo":
+                return 10  # ta
+            if tipo == "armi_corpo_a_corpo":
+                return 15 if vince else 3  # td della parata
+            if tipo == "riflessi":
+                # solo per non bloccare il tiro di iniziativa del costruttore (che ripete
+                # finché i due valori non differiscono): il valore in sé è ininfluente qui
+                return 1 if self is pd4 else 999
+            return 1
+        return f
+
+    for vince in (True, False):
+        _eng_engine.Personaggio.tira = _tira_parata(vince)
+        try:
+            pa4 = Personaggio("AttPar")
+            pd4 = Personaggio("DifPar")
+            dotazione_base(pa4, db_e["attacchi"], db_e["stances"])
+            dotazione_base(pd4, db_e["attacchi"], db_e["stances"])
+            d_par = webapp.DuelloWeb(pg=pd4, avversario=pa4)
+            d_par.attivo, d_par.altro = pa4, pd4
+            hp_prima_par = sum(pd4.hp.values())
+            d_par.usa_attacco(attp)
+            assert "parata" in d_par.pending["opzioni"]  # mischia: mai serve un pareggio
+            d_par.risolvi_risposta("parata", "busto")
+            danno_par = hp_prima_par - sum(pd4.hp.values())
+            if vince:
+                assert danno_par == 0, danno_par  # blocco totale
+            else:
+                margine = min(10 - 3, MARGINE_CAP) * MARGINE_FATTORE
+                assert danno_par == (40 + margine) // 2, danno_par  # dimezzato per difetto
+        finally:
+            _eng_engine.Personaggio.tira = _tira_orig3
+
+    # ================= CPU: equip scalato al livello =================
+    c_basso = Personaggio("CpuBasso")
+    dotazione_base(c_basso, db_e["attacchi"], db_e["stances"])
+    webapp._equipaggia_cpu(c_basso, 1)
+    assert hasattr(c_basso, "armi_equip")  # sempre presente, anche se vuoto
+
+    n_equip_alto = 0
+    for _ in range(20):
+        c_alto = Personaggio("CpuAlto")
+        dotazione_base(c_alto, db_e["attacchi"], db_e["stances"])
+        webapp._equipaggia_cpu(c_alto, 10)
+        if (c_alto.armi_equip or c_alto.armatura["busto"]
+                or c_alto.protesi_locazioni or c_alto.augments):
+            n_equip_alto += 1
+    assert n_equip_alto >= 15, n_equip_alto  # a livello 10 quasi sempre equipaggiata
+
+    # ================= Torneo Evo: draft di 1 item su 3 ad ogni round vinto =================
+    tt = webapp.TorneoEvo()
+    tt.fase = "duello"
+    tt.risolvi_duello(True)
+    assert tt.fase in ("risultato", "vittoria")
+    if tt.fase == "risultato":
+        eroe_t = tt.eroi[tt.io]
+        assert eroe_t.armi_equip == []  # nulla ancora scelto
+        pw = tt.scelte["poteri"][0]
+        stat = tt.scelte["stats"][0] if tt.scelte["stats"] else None
+        err_scelta = tt.scegli(pw["id"], stat)
+        assert err_scelta is None
+        assert tt.fase == "oggetto" if tt.scelte_item else tt.fase == "pronto"
+        if tt.fase == "oggetto":
+            pool_prima = tt.scelte_item
+            assert 1 <= len(pool_prima) <= 3
+            categoria, item = pool_prima[0]
+            err_item = tt.scegli_item(categoria, item["id"])
+            assert err_item is None
+            assert tt.fase == "pronto" and tt.scelte_item is None
+            # l'item si vede davvero sull'eroe, coerentemente con la categoria scelta
+            if categoria == "arma":
+                assert item["id"] in eroe_t.armi_equip
+            elif categoria == "armatura":
+                assert getattr(eroe_t, "armatura_equip_id", None) == item["id"]
+            else:
+                assert any(s["def"] is item for s in eroe_t.augments)
+            # una seconda chiamata a scegli_item senza una scelta in corso viene rifiutata
+            assert tt.scegli_item(categoria, item["id"]) is not None
 
     print("OK — tutti i check passati")
 

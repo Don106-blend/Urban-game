@@ -7,7 +7,7 @@ import random
 import tkinter as tk
 from tkinter import ttk, messagebox
 
-from engine import (DADI, LOCAZIONI, ARTI, STATS, SKILLS, FALLBACK,
+from engine import (LOCAZIONI, ARTI, STATS, SKILLS, FALLBACK,
                     per_rango, carica, bonus_colpire, Personaggio,
                     personaggio_casuale, scheda)
 
