@@ -2,7 +2,7 @@
   {
     "id": 1,
     "nome": "Pistola",
-    "descrizione": "Una pistola comune.",
+    "descrizione": "Una pistola comune: colpo a distanza (non si para), 7 colpi per duello.",
     "valore": 500,
     "attacchi": [
       2
@@ -10,7 +10,7 @@
   },
   {
     "nome": "Spada",
-    "descrizione": "",
+    "descrizione": "Una lama: colpo di taglio con sanguinamento e affondo perforante.",
     "valore": 150,
     "attacchi": [
       48,

@@ -2,16 +2,16 @@
   {
     "id": 1,
     "nome": "Giubbotto antiproiettile",
-    "descrizione": "Protegge il busto dai proiettili.",
+    "descrizione": "Protegge il busto: +50 hp di armatura e -20% ai danni perforanti.",
     "valore": 200,
     "locazioni": [
       "busto"
     ],
-    "armatura_hp": 40,
+    "armatura_hp": 50,
     "resistenze": [
       {
         "tipo_danno": "perforante",
-        "valore": 10
+        "valore": 20
       }
     ],
     "stance": [],
@@ -21,7 +21,7 @@
   {
     "id": 2,
     "nome": "Armatura da combattimento",
-    "descrizione": "Corazza pesante che copre tutto il corpo.",
+    "descrizione": "Corazza pesante che copre tutto il corpo: +10 hp di armatura per locazione, -8% ai danni contundenti e la stance Corazza.",
     "valore": 600,
     "locazioni": [
       "testa",
@@ -31,11 +31,11 @@
       "gamba_sx",
       "gamba_dx"
     ],
-    "armatura_hp": 25,
+    "armatura_hp": 10,
     "resistenze": [
       {
         "tipo_danno": "contundente",
-        "valore": 5
+        "valore": 8
       }
     ],
     "stance": [
@@ -46,16 +46,16 @@
   },
   {
     "nome": "Casco da lotta",
-    "descrizione": "",
-    "valore": 50,
+    "descrizione": "Protegge la testa: +15 hp di armatura e -10% ai danni contundenti.",
+    "valore": 150,
     "locazioni": [
       "testa"
     ],
-    "armatura_hp": 25,
+    "armatura_hp": 15,
     "resistenze": [
       {
         "tipo_danno": "contundente",
-        "valore": 25
+        "valore": 10
       }
     ],
     "stance": [],

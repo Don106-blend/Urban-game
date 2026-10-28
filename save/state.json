@@ -1,5 +1,5 @@
 {
- "crediti": 994240,
+ "crediti": 991560,
  "personaggi": [
   {
    "id": 7,
@@ -26,8 +26,8 @@
     }
    ],
    "hp": {
-    "testa": 50,
-    "busto": 150,
+    "testa": 80,
+    "busto": 120,
     "braccio_sx": 100,
     "braccio_dx": 100,
     "gamba_sx": 100,
@@ -44,7 +44,7 @@
    "vittorie": 3,
    "sconfitte": 10,
    "morto": false,
-   "last_heal": 1784037392.883455,
+   "last_heal": 1793222847.2261586,
    "armi": [
     2
    ],
@@ -82,8 +82,8 @@
     }
    ],
    "hp": {
-    "testa": 50,
-    "busto": 150,
+    "testa": 80,
+    "busto": 120,
     "braccio_sx": 100,
     "braccio_dx": 100,
     "gamba_sx": 100,
@@ -98,7 +98,7 @@
    "vittorie": 2,
    "sconfitte": 11,
    "morto": false,
-   "last_heal": 1784037392.883455,
+   "last_heal": 1793222847.2261586,
    "armatura_equip": 2,
    "protesi": [
     1
@@ -129,8 +129,8 @@
     }
    ],
    "hp": {
-    "testa": 50,
-    "busto": 150,
+    "testa": 80,
+    "busto": 120,
     "braccio_sx": 100,
     "braccio_dx": 100,
     "gamba_sx": 100,
@@ -145,7 +145,7 @@
    "vittorie": 0,
    "sconfitte": 2,
    "morto": false,
-   "last_heal": 1784037392.883455
+   "last_heal": 1793222847.2261586
   },
   {
    "id": 21,
@@ -172,8 +172,8 @@
     }
    ],
    "hp": {
-    "testa": 50,
-    "busto": 150,
+    "testa": 80,
+    "busto": 120,
     "braccio_sx": 100,
     "braccio_dx": 100,
     "gamba_sx": 100,
@@ -188,7 +188,7 @@
    "vittorie": 0,
    "sconfitte": 1,
    "morto": false,
-   "last_heal": 1784037392.883455
+   "last_heal": 1793222847.2261586
   },
   {
    "id": 34,
@@ -215,8 +215,8 @@
     }
    ],
    "hp": {
-    "testa": 50,
-    "busto": 150,
+    "testa": 80,
+    "busto": 120,
     "braccio_sx": 100,
     "braccio_dx": 100,
     "gamba_sx": 100,
@@ -224,17 +224,18 @@
    },
    "crippled": [],
    "livello": 1,
-   "xp": 0,
+   "xp": 100,
    "token": 0,
-   "toughness": 0,
+   "toughness": 1,
    "armi": [],
    "armatura_equip": null,
    "protesi": [],
    "augments": [],
    "vittorie": 0,
-   "sconfitte": 0,
+   "sconfitte": 1,
    "morto": false,
-   "last_heal": 1784037392.883455
+   "last_heal": 1793222847.2261586,
+   "bias_duelli": 0
   },
   {
    "id": 35,
@@ -273,8 +274,8 @@
     }
    ],
    "hp": {
-    "testa": 50,
-    "busto": 150,
+    "testa": 80,
+    "busto": 120,
     "braccio_sx": 100,
     "braccio_dx": 100,
     "gamba_sx": 100,
@@ -297,7 +298,7 @@
    "vittorie": 2,
    "sconfitte": 1,
    "morto": false,
-   "last_heal": 1784037392.883455
+   "last_heal": 1793222847.2261586
   },
   {
    "id": 36,
@@ -336,12 +337,12 @@
     }
    ],
    "hp": {
-    "testa": 50,
-    "busto": 131,
+    "testa": 80,
+    "busto": 120,
     "braccio_sx": 100,
     "braccio_dx": 100,
     "gamba_sx": 100,
-    "gamba_dx": 39
+    "gamba_dx": 100
    },
    "crippled": [],
    "livello": 5,
@@ -360,20 +361,83 @@
    "vittorie": 1,
    "sconfitte": 0,
    "morto": false,
-   "last_heal": 1784037387.440647
+   "last_heal": 1793222847.2261586
+  },
+  {
+   "id": 37,
+   "nome": "Aris Voss",
+   "data_nascita": "04/06/1978",
+   "bio": "Campione del Torneo Evo.",
+   "stats": {
+    "fisico": 1,
+    "riflessi": 4,
+    "mente": 2,
+    "sociale": 1,
+    "controllo": 4
+   },
+   "skills": {
+    "armi_distanza": 1,
+    "armi_corpo_a_corpo": 1,
+    "acrobatica": 1,
+    "tattica": 1
+   },
+   "poteri": [
+    {
+     "id": 3,
+     "rango": 1
+    },
+    {
+     "id": 14,
+     "rango": 2
+    },
+    {
+     "id": 1,
+     "rango": 3
+    },
+    {
+     "id": 6,
+     "rango": 4
+    }
+   ],
+   "hp": {
+    "testa": 80,
+    "busto": 54,
+    "braccio_sx": 100,
+    "braccio_dx": 100,
+    "gamba_sx": 100,
+    "gamba_dx": 100
+   },
+   "crippled": [],
+   "livello": 5,
+   "xp": 600,
+   "token": 0,
+   "toughness": 2,
+   "armi": [
+    1
+   ],
+   "armatura_equip": 1,
+   "protesi": [],
+   "augments": [
+    6
+   ],
+   "vittorie": 2,
+   "sconfitte": 0,
+   "morto": false,
+   "last_heal": 1793222799.1754577,
+   "bias_duelli": 0
   }
  ],
- "prossimo_id": 37,
+ "prossimo_id": 38,
  "contratti": [
   {
    "id": null,
-   "nome": "Alba Riva",
-   "data_nascita": "23/10/1991",
+   "nome": "Jonas Esposito",
+   "data_nascita": "01/06/2002",
    "bio": "",
    "stats": {
     "fisico": 1,
-    "riflessi": 1,
-    "mente": 2,
+    "riflessi": 2,
+    "mente": 1,
     "sociale": 1,
     "controllo": 1
    },
@@ -385,13 +449,13 @@
    },
    "poteri": [
     {
-     "id": 20,
+     "id": 13,
      "rango": 1
     }
    ],
    "hp": {
-    "testa": 50,
-    "busto": 150,
+    "testa": 80,
+    "busto": 120,
     "braccio_sx": 100,
     "braccio_dx": 100,
     "gamba_sx": 100,
@@ -409,18 +473,18 @@
    "vittorie": 0,
    "sconfitte": 0,
    "morto": false,
-   "last_heal": 1784033089.422246,
+   "last_heal": 1793222833.2231975,
    "costo": 200
   },
   {
    "id": null,
-   "nome": "Maya Marchetti",
-   "data_nascita": "25/09/2002",
+   "nome": "Emma Vance",
+   "data_nascita": "11/04/1985",
    "bio": "",
    "stats": {
-    "fisico": 1,
+    "fisico": 2,
     "riflessi": 1,
-    "mente": 2,
+    "mente": 1,
     "sociale": 1,
     "controllo": 1
    },
@@ -432,13 +496,13 @@
    },
    "poteri": [
     {
-     "id": 17,
+     "id": 4,
      "rango": 1
     }
    ],
    "hp": {
-    "testa": 50,
-    "busto": 150,
+    "testa": 80,
+    "busto": 120,
     "braccio_sx": 100,
     "braccio_dx": 100,
     "gamba_sx": 100,
@@ -456,8 +520,56 @@
    "vittorie": 0,
    "sconfitte": 0,
    "morto": false,
-   "last_heal": 1784033089.4222715,
+   "last_heal": 1793222833.2231975,
+   "costo": 200
+  },
+  {
+   "id": null,
+   "nome": "Sasha Silva",
+   "data_nascita": "14/08/1971",
+   "bio": "",
+   "stats": {
+    "fisico": 1,
+    "riflessi": 1,
+    "mente": 2,
+    "sociale": 1,
+    "controllo": 1
+   },
+   "skills": {
+    "armi_distanza": 1,
+    "armi_corpo_a_corpo": 1,
+    "acrobatica": 1,
+    "tattica": 1
+   },
+   "poteri": [
+    {
+     "id": 11,
+     "rango": 1
+    }
+   ],
+   "hp": {
+    "testa": 80,
+    "busto": 120,
+    "braccio_sx": 100,
+    "braccio_dx": 100,
+    "gamba_sx": 100,
+    "gamba_dx": 100
+   },
+   "crippled": [],
+   "livello": 1,
+   "xp": 0,
+   "token": 0,
+   "toughness": 0,
+   "armi": [],
+   "armatura_equip": null,
+   "protesi": [],
+   "augments": [],
+   "vittorie": 0,
+   "sconfitte": 0,
+   "morto": false,
+   "last_heal": 1793222833.2231975,
    "costo": 200
   }
- ]
+ ],
+ "hp_versione": 2
 }

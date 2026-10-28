@@ -1,22 +1,33 @@
 """Check minimale della logica di combattimento: python test_combat.py"""
-from combat import Personaggio, LOCAZIONI, bonus_colpire, per_rango
+import atexit
+import os
+import shutil
+import tempfile
+
+# i test importano app, che carica E RISCRIVE state.json e feedback.jsonl: li si dirotta su una
+# cartella temporanea PRIMA di importarla, cosi' il salvataggio reale non viene mai toccato
+_SAVE_TMP = tempfile.mkdtemp(prefix="urban_test_")
+os.environ["URBAN_SAVE_DIR"] = _SAVE_TMP
+atexit.register(shutil.rmtree, _SAVE_TMP, ignore_errors=True)
+
+from engine import Personaggio, LOCAZIONI, AZIONI_BASE, bonus_colpire, per_rango
 
 
 def main():
     # danno pieno a testa/busto
     p = Personaggio("Test")
     p.applica_danno("busto", 30)
-    assert p.hp["busto"] == 120
+    assert p.hp["busto"] == LOCAZIONI["busto"] - 30
 
     # armatura assorbita prima degli hp
     p.armatura["testa"] = 20
     p.applica_danno("testa", 30)
-    assert p.armatura["testa"] == 0 and p.hp["testa"] == 40
+    assert p.armatura["testa"] == 0 and p.hp["testa"] == LOCAZIONI["testa"] - 10
 
-    # resistenza al tipo di danno, applicata prima di tutto
+    # resistenza al tipo di danno (in percentuale), applicata prima di tutto
     p.resistenze["fuoco"] = 15
     p.applica_danno("busto", 40, "fuoco")
-    assert p.hp["busto"] == 120 - 25
+    assert p.hp["busto"] == LOCAZIONI["busto"] - 30 - 34  # 15% di 40 = 6 in meno
 
     # arto: danno pieno fino a 0, poi metà all'arto e metà distribuita
     p2 = Personaggio("Test2")
@@ -104,19 +115,19 @@ def main():
                                                        "tipo_danno": "fuoco"}]},
                              "turni": -1})
     pi.applica_danno("busto", 100, "fuoco")
-    assert pi.hp["busto"] == 150
+    assert pi.hp["busto"] == LOCAZIONI["busto"]
     pi.applica_danno("busto", 30, "taglio")
-    assert pi.hp["busto"] == 120
+    assert pi.hp["busto"] == LOCAZIONI["busto"] - 30
     # immunità "tutto" (permanente da potere) annulla ogni tipo
     pi.immunita.add("tutto")
     pi.applica_danno("busto", 30, "taglio")
-    assert pi.hp["busto"] == 120
+    assert pi.hp["busto"] == LOCAZIONI["busto"] - 30
 
     # resistenza "tutto" copre ogni tipo di danno
     pr = Personaggio("Res")
     pr.resistenze["tutto"] = 15
     pr.applica_danno("busto", 40, "gelo")
-    assert pr.hp["busto"] == 150 - 25
+    assert pr.hp["busto"] == LOCAZIONI["busto"] - 34
 
     # stance permanente (turni -1): il tick non la fa scadere
     pi.tick_turno()
@@ -168,7 +179,8 @@ def main():
     assert slot["attivo"]
     assert p8.armatura["testa"] == 50
     assert p8.resistenze["fuoco"] == 20
-    assert [x["id"] for x in p8.attacchi] == [3]
+    assert [x["id"] for x in p8.attacchi] == [1, 3]           # il Pugno resta nell'elenco...
+    assert [x["id"] for x in p8.attacchi_visibili()] == [3]    # ...ma oscurato dal sostituto
     assert p8.stance_conosciute[0]["nome"] == "Paladino"
 
     # scaling per rango: rango 1 = x10, rango 4 = x100 (senza override ai ranghi 2-3)
@@ -229,7 +241,7 @@ def main():
                         "effetti_nel_tempo": {}, "attacchi": {}, "stance": {}},
                 "rango": 1, "attivo": False}
     pv.attiva_potere(slot_vel, [], [], [])
-    assert pv.n_azioni == 3 and pv.n_bonus == 2
+    assert pv.n_azioni == AZIONI_BASE + 2 and pv.n_bonus == 2  # base + 2
     assert pv.azioni == 3 and pv.bonus == 2  # effetto immediato anche nel turno corrente
 
     # trigger stance "vieni_colpito": applica un effetto nel tempo a sé quando colpito
@@ -271,12 +283,15 @@ def main():
                                "turni": 2})
     assert pmr.rango_dado("mente") == 2
 
-    # mod_rango che sfonderebbe il floor (rango 1 - 1 = 0): resta a 1, +flat -2 al risultato
+    # mod_rango che sfonderebbe il floor (rango 1 - 1 = 0): resta a 1, flat -1 al risultato
     pfl = Personaggio("Floor")
     pfl.stats["mente"] = 1
     pfl.effetti_attivi.append({"def": {"nome": "Debuff2", "modificatori":
                                [{"tipo": "mod_rango", "statistica": "mente", "delta": -1}]},
                                "turni": 2})
+    rango, malus = pfl._calcola_rango("mente")
+    assert rango == 1 and malus == -1
+    pfl.effetti_attivi[0]["def"]["modificatori"][0]["delta"] = -2   # due ranghi sotto l'1
     rango, malus = pfl._calcola_rango("mente")
     assert rango == 1 and malus == -2
 
@@ -435,11 +450,13 @@ def main():
 
     # valuta: punteggio deterministico dai componenti
     pv2 = Personaggio("Val")  # stats tutte a 1, skill a 0, nessun potere
-    assert valuta(pv2) == 3 * 5
+    from engine import PESI_VALUTA
+    ps, pk, pp = PESI_VALUTA  # pesi di statistiche, skill, ranghi dei poteri
+    assert valuta(pv2) == ps * 5
     pv2.stats["fisico"] = 4
     pv2.skills["tattica"] = 2
     pv2.poteri.append({"def": {"id": 1}, "rango": 3, "attivo": False})
-    assert valuta(pv2) == 3 * 8 + 2 * 2 + 5 * 3
+    assert valuta(pv2) == ps * 8 + pk * 2 + pp * 3
 
     # una sola stance attiva per volta (quelle permanenti da potere non contano)
     ps1 = Personaggio("UnaSola")
@@ -559,10 +576,10 @@ def main():
            "rango": 1, "attivo": False}
     pdis.poteri = [pw2]
     pdis.attiva_potere(pw2, [att_x], [], [])
-    assert pdis.immune("fuoco") and pdis.mira_bonus and pdis.n_azioni == 2
+    assert pdis.immune("fuoco") and pdis.mira_bonus and pdis.n_azioni == AZIONI_BASE + 1
     assert "coda" in pdis.hp and any(a["id"] == 99 for a in pdis.attacchi)
     pdis.disattiva_potere(pw2)
-    assert not pdis.immune("fuoco") and not pdis.mira_bonus and pdis.n_azioni == 1
+    assert not pdis.immune("fuoco") and not pdis.mira_bonus and pdis.n_azioni == AZIONI_BASE
     assert "coda" not in pdis.hp and all(a["id"] != 99 for a in pdis.attacchi)
 
     # effetti nel tempo persistenti: non scadono, spariscono con la disattivazione del potere
@@ -597,21 +614,21 @@ def main():
     par.tick_turno()  # scade: l'armatura se ne va
     assert par.armatura["busto"] == 0
 
-    # bracci in negativo: -2 a colpire per braccio, cumulativo
+    # bracci in negativo: -1 a colpire per braccio (un pip = un rango), cumulativo
     pbr = Personaggio("Ferito")
     avv_br = Personaggio("AvvFer")
     assert bonus_colpire(pbr, avv_br) == 0
     pbr.hp["braccio_sx"] = -10
-    assert pbr.malus_bracci() == -2
-    assert bonus_colpire(pbr, avv_br) == -2
+    assert pbr.malus_bracci() == -1
+    assert bonus_colpire(pbr, avv_br) == -1
     pbr.hp["braccio_dx"] = -5
-    assert pbr.malus_bracci() == -4  # cumulativo
+    assert pbr.malus_bracci() == -2  # cumulativo
 
-    # gambe in negativo: -2 a schivare per gamba, cumulativo
+    # gambe in negativo: -1 a schivare per gamba, cumulativo
     pbr.hp["gamba_sx"] = -1
-    assert pbr.malus_gambe() == -2
+    assert pbr.malus_gambe() == -1
     pbr.hp["gamba_dx"] = -20
-    assert pbr.malus_gambe() == -4
+    assert pbr.malus_gambe() == -2
 
     # braccio CRIPPLED blocca la mira (a meno di potere 2x2 attivo)
     pcr = Personaggio("Rotto")
@@ -676,14 +693,15 @@ def main():
     assert len(t.eroi) == 16 and len(t.turni[0]) == 8 and t.fase == "intro"
     e = t.eroi[t.io]
     assert len(e.poteri) == 1 and e.stats["controllo"] == 1
-    # danni prima della vittoria: a fine turno si cura il 75%
+    # danni prima della vittoria: a fine round si curano tutti
     e.hp["busto"] -= 100
     t.fase = "duello"
     t.risolvi_duello(True)
     assert t.fase == "risultato" and t.round == 1
     assert len(t.turni) == 2 and len(t.turni[1]) == 4
     assert e.stats["controllo"] == 2          # sale da solo a ogni vittoria
-    assert e.hp["busto"] == 125               # 75% dei 100 danni recuperati
+    assert e.hp["busto"] == LOCAZIONI["busto"]        # a fine round si cura tutto
+    assert not e.crippled
     assert e.stamina == e.stamina_max()       # stamina piena a ogni turno
     assert len(t.scelte["poteri"]) == 3 and t.scelte["rango"] == 2
     assert len(t.scelte["stats"]) == 2 and "controllo" not in t.scelte["stats"]
@@ -1012,19 +1030,19 @@ def main():
     # armatura: hp extra sulle locazioni coperte, resistenze, stance sbloccate
     pa = Personaggio("Corazzato")
     pa.equipaggia_armatura(armor_gilet, db_e["stances"], db_e["effetti"])
-    assert pa.armatura["busto"] == 40 and pa.armatura["testa"] == 0
-    assert pa.resistenza_tot("perforante") == 10
+    assert pa.armatura["busto"] == armor_gilet["armatura_hp"] and pa.armatura["testa"] == 0
+    assert pa.resistenza_tot("perforante") == armor_gilet["resistenze"][0]["valore"]  # in %
     pa2 = Personaggio("Corazzato2")
     pa2.equipaggia_armatura(armor_combat, db_e["stances"], db_e["effetti"])
-    assert all(pa2.armatura[l] == 25 for l in LOCAZIONI)
+    assert all(pa2.armatura[l] == armor_combat["armatura_hp"] for l in LOCAZIONI)
     assert any(s["id"] == 17 for s in pa2.stance_conosciute)  # Corazza sbloccata
 
     # protesi: hp/hp_max sostituiti, mai CRIPPLED, +10 vs elettrico, sblocca un attacco
     pp = Personaggio("Cyborg")
     pp.equipaggia_protesi(protesi_braccio, db_e["attacchi"], db_e["stances"], db_e["effetti"])
-    assert pp.hp["braccio_dx"] == 230 and pp.hp_max["braccio_dx"] == 230
+    assert pp.hp["braccio_dx"] == protesi_braccio["hp"] == pp.hp_max["braccio_dx"]
     assert "braccio_dx" in pp.protesi_locazioni
-    assert any(a["id"] == 6 for a in pp.attacchi)  # Pugno rinforzato
+    assert any(a["id"] == protesi_braccio["attacchi"][0] for a in pp.attacchi)  # attacco della protesi
     pp.hp["braccio_dx"] = -999
     pp.applica_danno("busto", 1)  # una chiamata qualsiasi rifà il check crippled
     assert "braccio_dx" not in pp.crippled
@@ -1046,13 +1064,16 @@ def main():
     assert not pg.poteri
     assert pg.puo_attivare_augment(slot_att)
     pg.attiva_augment(slot_att, db_e["attacchi"], db_e["stances"], db_e["effetti"])
-    assert slot_att["attivo"] and pg.n_azioni == 2  # +1 azione dall'iniettore
+    extra_az = aug_attivo["effetti"]["1"][0]["azioni"]  # azioni extra date dall'iniettore
+    assert slot_att["attivo"] and pg.n_azioni == AZIONI_BASE + extra_az
     assert not pg.poteri  # non è finito tra i poteri: MAX_POTERI resta intatto
     assert pg.stato_augment(aug_attivo)["usi_rimasti"] == 1  # usi_massimi=2, uno consumato
 
-    # durata_turni: si spegne da solo dopo N turni (2, per l'iniettore)
-    pg.tick_turno()
-    assert slot_att["attivo"]
+    # durata_turni: si spegne da solo dopo N turni (quelli dell'iniettore nei dati)
+    durata = aug_attivo["durata_turni"]
+    for _ in range(durata - 1):
+        pg.tick_turno()
+        assert slot_att["attivo"]
     pg.tick_turno()
     assert not slot_att["attivo"]
 
@@ -1069,8 +1090,12 @@ def main():
 
     # EMP: spegne gli augment attivi/passivi e blocca mosse/stance sbloccate da una protesi
     pe = Personaggio("BersaglioEMP")
-    pe.equipaggia_protesi(protesi_gamba, db_e["attacchi"], db_e["stances"], db_e["effetti"])
-    stance_gamba = next(s for s in db_e["stances"] if s["id"] == protesi_gamba["stance"][0])
+    # protesi di prova con una stance MANUALE (quelle dei dati possono essere permanenti)
+    protesi_manuale = {"id": 99, "nome": "Gamba di prova", "locazione": "gamba_sx", "hp": 200,
+                       "costo_umanita": 2, "attacchi": [], "stance": [11],
+                       "stance_attivate": [], "effetti_nel_tempo": []}
+    pe.equipaggia_protesi(protesi_manuale, db_e["attacchi"], db_e["stances"], db_e["effetti"])
+    stance_gamba = next(s for s in db_e["stances"] if s["id"] == protesi_manuale["stance"][0])
     slot_e = {"def": aug_passivo, "rango": 1, "attivo": False}
     pe.attiva_potere(slot_e, db_e["attacchi"], db_e["stances"], db_e["effetti"])
     pe.augments = [slot_e]
@@ -1214,7 +1239,7 @@ def main():
     # record_to_pg: tutto l'inventario si applica correttamente a un Personaggio vero
     p_inv = webapp.record_to_pg(rec_inv)
     assert any(a["id"] in spada["attacchi"] for a in p_inv.attacchi)
-    assert p_inv.armatura["testa"] == 25  # Armatura da combattimento, tutte le locazioni
+    assert p_inv.armatura["testa"] == armor_combat["armatura_hp"]  # Armatura da combattimento, tutte le locazioni
     assert "braccio_dx" in p_inv.protesi_locazioni and "gamba_sx" in p_inv.protesi_locazioni
     assert p_inv.hp["braccio_dx"] == protesi_braccio["hp"]
     assert any(s["def"] is aug_passivo and s["attivo"] for s in p_inv.augments)  # passivo già attivo
@@ -1353,7 +1378,324 @@ def main():
             # una seconda chiamata a scegli_item senza una scelta in corso viene rifiutata
             assert tt.scegli_item(categoria, item["id"]) is not None
 
+    overhaul(webapp)  # regole dell'overhaul del gameplay (v. sotto)
+
     print("OK — tutti i check passati")
+
+
+def overhaul(webapp):
+    """Controlli delle regole dell'overhaul del gameplay (OVERHAUL_GAMEPLAY.md), per fase."""
+    import math
+    import random
+    import subprocess
+    import sys
+    from engine import eroe_base, umanita_max
+    from engine import (AZIONI_BASE, BONUS_RANGO, MIRA_PENALITA, RESISTENZA_MAX, PESO_LOCAZIONE,
+                        dotazione_base, costo_azioni, prob_supera, carica_db)
+    db = webapp.DB
+
+    # ---- overhaul fase 0: difetti corretti ----
+    # 0.1 un DoT con la locazione sparita (arto extra di Ali/2x2 rimosso) non fa crollare il duello
+    pdot = Personaggio("DoT")
+    pdot.effetti_attivi.append({"def": {"nome": "Brucia", "tipo": "danno", "tipo_danno": "fuoco",
+                                        "formula": {"dadi": [], "flat": 10, "mult": 1}},
+                                "turni": 2, "loc": "ala_sx"})
+    pdot.tick_turno()  # prima: KeyError
+    assert sum(pdot.hp_max.values()) - sum(pdot.hp.values()) == 10
+
+    # 0.2 l'attacco sostituito resta nell'elenco ma e' oscurato finche' il sostituto e' usabile
+    x = {"id": 1, "nome": "Pugno", "sostituisce": None}
+    y = {"id": 3, "nome": "Devastante", "sostituisce": 1, "cooldown_turni": 2}
+    z = {"id": 5, "nome": "Ultimo", "sostituisce": 3, "usi_limitati": True, "usi_massimi": 1}
+    pob = Personaggio("Oscurati")
+    pob.azioni = AZIONI_BASE
+    pob.attacchi = [x, y]
+    ids = lambda lista: [a["id"] for a in lista]
+    assert ids(pob.attacchi_visibili()) == [3]               # il Pugno e' oscurato dal sostituto
+    pob.consuma_attacco(y)                                   # Devastante in ricarica (resta in menu)...
+    assert ids(pob.attacchi_visibili()) == [1, 3]
+    assert ids(pob.attacchi_giocabili()) == [1]              # ...e torna il Pugno: mai senza mosse
+    pob.tick_turno()
+    pob.tick_turno()                                         # cooldown 2 scaduto
+    assert ids(pob.attacchi_visibili()) == [3]
+    pob.attacchi.append(z)                                   # catena Pugno <- Devastante <- Ultimo
+    assert ids(pob.attacchi_visibili()) == [5]
+    pob.consuma_attacco(z)                                   # usi esauriti: scende alla catena sotto
+    assert ids(pob.attacchi_visibili()) == [3, 5]
+    assert ids(pob.attacchi_giocabili()) == [3]
+    pob.emp_turni, pob.attacchi_protesi = 1, {3}             # EMP spegne la protesi di Devastante
+    assert ids(pob.attacchi_giocabili()) == [1]
+
+    # 0.3 stance con dati difettosi: nessuna e' piu' inerte o dal segno invertito
+    stance = {s["id"]: s for s in db["stances"]}
+    assert stance[16]["modificatori"][0]["valore"] > 0                      # Resistenza non e' piu' 0
+    for sid in (29, 30, 31):                                                # bonus al PROPRIO tiro
+        mod = stance[sid]["modificatori"][0]
+        assert mod["tipo"] == "colpire_proprio" and mod["flat"] > 0, sid
+    assert stance[31]["modificatori"][0]["flat"] > stance[29]["modificatori"][0]["flat"]
+
+    # 0.4 i test girano su un salvataggio temporaneo, mai su save/
+    assert os.path.abspath(webapp.SAVE_DIR) == os.path.abspath(_SAVE_TMP)
+
+    # ---- overhaul fase 1: ritmo e regole base ----
+    # 1A azioni base
+    assert AZIONI_BASE >= 3 and Personaggio("A").n_azioni == AZIONI_BASE
+    # 1B scala dei ranghi: +1 rango = 55% di colpire (e 36% a rovescio), non 72%
+    assert BONUS_RANGO == {1: 0, 2: 1, 3: 2, 4: 3}
+    assert prob_supera(0) == 0.45 and prob_supera(1) == 0.55 and prob_supera(-1) == 0.36
+    assert abs(prob_supera(2) - 0.64) < 1e-9 and abs(prob_supera(3) - 0.72) < 1e-9
+    # 1C penalita' di mira: costante del motore, esposta nello stato JSON
+    pm_a, pm_d = Personaggio("MiraA"), Personaggio("MiraD")
+    dotazione_base(pm_a, db["attacchi"], db["stances"])
+    dotazione_base(pm_d, db["attacchi"], db["stances"])
+    dm = webapp.DuelloWeb(pg=pm_a, avversario=pm_d)
+    assert dm.stato()["mira_pen"] == MIRA_PENALITA
+    dm.attivo, dm.altro = pm_a, pm_d
+    pm_a.azioni, pm_a.mira = 2, "testa"
+    pugno = next(a for a in pm_a.attacchi if a["nome"] == "Pugno")
+    dm.usa_attacco(pugno)
+    if dm.fase == "risposta":
+        assert dm.pending["pen_mira"] == MIRA_PENALITA
+    # 1D resistenze in percentuale, con tetto
+    pr1 = Personaggio("Res%")
+    pr1.resistenze["fuoco"] = 20
+    pr1.applica_danno("busto", 100, "fuoco")
+    assert pr1.hp["busto"] == pr1.hp_max["busto"] - 80
+    pr2 = Personaggio("ResTetto")
+    pr2.resistenze["fuoco"] = 90
+    assert pr2.resistenza_tot("fuoco") == RESISTENZA_MAX
+    pr2.applica_danno("busto", 100, "fuoco")
+    assert pr2.hp["busto"] == pr2.hp_max["busto"] - 25
+    # le resistenze di armature e poteri dei dati stanno nella scala percentuale
+    for arm in db["armor"]:
+        assert all(0 <= r["valore"] <= RESISTENZA_MAX for r in arm["resistenze"]), arm["nome"]
+
+    # ---- overhaul fase 2/3: attacchi, slot, kit base ----
+    # nessun attacco split sopra 270 totali: una zampata sola non uccide dalla testa
+    for a in db["attacchi"]:
+        if a.get("split_danni"):
+            assert a["danno"]["flat"] * a.get("colpi", 1) <= 270, a["nome"]
+        # un attacco con cooldown>=4 o split>=240 e' un ultimate: non puo' avere cooldown 0
+        if a.get("split_danni") and a["danno"]["flat"] >= 240:
+            assert a.get("cooldown_turni", 0) >= 2, a["nome"]
+    # la tabella degli slot (tools/fase2_attacchi.py) e i dati sono coerenti
+    esito = subprocess.run([sys.executable, os.path.join("tools", "fase2_attacchi.py")],
+                           capture_output=True, text=True, cwd=os.path.dirname(os.path.abspath(__file__)))
+    assert esito.returncode == 0, esito.stdout[-400:] + esito.stderr[-400:]
+    # 3A kit base: Pugno (1 azione) + Colpo pesante (2 azioni, non parabile)
+    pk = Personaggio("Kit")
+    dotazione_base(pk, db["attacchi"], db["stances"])
+    nomi_kit = {a["nome"]: a for a in pk.attacchi}
+    assert set(nomi_kit) == {"Pugno", "Colpo pesante"}
+    assert costo_azioni(nomi_kit["Pugno"]) == 1 and costo_azioni(nomi_kit["Colpo pesante"]) == 2
+    assert nomi_kit["Colpo pesante"]["parabile"] is False
+    pk.azioni = 1                                             # con 1 sola azione il pesante non si paga
+    assert [a["nome"] for a in pk.attacchi_giocabili()] == ["Pugno"]
+    pk.azioni = 2
+    assert {a["nome"] for a in pk.attacchi_giocabili()} == {"Pugno", "Colpo pesante"}
+    # usa_attacco toglie il costo in azioni; il pesante non offre la parata, la schivata si'
+    ka, kd = Personaggio("KitA"), Personaggio("KitD")
+    for q in (ka, kd):
+        dotazione_base(q, db["attacchi"], db["stances"])
+    dk = webapp.DuelloWeb(pg=kd, avversario=ka)   # difende il lato "player": la risposta resta in sospeso
+    dk.attivo, dk.altro = ka, kd
+    ka.azioni, kd.risposte = 3, 1
+    dk.usa_attacco(nomi_kit["Colpo pesante"])
+    assert ka.azioni == 1
+    assert dk.pending is not None and "parata" not in dk.pending["opzioni"]
+    assert "schivata" in dk.pending["opzioni"]
+    dk.risolvi_risposta("nessuna risposta")
+    kd.risposte = 1                                           # il Paladino para anche cio' che non e' parabile
+    kd.stance_attive.append({"def": {"id": 1, "modificatori": [{"tipo": "parata_sempre"}]}, "turni": -1})
+    ka.azioni = 3
+    dk.usa_attacco(nomi_kit["Colpo pesante"])
+    assert dk.pending is not None and "parata" in dk.pending["opzioni"]
+    dk.risolvi_risposta("nessuna risposta")
+    # il bersaglio casuale pesa il busto il doppio (la testa 1 su 7)
+    pw_ = Personaggio("Peso")
+    random.seed(11)
+    conta = {l: 0 for l in pw_.hp}
+    for _ in range(14000):
+        conta[pw_.locazione_casuale()] += 1
+    tot_peso = sum(PESO_LOCAZIONE.get(l, 1) for l in pw_.hp)
+    for l in pw_.hp:
+        atteso = PESO_LOCAZIONE.get(l, 1) / tot_peso
+        assert abs(conta[l] / 14000 - atteso) < 0.02, (l, conta[l])
+
+    # la mira vale per TUTTI i colpi mirabili del turno; il Colpo pesante non si mira e non la consuma
+    from engine import MIRA_DURA_TURNO
+    assert MIRA_DURA_TURNO and nomi_kit["Colpo pesante"]["can_aim"] is False
+    ma, mb = Personaggio("MiraTurnoA"), Personaggio("MiraTurnoB")
+    for q in (ma, mb):
+        dotazione_base(q, db["attacchi"], db["stances"])
+    dm2 = webapp.DuelloWeb(pg=mb, avversario=ma)   # difende il lato "player": la risposta resta in sospeso
+    dm2.attivo, dm2.altro = ma, mb
+    ma.azioni, ma.mira, mb.risposte = 3, "testa", 1
+    pg_m = next(a for a in ma.attacchi if a["nome"] == "Pugno")
+    pw_m = next(a for a in ma.attacchi if a["nome"] == "Colpo pesante")
+    for _ in range(2):                                  # due Pugni dello stesso turno: entrambi mirati
+        mb.risposte = 1
+        dm2.usa_attacco(pg_m)
+        assert dm2.pending["loc"] == "testa" and dm2.pending["pen_mira"] == MIRA_PENALITA
+        assert ma.mira == "testa"
+        dm2.risolvi_risposta("nessuna risposta")
+    ma.azioni, mb.risposte = 2, 1                        # il pesante: ne' mirato ne' consuma la mira
+    dm2.usa_attacco(pw_m)
+    assert dm2.pending["pen_mira"] == 0 and not dm2.pending["mirata"] and ma.mira == "testa"
+    dm2.risolvi_risposta("nessuna risposta")
+    dm2.fine_turno()                                     # la mira non si porta nel turno dopo
+    assert ma.mira is None
+
+    # ---- overhaul fase 4: IA a valore atteso ----
+    ia_a, ia_d = Personaggio("IA-A"), Personaggio("IA-D")
+    for q in (ia_a, ia_d):
+        dotazione_base(q, db["attacchi"], db["stances"])
+        q.init_stamina()
+    dia = webapp.DuelloWeb(pg=ia_a, avversario=ia_d)
+    dia.attivo, dia.altro = ia_a, ia_d
+    att_p = next(a for a in ia_a.attacchi if a["nome"] == "Pugno")
+
+    def pend_di(ta, azioni_restanti, loc="braccio_sx"):
+        ia_d.risposte = 1
+        ia_a.azioni = azioni_restanti
+        return {"att": att_p, "ta": ta, "pen_mira": 0, "loc": loc, "mirata": None,
+                "colpi_rimasti": 1, "opzioni": ["nessuna risposta", "parata", "schivata"]}
+    random.seed(5)
+    # tiro d'attacco bassissimo: i riflessi reggono da soli, la risposta non si spreca
+    scelte = [dia.scegli_difesa(ia_d, pend_di(1, 2))[0] for _ in range(200)]
+    assert scelte.count("nessuna risposta") > 170
+    # tiro altissimo e nessun altro colpo in arrivo: la risposta e' gratis, si usa (parata)
+    scelte = [dia.scegli_difesa(ia_d, pend_di(14, 0))[0] for _ in range(200)]
+    assert scelte.count("parata") > 150
+    # la parata sposta il colpo sull'arto piu' sano, mai su testa/busto se ci sono arti buoni
+    sc, loc_par = dia.scegli_difesa(ia_d, pend_di(14, 0, loc="testa"))
+    if sc == "parata":
+        assert loc_par.startswith(("braccio", "gamba"))
+    # con 1 sola opzione non c'e' niente da scegliere
+    unica = pend_di(10, 1)
+    unica["opzioni"] = ["nessuna risposta"]
+    assert dia.scegli_difesa(ia_d, unica) == ("nessuna risposta", None)
+    # scelta dell'attacco: il pesante e' giocabile solo con 2 azioni libere
+    ia_a.azioni = 1
+    assert dia.scegli_attacco(ia_a, ia_d)["nome"] == "Pugno"
+    ia_a.azioni = 3
+    assert dia.scegli_attacco(ia_a, ia_d)["nome"] in ("Pugno", "Colpo pesante")
+
+    # ---- overhaul fase 4A: la CPU compra con un budget, con i vincoli del negozio ----
+    assert webapp.budget_cpu(1) < webapp.budget_cpu(5) <= webapp.BUDGET_CPU_MAX
+    assert webapp.budget_cpu(40) == webapp.BUDGET_CPU_MAX
+    prezzi = {(c, i["id"]): i["valore"] for c, cat in
+              (("arma", db["equip"]), ("armatura", db["armor"]), ("protesi", db["protesi"]),
+               ("augment", db["augments"])) for i in cat}
+    random.seed(21)
+    for livello in (1, 2, 3, 5, 8, 12, 20):
+        for _ in range(60):
+            cpu = eroe_base(db["attacchi"], db["poteri"], db["stances"])
+            webapp._equipaggia_cpu(cpu, livello)
+            speso = sum(prezzi[("arma", i)] for i in cpu.armi_equip)
+            speso += prezzi.get(("armatura", getattr(cpu, "armatura_equip_id", None)), 0)
+            for loc in cpu.protesi_locazioni:
+                speso += next(prezzi[("protesi", p["id"])] for p in db["protesi"] if p["locazione"] == loc)
+            speso += sum(prezzi[("augment", s["def"]["id"])] for s in cpu.augments)
+            assert speso <= webapp.budget_cpu(livello), (livello, speso)
+            assert len(cpu.armi_equip) <= webapp.MAX_ARMI
+            usata = sum(next(p for p in db["protesi"] if p["locazione"] == loc)["costo_umanita"]
+                        for loc in cpu.protesi_locazioni)
+            usata += sum(s["def"]["costo_umanita"] for s in cpu.augments)
+            assert usata <= umanita_max(cpu)
+    # eroe_livello: senza equip, con i Token spesi
+    el = webapp.eroe_livello(6)
+    assert el.livello == 6 and not getattr(el, "armi_equip", []) and not el.protesi_locazioni
+
+    # ---- overhaul fase 4B: bias per personaggio, limitato e con rientro ----
+    random.seed(4)
+    g = eroe_base(db["attacchi"], db["poteri"], db["stances"])
+    g.livello = 10
+    livelli = {webapp.cpu_bilanciata(g, bias=99).livello for _ in range(80)}
+    assert max(livelli) <= 10 + webapp.BIAS_MAX + 1 and min(livelli) >= 10 + webapp.BIAS_MAX - 1
+    rec_b = {"bias": 2}
+    for _ in range(webapp.DUELLI_PER_RIENTRO):
+        webapp.rientro_bias(rec_b)
+    assert rec_b["bias"] == 1
+    rec_neg = {"bias": -1}
+    for _ in range(webapp.DUELLI_PER_RIENTRO):
+        webapp.rientro_bias(rec_neg)
+    assert rec_neg["bias"] == 0
+
+    # ---- overhaul fase 4C: il survey a tre stati non spinge piu' le manopole a vuoto ----
+    salvato_prof = dict(webapp.PROFILO)
+    webapp.salva_profilo = lambda: None            # niente file: il profilo reale non si tocca
+    prima = dict(webapp.PROFILO)
+    webapp.aggiorna_profilo({"mira_corretta": False, "parti_critiche": False})   # 'non spuntato'
+    assert webapp.PROFILO == prima                  # prima contava come "no" e spingeva
+    webapp.aggiorna_profilo({"mira_corretta": "boh", "poteri_corretti": "boh"})
+    assert webapp.PROFILO == prima
+    webapp.aggiorna_profilo({"mira_corretta": "no"})
+    assert webapp.PROFILO["mira"] > prima["mira"] or prima["mira"] == webapp.LIMITI_PROFILO["mira"][1]
+    rec_s = {}
+    webapp.aggiorna_profilo({"troppo_debole": "si"}, rec_s)
+    assert rec_s["bias"] == 1
+    for _ in range(5):
+        webapp.aggiorna_profilo({"troppo_debole": "si"}, rec_s)
+    assert rec_s["bias"] == webapp.BIAS_MAX         # limitato
+    webapp.aggiorna_profilo({"troppo_forte": "si"}, rec_s)
+    assert rec_s["bias"] == webapp.BIAS_MAX - 1
+    assert "bias" not in webapp.PROFILO or webapp.PROFILO.get("bias_matchmaking", 0) == salvato_prof.get("bias_matchmaking", 0)
+    # un profilo saturo (come nel save dell'utente) viene riportato nei limiti in lettura
+    saturo = webapp._limita({"potere_subito": 0.95, "mira": 0.95, "stance": 0.95, "aggressivita": 0.95})
+    for k, (lo, hi) in webapp.LIMITI_PROFILO.items():
+        assert lo <= saturo[k] <= hi
+    webapp.PROFILO.clear()
+    webapp.PROFILO.update(salvato_prof)
+
+    # ---- overhaul: migrazione dei salvataggi (testa 50/busto 150 -> proporzioni nuove) ----
+    vecchio = {"personaggi": [{"hp": {"testa": 50, "busto": 150, "braccio_sx": 100, "braccio_dx": 100,
+                                      "gamba_sx": 100, "gamba_dx": 100}},
+                              {"hp": {"testa": 25, "busto": -10, "braccio_sx": 100, "braccio_dx": 0,
+                                      "gamba_sx": 100, "gamba_dx": 100}}],
+               "contratti": [{"hp": {"testa": 50, "busto": 150}}]}
+    assert webapp.migra_stato(vecchio) is True
+    sano, ferito = vecchio["personaggi"]
+    assert sano["hp"]["testa"] == LOCAZIONI["testa"] and sano["hp"]["busto"] == LOCAZIONI["busto"]
+    assert ferito["hp"]["testa"] == round(25 * LOCAZIONI["testa"] / 50)   # ferito a meta': resta a meta'
+    assert ferito["hp"]["busto"] == -10                                   # il coma non si tocca
+    assert vecchio["contratti"][0]["hp"]["testa"] == LOCAZIONI["testa"]
+    assert vecchio["hp_versione"] == webapp.HP_VERSIONE
+    assert webapp.migra_stato(vecchio) is False                           # idempotente
+    # un record con hp oltre il massimo non entra in duello oltre il massimo
+    pg_max = webapp.record_to_pg({"nome": "Troppo", "stats": {}, "skills": {}, "poteri": [],
+                                  "hp": {"testa": 999}, "crippled": [], "livello": 1})
+    assert pg_max.hp["testa"] == LOCAZIONI["testa"]
+
+    # ---- overhaul §9: quote da una logistica del gap di valuta e di hp ----
+    qa, qb = Personaggio("QuotaA"), Personaggio("QuotaB")
+    for q in (qa, qb):
+        dotazione_base(q, db["attacchi"], db["stances"])
+    dq = webapp.DuelloWeb(pg=qa, avversario=qb)
+    assert abs(dq.prob_vittoria() - 0.5) < 1e-9 and dq.quota_attuale() == 2.2   # pari: 50%, 2.2x
+    qa.stats["fisico"] = 4                                                      # il player e' piu' forte
+    assert dq.prob_vittoria() > 0.5 and dq.quota_attuale() < 2.2
+    qa.stats["fisico"] = 1
+    q_pari = dq.quota_attuale()
+    qa.hp["busto"] -= 100                                                       # perde vita: sfavorito
+    assert dq.quota_attuale() > q_pari
+    for tipo in ("fisico", "riflessi", "mente", "sociale", "controllo"):        # estremi nei limiti
+        qb.stats[tipo] = 4
+    qb.skills = {k: 4 for k in qb.skills}
+    qa.hp = {l: 1 for l in qa.hp}
+    assert 1.1 <= dq.quota_attuale() <= 6.0
+    qa.hp = dict(qa.hp_max)
+    assert webapp.valuta(qb) > webapp.valuta(qa)
+    # lo scontro tra CPU del torneo segue la stessa logistica: +30 di valuta = ~75-80%
+    tq = webapp.TorneoEvo()
+    random.seed(8)
+    forte, debole = tq.eroi[0], tq.eroi[1]
+    for tipo in ("fisico", "riflessi", "mente", "sociale", "controllo"):
+        forte.stats[tipo] = 4
+    dv = webapp.valuta(forte) - webapp.valuta(debole)
+    atteso = 1 / (1 + math.exp(-webapp.K_VALUTA * dv))
+    vinte = sum(tq._vince_cpu(0, 1) == 0 for _ in range(4000)) / 4000
+    assert abs(vinte - atteso) < 0.03 and vinte > 0.7, (vinte, atteso)  # la logistica, non va/(va+vb)
 
 
 if __name__ == "__main__":

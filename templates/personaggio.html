@@ -125,6 +125,7 @@
         <div class="potere-row">
           <span class="potere-nome">{{ armatura.nome }}</span>
           <span class="badge badge-rango">+{{ armatura.armatura_hp }} hp su {{ armatura.locazioni|join(', ') }}</span>
+          {% for r in armatura.resistenze %}<span class="badge">-{{ r.valore }}% {{ r.tipo_danno }}</span>{% endfor %}
           <p class="muted">{{ armatura.descrizione }}</p>
           <form method="post" action="{{ url_for('negozio_disequip') }}">
             <input type="hidden" name="pid" value="{{ c.id }}">

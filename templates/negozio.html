@@ -62,7 +62,7 @@
       <span class="costo">¤ {{ a.valore }}</span>
     </div>
     <p class="muted">{{ a.descrizione or "Armatura." }}
-      +{{ a.armatura_hp }} hp su {{ a.locazioni|join(', ') }} (1 slot, sostituisce quella indossata)</p>
+      +{{ a.armatura_hp }} hp su {{ a.locazioni|join(', ') }}{% for r in a.resistenze %} · -{{ r.valore }}% {{ r.tipo_danno }}{% endfor %} (1 slot, sostituisce quella indossata)</p>
     {% if vivi %}
     <form method="post" action="{{ url_for('negozio_equip') }}">
       <input type="hidden" name="categoria" value="armatura">

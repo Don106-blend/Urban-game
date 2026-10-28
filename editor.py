@@ -33,6 +33,17 @@ LOCAZIONI_STANCE = ["tutte", "testa", "busto", "braccio_sx", "braccio_dx",
 LOCAZIONI_BASE = LOCAZIONI_STANCE[1:]  # le 6 locazioni reali, senza "tutte" (per protesi/armatura)
 DADI_FISSI = ["d4", "d6", "d8", "d10", "d12", "d20"]  # dadi a taglia fissa, es. 2d6*30
 
+# slot di danno: (minimo, massimo, cooldown min, cooldown max) per singolo bersaglio e per split
+# (danno TOTALE suddiviso su tutte le locazioni). Lo stesso schema di tools/fase2_attacchi.py.
+FASCE_DANNO = {
+    "base (sempre disponibile)": ((35, 45), None, (0, 0)),
+    "r1 / arma comune": ((70, 90), (120, 150), (0, 0)),
+    "r2": ((90, 120), (150, 190), (0, 1)),
+    "r3": ((120, 160), (190, 240), (1, 2)),
+    "r4 / ultimate": ((160, 210), (240, 270), (2, 4)),
+}
+SPLIT_MAX = 270   # nessun attacco split sopra questo totale: non uccide dalla testa da solo
+
 AIUTO_STANCE = """STANCE — guida rapida
 
 Una stance è una tattica che resta attiva per una certa DURATA. Finché è
@@ -68,11 +79,13 @@ ALLORA — cosa fa la stance (attiva solo le sezioni che ti servono):
   MODIFICATORI PASSIVI:
     • colpire_proprio     : modifica il TUO tiro per colpire.
     • colpire_avversario  : modifica il tiro per colpire dell'AVVERSARIO.
-        (flat = bonus/malus fisso; dado proprio/avversario = aggiunge il tuo
-         dado meno quello avversario, es. Taunt col dado sociale.)
+        (flat = bonus/malus fisso IN PIP: un pip vale un rango intero, quindi +1
+         sposta la probabilita' di colpire di circa 10 punti; dado proprio/avversario
+         = aggiunge il tuo dado meno quello avversario, es. Taunt col dado sociale.)
     • parata_sempre       : puoi sempre parare i colpi che ti raggiungono.
     • distribuisci_danni  : i danni che subisci vengono divisi su tutto il corpo.
-    • resistenza          : riduce di 'valore' i danni di un tipo (o "tutto").
+    • resistenza          : riduce del 'valore' PER CENTO i danni di un tipo (o "tutto"),
+        con somma di tutte le fonti e tetto al 75%.
     • immunita            : annulla i danni di un tipo (o "tutto").
     • mod_rango           : +/- ranghi a una statistica/skill; 'target' sceglie
         se l'effetto è su di te (self) o sull'avversario. delta va in delta/val.
@@ -282,7 +295,8 @@ class RigheEffettiPotere(RigheDinamiche):
         linea2 = ttk.Frame(corpo)
         linea2.pack(anchor="w", pady=(6, 0))
         campo(linea2, "Statistica (mod)", combo(linea2, sv, self.get_tipi, 17))
-        campo(linea2, "Delta / valore / hp", ttk.Entry(linea2, textvariable=ev, width=7))
+        campo(linea2, "Delta / valore (resistenza: %) / hp",
+              ttk.Entry(linea2, textvariable=ev, width=7))
         campo(linea2, "Tipo danno", combo(linea2, dnv, lambda: TIPI_DANNO, 13))
         campo(linea2, "Azioni", tk.Spinbox(linea2, from_=-9, to=9, width=4, textvariable=azv))
         campo(linea2, "Bonus", tk.Spinbox(linea2, from_=-9, to=9, width=4, textvariable=bov))
@@ -340,14 +354,15 @@ class RigheModificatori(RigheDinamiche):
         linea1 = ttk.Frame(corpo)
         linea1.pack(anchor="w")
         campo(linea1, "Tipo", combo(linea1, tv, lambda: TIPI_MODIFICATORE, 19))
-        campo(linea1, "Flat", ttk.Entry(linea1, textvariable=fv, width=6))
+        campo(linea1, "Flat (pip: 1 pip = 1 rango)", ttk.Entry(linea1, textvariable=fv, width=6))
         campo(linea1, "Dado proprio", combo(linea1, dpv, con_vuoto, 16))
         campo(linea1, "Dado avversario", combo(linea1, dav, con_vuoto, 16))
 
         linea2 = ttk.Frame(corpo)
         linea2.pack(anchor="w", pady=(6, 0))
         campo(linea2, "Tipo danno", combo(linea2, dnv, lambda: TIPI_DANNO, 13))
-        campo(linea2, "Valore / delta / molt.", ttk.Entry(linea2, textvariable=vv, width=7))
+        campo(linea2, "Valore (resistenza: %) / delta / molt.",
+              ttk.Entry(linea2, textvariable=vv, width=7))
         campo(linea2, "Statistica (mod rango)", combo(linea2, sv, self.get_tipi, 17))
         campo(linea2, "Target", combo(linea2, tgv, lambda: TARGET_MOD, 10))
         campo(linea2, "Locazione (armatura)", combo(linea2, lv, lambda: LOCAZIONI_STANCE, 12))
@@ -436,7 +451,7 @@ class RigheModEffetto(RigheDinamiche):
 
 
 class RigheResistenze(RigheDinamiche):
-    """Righe 'tipo danno | valore' — resistenze fisse concesse da armatura/protesi."""
+    """Righe 'tipo danno | valore %' — resistenze percentuali (tetto 75%) di armatura/protesi."""
 
     def __init__(self, parent):
         super().__init__(parent, "+ resistenza")
@@ -445,9 +460,9 @@ class RigheResistenze(RigheDinamiche):
         item = item or {}
         riga = ttk.Frame(self.frame)
         tv = tk.StringVar(value=item.get("tipo_danno", "contundente"))
-        vv = tk.StringVar(value=str(item.get("valore", 5)))
+        vv = tk.StringVar(value=str(item.get("valore", 10)))
         combo(riga, tv, lambda: TIPI_DANNO, 13).pack(side="left")
-        ttk.Label(riga, text="valore").pack(side="left", padx=(6, 2))
+        ttk.Label(riga, text="% del danno").pack(side="left", padx=(6, 2))
         ttk.Entry(riga, textvariable=vv, width=5).pack(side="left")
         self._registra(riga, (tv, vv))
 
@@ -619,6 +634,10 @@ class TabAttacchi(CrudTab):
         self.cooldown_turni = tk.StringVar(value="0")
         self.usi_limitati = tk.BooleanVar()
         self.usi_massimi = tk.StringVar(value="1")
+        self.costo_azioni = tk.StringVar(value="1")
+        self.parabile = tk.BooleanVar(value=True)
+        self.slot_guida = tk.StringVar(value="(nessuno)")
+        self.avviso_fascia = tk.StringVar()
 
         r1 = ttk.Frame(form)
         r1.pack(anchor="w")
@@ -633,6 +652,8 @@ class TabAttacchi(CrudTab):
         ttk.Checkbutton(flags, text="Ranged", variable=self.ranged).pack(side="left")
         ttk.Checkbutton(flags, text="Può mirare", variable=self.can_aim).pack(side="left", padx=8)
         ttk.Checkbutton(flags, text="Schivabile", variable=self.can_dodge).pack(side="left")
+        ttk.Checkbutton(flags, text="Parabile (se in mischia)",
+                        variable=self.parabile).pack(side="left", padx=8)
         ttk.Checkbutton(flags, text="Split danni (tutte le locazioni)",
                         variable=self.split_danni).pack(side="left", padx=8)
         r2 = ttk.Frame(form)
@@ -648,8 +669,23 @@ class TabAttacchi(CrudTab):
         r3.pack(anchor="w", pady=2)
         ttk.Label(r3, text="Danno base").pack(side="left")
         ttk.Entry(r3, textvariable=self.flat, width=6).pack(side="left", padx=6)
-        ttk.Label(r3, text="(il margine del tiro per colpire aggiunge danno extra "
+        ttk.Label(r3, text="(il margine del tiro per colpire aggiunge ~7 danni "
                            "in automatico: qui va solo la base)").pack(side="left", padx=6)
+        ttk.Label(r3, text="Costo in azioni").pack(side="left", padx=(12, 0))
+        tk.Spinbox(r3, from_=1, to=9, width=3, textvariable=self.costo_azioni).pack(
+            side="left", padx=6)
+        r3b = ttk.Frame(form)
+        r3b.pack(anchor="w", pady=2)
+        ttk.Label(r3b, text="Slot di riferimento (guida, non salvato)").pack(side="left")
+        cb_slot = ttk.Combobox(r3b, textvariable=self.slot_guida, state="readonly", width=24,
+                               values=["(nessuno)"] + list(FASCE_DANNO))
+        cb_slot.pack(side="left", padx=6)
+        cb_slot.bind("<<ComboboxSelected>>", lambda _e: self.aggiorna_fascia())
+        for v in (self.flat, self.cooldown_turni):
+            v.trace_add("write", lambda *_: self.aggiorna_fascia())
+        self.split_danni.trace_add("write", lambda *_: self.aggiorna_fascia())
+        ttk.Label(r3b, textvariable=self.avviso_fascia, foreground="#b45309").pack(
+            side="left", padx=6)
         r4 = ttk.Frame(form)
         r4.pack(anchor="w", pady=2)
         ttk.Label(r4, text="Sostituisce azione").pack(side="left")
@@ -700,7 +736,28 @@ class TabAttacchi(CrudTab):
         self.usi_massimi.set(str(a.get("usi_massimi", 1)))
         self.toggle_usi()
         self.colpi.set(str(a.get("colpi", 1)))
+        self.costo_azioni.set(str(a.get("costo_azioni", 1)))
+        self.parabile.set(a.get("parabile", True))
         self.eff_applicati.set(a.get("effetti_applicati", []))
+        self.aggiorna_fascia()
+
+    def aggiorna_fascia(self):
+        """Avvisa se danno/cooldown escono dalla fascia dello slot scelto come riferimento
+        (OVERHAUL_GAMEPLAY.md §6 2A). Il danno di un attacco split e' il TOTALE."""
+        slot, danno, cd = self.slot_guida.get(), num(self.flat), num(self.cooldown_turni)
+        avvisi = []
+        if self.split_danni.get() and danno > SPLIT_MAX:
+            avvisi.append(f"split sopra {SPLIT_MAX} totali: uccide dalla testa da solo")
+        if slot in FASCE_DANNO:
+            singolo, split, (c_lo, c_hi) = FASCE_DANNO[slot]
+            lo, hi = split if (self.split_danni.get() and split) else singolo
+            if danno and not lo <= danno <= hi:
+                avvisi.append(f"danno fuori fascia {lo}-{hi}")
+            if not c_lo <= cd <= c_hi:
+                avvisi.append(f"cooldown fuori fascia {c_lo}-{c_hi}")
+            if slot.startswith("r4") and cd == 0:
+                avvisi.append("un ultimate non puo' avere cooldown 0")
+        self.avviso_fascia.set("⚠ " + "; ".join(avvisi) if avvisi else "")
 
     def toggle_usi(self):
         self.spin_usi.configure(state="normal" if self.usi_limitati.get() else "disabled")
@@ -710,18 +767,23 @@ class TabAttacchi(CrudTab):
         if not nome:
             return None
         sost = self.sostituisce.get()
+        # il danno puo' avere dadi/mult (non modificabili da questo form): si conservano
+        vecchio = next((x for x in self.items if x["id"] == self.edit_id), {})
+        danno = {**{"dadi": [], "mult": 1}, **vecchio.get("danno", {}), "flat": num(self.flat)}
         return {
             "nome": nome,
             "descrizione": self.descr.get("1.0", "end").strip(),
             "ranged": self.ranged.get(),
             "can_aim": self.can_aim.get(),
             "can_dodge": self.can_dodge.get(),
+            "parabile": self.parabile.get(),
+            "costo_azioni": max(1, num(self.costo_azioni, 1)),
             "attivo_default": self.attivo_default.get(),
             "split_danni": self.split_danni.get(),
             "tipo_danno": self.tipo_danno.get(),
             "skill_colpire": (self.skill_colpire.get()
                               if self.skill_colpire.get() != "(default)" else None),
-            "danno": {"dadi": [], "flat": num(self.flat), "mult": 1},
+            "danno": danno,
             "sostituisce": id_da_etichetta(sost) if sost != "(nessuna)" else None,
             "cooldown_turni": num(self.cooldown_turni),
             "usi_limitati": self.usi_limitati.get(),
@@ -1142,7 +1204,8 @@ class TabArmatura(CrudTab):
         ttk.Label(lf_loc, text="  Armatura (hp) per locazione coperta").pack(side="left", padx=(12, 2))
         tk.Spinbox(lf_loc, from_=0, to=200, width=5, textvariable=self.armatura_hp).pack(side="left")
 
-        lf_res = ttk.LabelFrame(form, text="Resistenze fisse", padding=4)
+        lf_res = ttk.LabelFrame(form, text="Resistenze (% del danno, tetto 75% sommando tutte le fonti)",
+                                padding=4)
         lf_res.pack(anchor="w", fill="x", pady=6)
         self.resistenze = RigheResistenze(lf_res)
         self.resistenze.frame.pack(anchor="w")

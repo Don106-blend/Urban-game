@@ -14,12 +14,12 @@
   {
     "id": 2,
     "nome": "Rigenerazione",
-    "descrizione": "Cura tutte le locazioni all'inizio di ogni turno.",
+    "descrizione": "Cura 15 hp a tutte le locazioni all'inizio di ogni turno.",
     "tipo": "cura",
     "tipo_danno": "",
     "formula": {
       "dadi": [],
-      "flat": 10,
+      "flat": 15,
       "mult": 1
     },
     "split": false,
@@ -46,7 +46,7 @@
   },
   {
     "nome": "Stordimento",
-    "descrizione": "Abbassa di uno step il dado mente e dà -2 a tutti i tiri per colpire.",
+    "descrizione": "Abbassa di un rango il dado sociale, dà -1 a tutti i tiri per colpire e toglie una risposta.",
     "tipo": "modificatore",
     "tipo_danno": "",
     "split": false,
@@ -63,7 +63,7 @@
       },
       {
         "tipo": "colpire",
-        "flat": -2
+        "flat": -1
       },
       {
         "tipo": "azioni",

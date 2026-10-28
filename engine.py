@@ -1,6 +1,6 @@
 """Urban RPG — motore di gioco (nessuna GUI).
 Contiene regole, dadi, Personaggio e generazione casuale.
-Usato sia dal simulatore Tkinter (combat.py) sia dall'app web Flask (app.py).
+Usato dall'app web Flask (app.py), dall'editor e dall'harness di bilanciamento (balance.py).
 """
 import json
 import os
@@ -12,17 +12,47 @@ DATA = os.path.join(BASE, "data")
 # Ogni tiro rango-dipendente usa lo stesso dado; il rango dà un bonus fisso invece di un
 # dado più grande — così la varianza resta costante e il vantaggio di rango è affidabile
 # invece di sommergersi nel proprio stesso dado più ballerino (v. overhaul combattimento).
+# Scala 0/1/2/3 ("pip"): un rango in più sposta P(colpire) da 45% a 55%, due a 64%, tre a 72%.
+# Con 0/3/6/9 un solo rango valeva il 72% di colpire e il 92% di vincere un duello: un muro.
+# ATTENZIONE: tutti i modificatori "in pip" (stance, effetti, malus) sono tarati su questa scala,
+# dove un pip vale un rango intero.
 DADO_BASE = 10
-BONUS_RANGO = {1: 0, 2: 3, 3: 6, 4: 9}
+BONUS_RANGO = {1: 0, 2: 1, 3: 2, 4: 3}
 DADI_FISSI = {"d4": 4, "d6": 6, "d8": 8, "d10": 10, "d12": 12, "d20": 20}
+# azioni per turno di un eroe senza poteri. Con UNA sola risposta per round e piu' azioni per
+# turno la risposta diventa scarsa: decidere se bruciarla sul primo colpo (di cui si conosce il
+# tiro) o tenerla per il secondo e' una scelta vera. 3 e non 2 perche' misurato con un difensore
+# COMPETENTE (parata che dimezza e sposta il colpo sugli arti): a 2 azioni un duello pari dura
+# 16-33 round, a 3 dura 6-7. A 3 azioni il Colpo pesante (2) + una mira o un colpo (1) chiudono
+# esattamente il turno.
+AZIONI_BASE = 3
+# mirare costa un'azione e dà +MIRA_PENALITA al tiro del difensore (consumata dal primo attacco):
+# a 4 era una trappola (28% di vittorie mirando sempre alla testa); a 1 con difesa competente
+# la mira alla testa vale ~60% e quella al busto ~38%: un'opzione vera, non obbligata
+MIRA_PENALITA = 1
+# la mira vale per TUTTI i colpi mirabili del turno, non solo per il primo: con 3 azioni "mira +
+# due colpi" e' un turno (con la mira consumata dal primo colpo valeva meno di tre Pugni: 20-30%
+# di vittorie mirando al busto, qualunque penalita'). Il Colpo pesante non e' mirabile: con la
+# mira consumata e il pesante mirabile, "mira + pesante" riempiva un turno e batteva ogni altra
+# strategia (76% di media, 84% contro chi spamma Pugni) perche' il pesante non si para.
+MIRA_DURA_TURNO = True
+# le resistenze sono percentuali del danno (tetto): flat contro danni flat era un interruttore,
+# un casco da 50¤ che azzerava il Pugno sulla sola locazione che uccide
+RESISTENZA_MAX = 75
 # margine (ta - td) oltre al colpo semplice: quanto pesa un tiro vinto largo sul danno,
 # di fatto il sostituto dei "critici" — cappato per non far esplodere i tiri estremi.
 MARGINE_CAP = 8
 MARGINE_FATTORE = 2
 MAX_POTERI = 4
-LOCAZIONI = {"testa": 50, "busto": 150, "braccio_sx": 100, "braccio_dx": 100,
+# testa 80 e busto 120 (erano 50 e 150): con la testa a 50 ogni colpo da >= 50 la uccideva in un
+# colpo solo e 9 duelli su 10 si decidevano alla lotteria della testa; a 80 non la uccide quasi
+# mai da solo (serve un margine alto o due colpi) e il busto diventa un bersaglio vero
+LOCAZIONI = {"testa": 80, "busto": 120, "braccio_sx": 100, "braccio_dx": 100,
              "gamba_sx": 100, "gamba_dx": 100}
 ARTI = ("braccio_sx", "braccio_dx", "gamba_sx", "gamba_dx")
+# peso di una locazione quando il bersaglio e' casuale (assente = 1): il busto e' il bersaglio
+# piu' grosso, un colpo non mirato lo prende il doppio delle volte (la testa resta 1 su 7)
+PESO_LOCAZIONE = {"busto": 2}
 STATS = ["fisico", "riflessi", "mente", "sociale", "controllo"]
 NOMI_PROPRI = ["Aris", "Luna", "Marco", "Sasha", "Ivan", "Nadia", "Teo", "Zoe",
                "Dario", "Mira", "Elia", "Vera", "Kai", "Nina", "Ruben", "Alba",
@@ -44,6 +74,19 @@ def nome_casuale(usati=()):
         if nome not in usati:
             return nome
     return f"{random.choice(NOMI_PROPRI)} {random.choice(COGNOMI)} II"
+
+
+def costo_azioni(att):
+    """Azioni che costa usare un attacco (campo opzionale, default 1): un colpo pesante
+    ne costa 2, quindi riempie da solo il turno di un eroe senza poteri."""
+    return max(1, att.get("costo_azioni", 1))
+
+
+def prob_supera(k):
+    """P(d10 + k > d10): probabilita' che un tiro con vantaggio netto k superi (strettamente)
+    un tiro puro. Serve all'IA per stimare colpi e difese senza tirare i dadi; a k = 0 e' 45%."""
+    return sum(1 for x in range(1, DADO_BASE + 1) for y in range(1, DADO_BASE + 1)
+               if x + k > y) / DADO_BASE ** 2
 
 
 def per_rango(mapping, rango):
@@ -92,7 +135,7 @@ def _valore_mod(m, proprietario, altro):
 def bonus_colpire(attaccante, difensore):
     """Somma dei modificatori al tiro per colpire dell'attaccante: dalle proprie stance,
     dai propri effetti attivi (es. stordimento), dalle stance del difensore
-    e dai bracci feriti (-2 per braccio in negativo)."""
+    e dai bracci feriti (-1 per braccio in negativo)."""
     tot = attaccante.malus_bracci()
     for st in attaccante.stance_attive:
         for m in st["def"].get("modificatori", []):
@@ -123,7 +166,7 @@ class Personaggio:
         self.stats = {s: 1 for s in STATS}
         self.skills = {s: 0 for s in SKILLS}
         self.movimento = "standard"
-        self.n_azioni = 1
+        self.n_azioni = AZIONI_BASE
         self.n_bonus = 1
         self.n_risposte = 1
         self.poteri = []            # [{"def": potere, "rango": int, "attivo": bool}]
@@ -179,8 +222,9 @@ class Personaggio:
 
     def _calcola_rango(self, tipo, avversario=None):
         """Rango effettivo (1-4) per un tiro, più l'eventuale malus da rango sfondato.
-        Il rango non scende mai sotto 1: se il debuff lo spingerebbe più giù,
-        il rango resta 1 e si applica un flat -2 al risultato del tiro."""
+        Il rango non scende mai sotto 1: se il debuff lo spingerebbe più giù, il rango
+        resta 1 e si applica un flat pari ai ranghi mancanti (-1 per ogni rango sotto l'1:
+        è la scala 0/1/2/3 prolungata sotto lo zero)."""
         if tipo in self.stats:
             base = self.stats[tipo]
         else:
@@ -191,18 +235,22 @@ class Personaggio:
             delta += avversario._mod_rango(tipo, "avversario")
         grezzo = base + delta
         rango = max(1, min(4, grezzo))
-        malus_floor = -2 if grezzo < 1 else 0
+        malus_floor = min(0, grezzo - 1)
         return rango, malus_floor
 
     def rango_dado(self, tipo, avversario=None):
         return self._calcola_rango(tipo, avversario)[0]
 
+    def bonus_tiro(self, tipo, avversario=None):
+        """Parte fissa di un tiro di statistica/skill (bonus di rango, rango sfondato, flat
+        degli effetti): tira() = d10 + bonus_tiro(). Serve all'IA per stimare le probabilita'."""
+        rango, malus_floor = self._calcola_rango(tipo, avversario)
+        return malus_floor + self._flat_risultato(tipo) + BONUS_RANGO[rango]
+
     def tira(self, tipo, avversario=None):
         if tipo in DADI_FISSI:  # dado a taglia fissa (es. "d6"), non legato a statistiche
             return random.randint(1, DADI_FISSI[tipo])
-        rango, malus_floor = self._calcola_rango(tipo, avversario)
-        flat = malus_floor + self._flat_risultato(tipo) + BONUS_RANGO[rango]
-        return random.randint(1, DADO_BASE) + flat
+        return random.randint(1, DADO_BASE) + self.bonus_tiro(tipo, avversario)
 
     def tira_formula(self, f, avversario=None):
         """(somma dadi + flat) * mult — usata per danni ed effetti."""
@@ -214,12 +262,18 @@ class Personaggio:
         return any(s["attivo"] and s["def"]["nome"] == nome for s in self.poteri)
 
     def malus_bracci(self):
-        """-2 a colpire per ogni braccio con hp in negativo (cumulativo)."""
-        return -2 * sum(1 for l in self.hp if l.startswith("braccio") and self.hp[l] < 0)
+        """-1 a colpire per ogni braccio con hp in negativo (cumulativo)."""
+        return -sum(1 for l in self.hp if l.startswith("braccio") and self.hp[l] < 0)
 
     def malus_gambe(self):
-        """-2 a schivare per ogni gamba con hp in negativo (cumulativo)."""
-        return -2 * sum(1 for l in self.hp if l.startswith("gamba") and self.hp[l] < 0)
+        """-1 a schivare per ogni gamba con hp in negativo (cumulativo)."""
+        return -sum(1 for l in self.hp if l.startswith("gamba") and self.hp[l] < 0)
+
+    def locazione_casuale(self):
+        """Locazione colpita da un attacco non mirato (pesata da PESO_LOCAZIONE, uniforme di
+        default); comprende gli arti extra di Ali/2x2."""
+        locs = list(self.hp)
+        return random.choices(locs, [PESO_LOCAZIONE.get(l, 1) for l in locs])[0]
 
     def puo_schivare(self):
         """Una gamba CRIPPLED toglie la schivata."""
@@ -257,13 +311,14 @@ class Personaggio:
                    for m in st["def"].get("modificatori", []))
 
     def resistenza_tot(self, tipo_danno):
-        # "tutto" copre ogni tipo di danno; "nessuno" non combacia mai
+        """Resistenza al tipo di danno in PERCENTUALE (somma di poteri, equip e stance,
+        tetto RESISTENZA_MAX). "tutto" copre ogni tipo di danno; "nessuno" non combacia mai."""
         tot = self.resistenze.get(tipo_danno, 0) + self.resistenze.get("tutto", 0)
         for st in self.stance_attive:
             for m in st["def"].get("modificatori", []):
                 if m["tipo"] == "resistenza" and m.get("tipo_danno") in (tipo_danno, "tutto"):
                     tot += m.get("valore", 0)
-        return tot
+        return min(tot, RESISTENZA_MAX)
 
     def immune(self, tipo_danno):
         if "tutto" in self.immunita or tipo_danno in self.immunita:
@@ -306,9 +361,9 @@ class Personaggio:
             righe.append(f"Debolezza ({tipo_danno}): +{extra} danni.")
         res = self.resistenza_tot(tipo_danno)
         if res > 0 and danno > 0:
-            rid = min(res, danno)
+            rid = danno * res // 100
             danno -= rid
-            righe.append(f"Resistenza ({tipo_danno}): -{rid} danni.")
+            righe.append(f"Resistenza ({tipo_danno} {res}%): -{rid} danni.")
         if danno <= 0:
             righe.append("Il colpo non fa danni.")
             return righe
@@ -411,8 +466,10 @@ class Personaggio:
                               self.applica_danno("busto", amt, edef.get("tipo_danno", "contundente"),
                                                  split=True)]
                 else:
-                    # locazione colpita dall'attacco che ha applicato l'effetto, altrimenti casuale
-                    loc = e.get("loc") or random.choice(list(self.hp))
+                    # locazione colpita dall'attacco che ha applicato l'effetto, altrimenti casuale;
+                    # se nel frattempo è sparita (arto extra di Ali/2x2 rimosso allo spegnimento
+                    # del potere) si ripiega sul caso invece di far crollare la richiesta
+                    loc = e["loc"] if e.get("loc") in self.hp else random.choice(list(self.hp))
                     righe.append(f"{edef['nome']}: {amt} danni a {loc}.")
                     righe += ["  " + r for r in
                               self.applica_danno(loc, amt, edef.get("tipo_danno", "contundente"))]
@@ -528,6 +585,25 @@ class Personaggio:
             return False
         return stato["usi_rimasti"] is None or stato["usi_rimasti"] > 0
 
+    def puo_pagare_attacco(self, att):
+        """Ha abbastanza azioni per questo attacco (costo_azioni, default 1)?"""
+        return self.azioni >= costo_azioni(att)
+
+    def attacchi_visibili(self):
+        """Gli attacchi del menu. Un attacco 'sostituito' resta nell'elenco ma è oscurato
+        finché chi lo sostituisce è utilizzabile (niente cooldown, usi o EMP): torna
+        disponibile quando il sostituto è in ricarica o senza usi. Così un potere con un
+        attacco a cooldown (Super Forza: Colpo Devastante, 2 turni) non lascia mai il turno
+        senza una mossa — prima il Pugno veniva rimosso e il turno andava perso."""
+        return [a for a in self.attacchi
+                if not any(b.get("sostituisce") == a["id"] and self.puo_usare_attacco(b)
+                           for b in self.attacchi)]
+
+    def attacchi_giocabili(self):
+        """Attacchi che si possono scegliere ora: visibili, usabili e pagabili con le azioni."""
+        return [a for a in self.attacchi_visibili()
+                if self.puo_usare_attacco(a) and self.puo_pagare_attacco(a)]
+
     def consuma_attacco(self, att):
         """Da chiamare quando l'attacco viene usato: scala utilizzi e fa partire il cooldown
         (che scorre a inizio dei propri turni: 1 = riusabile già dal turno successivo)."""
@@ -631,7 +707,7 @@ class Personaggio:
         for r in armor.get("resistenze", []):
             t, v = r.get("tipo_danno", "contundente"), r.get("valore", 0)
             self.resistenze[t] = self.resistenze.get(t, 0) + v
-            righe.append(f"Resistenza {t} +{v}.")
+            righe.append(f"Resistenza {t} +{v}%.")
         for sid in armor.get("stance", []):
             sdef = next((x for x in db_stances if x["id"] == sid), None)
             if sdef and all(x["id"] != sid for x in self.stance_conosciute):
@@ -767,7 +843,7 @@ class Personaggio:
                 t, v = eff.get("tipo_danno", "contundente"), eff.get("valore", 0)
                 self.resistenze[t] = self.resistenze.get(t, 0) + v
                 revert.append(("resistenza", t, v))
-                righe.append(f"Resistenza {t} +{v}.")
+                righe.append(f"Resistenza {t} +{v}%.")
             elif eff["tipo"] == "immunita":
                 t = eff.get("tipo_danno", "nessuno")
                 self.immunita.add(t)
@@ -813,11 +889,11 @@ class Personaggio:
                 if att is None:
                     continue
                 if att.get("sostituisce"):
+                    # l'attacco sostituito NON viene tolto: resta oscurato finché questo è
+                    # utilizzabile (v. attacchi_visibili), poi fa da ripiego
                     rimpiazzato = next((x for x in self.attacchi
                                         if x["id"] == att["sostituisce"]), None)
-                    self.attacchi = [x for x in self.attacchi if x["id"] != att["sostituisce"]]
                     if rimpiazzato is not None:
-                        revert.append(("attacco_ripristina", rimpiazzato))
                         righe.append(f"{att['nome']} sostituisce {rimpiazzato['nome']}.")
                 if all(x["id"] != att["id"] for x in self.attacchi):
                     self.attacchi.append(att)
@@ -893,9 +969,6 @@ class Personaggio:
                 self.locazione_potere.pop(azione[1], None)
             elif tipo == "attacco":
                 self.attacchi = [x for x in self.attacchi if x["id"] != azione[1]]
-            elif tipo == "attacco_ripristina":
-                if all(x["id"] != azione[1]["id"] for x in self.attacchi):
-                    self.attacchi.append(azione[1])
             elif tipo == "stance_appresa":
                 self.stance_conosciute = [s for s in self.stance_conosciute
                                           if s["id"] != azione[1]]
@@ -959,10 +1032,17 @@ def personaggio_casuale(db_attacchi, db_poteri, db_stances, nomi_usati=()):
     return p
 
 
+# pesi di valuta(), da una regressione logistica su 24.000 duelli veri tra eroi di livello
+# diverso (python balance.py ... v. OVERHAUL_GAMEPLAY.md §9): una statistica pesa 3, una skill 1
+# (i pesi 3/2/5 precedenti sopravvalutavano skill e poteri: salire di rango un potere vale
+# +3-6 punti di vittoria ma costa stamina). Con questi pesi P(vittoria) = sigmoide(K * differenza).
+PESI_VALUTA = (3, 1, 2)
+
+
 def valuta(p):
-    """Punteggio di forza approssimativo di un personaggio, per il matchmaking."""
-    return (3 * sum(p.stats.values()) + 2 * sum(p.skills.values())
-            + 5 * sum(s["rango"] for s in p.poteri))
+    """Punteggio di forza approssimativo di un personaggio, per quote e matchmaking."""
+    return (PESI_VALUTA[0] * sum(p.stats.values()) + PESI_VALUTA[1] * sum(p.skills.values())
+            + PESI_VALUTA[2] * sum(s["rango"] for s in p.poteri))
 
 
 def umanita_max(p):

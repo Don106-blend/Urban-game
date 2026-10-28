@@ -1,1 +1,67 @@
-# Urban-game
+# Urban
+
+Gioco di combattimento a duelli (Arena con box, contratti, negozio, scommesse e sponsor; Torneo Evo a 16 eroi con draft).
+Server Flask + editor dei dati in Tkinter. Nessuna dipendenza oltre a Flask.
+
+## Come si usa
+
+| Cosa | Comando |
+|---|---|
+| Gioco (http://127.0.0.1:5000) | `python app.py` oppure `avvia_app.bat` |
+| Editor di attacchi, poteri, stance, effetti, oggetti | `python editor.py` oppure `avvia_editor.bat` |
+| Test delle regole | `python test_combat.py` e `python test_editor.py` |
+| Misure di bilanciamento | `python balance.py tutto` (v. sotto) |
+
+I salvataggi stanno in `save/` (personaggi, crediti, feedback, profilo della CPU). Test e harness usano **sempre** una cartella
+temporanea (`URBAN_SAVE_DIR`) e non li toccano mai. Per provare l'app su una copia del salvataggio:
+`URBAN_SAVE_DIR=percorso/della/copia python app.py`.
+
+## Regole di base (valori di `engine.py`)
+
+- Tiro: `d10 + bonus di rango` con ranghi 1-4 = bonus 0/1/2/3. Colpisce chi *supera* il difensore (il pareggio va a chi si difende).
+- Ogni turno: **3 azioni**, 1 azione bonus, e **1 sola risposta per round** (nessuna risposta = riflessi, parata, schivata).
+  Il difensore vede il tiro d'attacco prima di scegliere. La parata dimezza il danno e sposta il colpo dove vuole il difensore.
+- Il kit base è Pugno (1 azione) + Colpo pesante (2 azioni, non parabile). Mirare costa 1 azione e dà +1 al tiro del difensore.
+- Locazioni: testa 80, busto 120, quattro arti da 100. Si perde con testa o busto a 0. Un colpo non mirato prende il busto il doppio
+  delle volte (la testa 1 su 7).
+- Le resistenze sono percentuali (tetto 75%); l'armatura assorbe hp per locazione prima degli hp.
+- I poteri sbloccano attacchi, stance ed effetti per rango; costano stamina a ogni turno.
+
+## Dati (`data/*.json`) e strumenti
+
+I contenuti sono JSON modificabili dall'editor. `tools/` contiene gli script **idempotenti** che hanno portato i dati dell'overhaul
+alle fasce misurate: `fase1_dati.py`, `fase2_attacchi.py` (la tabella degli slot di danno, con motivazione di ogni attacco fuori
+fascia; senza `--applica` stampa solo il rapporto), `fase2_poteri.py`, `fase2_oggetti.py`, `fase3_dati.py`.
+
+## Harness di bilanciamento (`balance.py`)
+
+Fa giocare il vero `DuelloWeb` a due IA e stampa le metriche di `OVERHAUL_GAMEPLAY.md` con la fascia di accettazione e PASS/FAIL.
+
+```
+python balance.py lunghezza     # durata dei duelli, decisi dalla testa, rimonte
+python balance.py ladder         # peso del rango (vittoria con +1/+2/+3 ranghi)
+python balance.py mira           # mira alla testa / al busto
+python balance.py decisioni      # nessuna scelta del kit base è dominata
+python balance.py equip          # ogni oggetto contro un eroe nudo
+python balance.py poteri         # round-robin dei 20 poteri (--rango 1..4, --solo "Nome", --matrice)
+python balance.py matchmaking    # eroe senza equip contro la CPU di pari livello
+python balance.py torneo         # tornei Evo interi con draft a caso
+python balance.py fuzz           # 100.000 duelli casuali: nessuna eccezione, nessun duello infinito
+python balance.py tutto
+```
+
+Opzioni: `--n` (duelli per cella), `--seed`, `--jobs`. Per prove "what-if" senza toccare i file:
+`--set "MIRA_PENALITA=2;DANNO_ATT={\"51\":80}||PY||pw('Pelle Invincibile')['effetti']['3'][0]['flat']=40"`
+(costanti di `engine`/`app`, campi degli attacchi e un frammento Python sui cataloghi in memoria).
+
+## Struttura
+
+`engine.py` regole e `Personaggio` · `app.py` server, duello web, torneo, IA, economia · `balance.py` harness ·
+`editor.py` editor dati · `static/`, `templates/` interfaccia.
+
+Il vecchio simulatore Tkinter (`combat.py`) è stato eliminato: era una seconda implementazione con le regole di prima dell'overhaul. Per simulare duelli c'è `balance.py`, che pilota il vero `DuelloWeb`.
+
+## Schermata del duello
+Il centro non è più un log: è una **scena**. L'ultimo scambio è una scheda con chi attacca, con cosa (descrizione, sigle delle regole, effetti che applica), i due tiri a confronto (attacco contro parata/schivata/riflessi), l'esito e il calcolo del danno (base, margine, parata ÷2, armatura) fino agli HP persi; sopra la scheda del bersaglio salgono i numeri e la scheda trema. Gli scambi precedenti sono righe di "Poco fa"; il vecchio log testuale resta nello "Storico testuale" chiuso. Quando stai per essere colpito la scheda mostra l'attacco in arrivo con la sua descrizione. Anche poteri, augment e stance hanno la descrizione nei menu. Il server prepara gli scambi in `DuelloWeb.eventi` (campo `eventi` dello stato) e la descrizione di un attacco in `info_attacco()`.
+
+Torneo Evo: a fine round tutti i danni vengono curati (anche gli arti CRIPPLED) e la stamina torna piena.

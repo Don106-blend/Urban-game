@@ -2,19 +2,19 @@
   {
     "id": 1,
     "nome": "Iniettore di Adrenalina",
-    "descrizione": "Impianto attivabile: una scarica di adrenalina sintetica dà un'azione extra.",
+    "descrizione": "Una scarica di adrenalina sintetica: +2 azioni extra ogni turno per 3 turni (2 usi).",
     "valore": 400,
     "costo_umanita": 2,
     "attivo": true,
-    "costo_stamina": 3,
-    "durata_turni": 2,
+    "costo_stamina": 2,
+    "durata_turni": 3,
     "usi_limitati": true,
     "usi_massimi": 2,
     "effetti": {
       "1": [
         {
           "tipo": "azioni",
-          "azioni": 1,
+          "azioni": 2,
           "bonus": 0,
           "risposte": 0
         }
@@ -98,12 +98,12 @@
   },
   {
     "nome": "Stabilizzatore di genoma",
-    "descrizione": "Stabilizza il corpo, ricaricandone la stamina",
+    "descrizione": "Stabilizza il corpo: rigenera 15 hp per locazione all'inizio di ogni turno per 4 turni (1 uso).",
     "valore": 300,
     "costo_umanita": 1,
     "attivo": true,
     "costo_stamina": 0,
-    "durata_turni": 1,
+    "durata_turni": 0,
     "usi_limitati": true,
     "usi_massimi": 1,
     "effetti": {
@@ -115,9 +115,9 @@
     "effetti_nel_tempo": {
       "1": [
         {
-          "effetto": 17,
-          "turni": 1,
-          "persistente": true
+          "effetto": 2,
+          "turni": 4,
+          "persistente": false
         }
       ],
       "2": [],
@@ -146,7 +146,7 @@
   },
   {
     "nome": "Generatore di scudi Mk-1",
-    "descrizione": "",
+    "descrizione": "Genera uno scudo: +30 hp di armatura per locazione per 4 turni (1 uso).",
     "valore": 500,
     "costo_umanita": 1,
     "attivo": true,
@@ -159,7 +159,7 @@
         {
           "tipo": "armatura",
           "dadi": [],
-          "flat": 20,
+          "flat": 30,
           "mult": 1
         }
       ],
@@ -195,7 +195,7 @@
   },
   {
     "nome": "spine celate",
-    "descrizione": "",
+    "descrizione": "Spine retrattili: +30 hp di armatura per locazione e chi ti colpisce sanguina. Si attiva (2 usi).",
     "valore": 100,
     "costo_umanita": 1,
     "attivo": true,
@@ -208,7 +208,7 @@
         {
           "tipo": "armatura",
           "dadi": [],
-          "flat": 15,
+          "flat": 30,
           "mult": 1
         }
       ],
@@ -301,14 +301,14 @@
   },
   {
     "nome": "E.M.P",
-    "descrizione": "",
+    "descrizione": "Impulso elettromagnetico: sblocca il colpo EMP per 3 turni (2 usi), che spegne augment e protesi dell'avversario.",
     "valore": 900,
     "costo_umanita": 3,
     "attivo": true,
-    "costo_stamina": 4,
-    "durata_turni": 1,
+    "costo_stamina": 1,
+    "durata_turni": 3,
     "usi_limitati": true,
-    "usi_massimi": 1,
+    "usi_massimi": 2,
     "effetti": {
       "1": [],
       "2": [],

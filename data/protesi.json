@@ -2,13 +2,13 @@
   {
     "id": 1,
     "nome": "Braccio prostetico",
-    "descrizione": "Sostituisce completamente il braccio: più resistente, colpisce più forte.",
+    "descrizione": "Sostituisce completamente il braccio (200 hp, mai CRIPPLED): colpisce più forte con il Pugno cibernetico.",
     "valore": 500,
     "locazione": "braccio_dx",
-    "hp": 230,
+    "hp": 200,
     "costo_umanita": 3,
     "attacchi": [
-      6
+      56
     ],
     "stance": [],
     "stance_attivate": [],
@@ -17,25 +17,25 @@
   {
     "id": 2,
     "nome": "Gamba prostetica",
-    "descrizione": "Sostituisce completamente la gamba: servomotori per riflessi più rapidi.",
+    "descrizione": "Sostituisce completamente la gamba: servomotori per riflessi più rapidi (-1 al tiro per colpire di chi ti attacca).",
     "valore": 450,
     "locazione": "gamba_sx",
     "hp": 200,
     "costo_umanita": 2,
     "attacchi": [],
-    "stance": [
+    "stance": [],
+    "stance_attivate": [
       11
     ],
-    "stance_attivate": [],
     "effetti_nel_tempo": []
   },
   {
     "nome": "Retina Cybernetica",
-    "descrizione": "",
+    "descrizione": "Sostituisce l'occhio e rinforza la testa (100 hp): +1 al tuo tiro per colpire.",
     "valore": 300,
     "costo_umanita": 1,
     "locazione": "testa",
-    "hp": 50,
+    "hp": 100,
     "attacchi": [],
     "stance": [],
     "stance_attivate": [
