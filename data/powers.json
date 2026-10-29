@@ -1,14 +1,14 @@
 [
   {
     "nome": "Pelle Invincibile",
-    "descrizione": "La pelle si indurisce: armatura (hp extra) su ogni locazione pari a 1 dado controllo x10 (x100 al rango 4).",
+    "descrizione": "La pelle si indurisce: armatura (hp extra) su ogni locazione: +15 al rango 1, +25 al 2, +30 al 3, +50 al 4. Ruolo: tank in mischia.",
     "rango": 4,
     "effetti": {
       "1": [
         {
           "tipo": "armatura",
           "dadi": [],
-          "flat": 55,
+          "flat": 15,
           "mult": 1
         }
       ],
@@ -16,7 +16,7 @@
         {
           "tipo": "armatura",
           "dadi": [],
-          "flat": 170,
+          "flat": 25,
           "mult": 1
         }
       ],
@@ -24,7 +24,7 @@
         {
           "tipo": "armatura",
           "dadi": [],
-          "flat": 575,
+          "flat": 30,
           "mult": 1
         }
       ],
@@ -32,7 +32,7 @@
         {
           "tipo": "armatura",
           "dadi": [],
-          "flat": 1450,
+          "flat": 50,
           "mult": 1
         }
       ]
@@ -74,12 +74,29 @@
   {
     "id": 2,
     "nome": "Super Forza",
-    "descrizione": "Forza sovrumana. Sostituisce Pugno con Colpo Devastante.",
+    "descrizione": "Forza sovrumana: +1 alla skill di mischia (+1 fisico dal rango 3) e, dal rango 2, -25% a tutti i danni subiti. Sostituisce il Pugno con Colpo Devastante (se non è utilizzabile torna il Pugno).",
     "rango": 4,
     "effetti": {
-      "1": [],
+      "1": [
+        {
+          "tipo": "mod_statistica",
+          "statistica": "armi_corpo_a_corpo",
+          "delta": 1
+        }
+      ],
       "2": [],
-      "3": [],
+      "3": [
+        {
+          "tipo": "mod_statistica",
+          "statistica": "armi_corpo_a_corpo",
+          "delta": 1
+        },
+        {
+          "tipo": "mod_statistica",
+          "statistica": "fisico",
+          "delta": 1
+        }
+      ],
       "4": []
     },
     "effetti_nel_tempo": {
@@ -110,7 +127,9 @@
     },
     "stance_attivate": {
       "1": [],
-      "2": [],
+      "2": [
+        16
+      ],
       "3": [],
       "4": []
     }
@@ -170,13 +189,41 @@
   {
     "id": 4,
     "nome": "Assorbi Energia",
-    "descrizione": "assorbe i danni",
+    "descrizione": "Assorbi i colpi: i danni si distribuiscono su tutto il corpo e chi ti colpisce brucia. Armatura +8/+12/+22/+30 per locazione, barriera del 20% dal rango 3.",
     "rango": 4,
     "effetti": {
-      "1": [],
-      "2": [],
-      "3": [],
-      "4": []
+      "1": [
+        {
+          "tipo": "armatura",
+          "dadi": [],
+          "flat": 8,
+          "mult": 1
+        }
+      ],
+      "2": [
+        {
+          "tipo": "armatura",
+          "dadi": [],
+          "flat": 12,
+          "mult": 1
+        }
+      ],
+      "3": [
+        {
+          "tipo": "armatura",
+          "dadi": [],
+          "flat": 22,
+          "mult": 1
+        }
+      ],
+      "4": [
+        {
+          "tipo": "armatura",
+          "dadi": [],
+          "flat": 30,
+          "mult": 1
+        }
+      ]
     },
     "effetti_nel_tempo": {
       "1": [],
@@ -192,22 +239,25 @@
     },
     "stance": {
       "1": [
-        5
-      ],
-      "2": [
         16
       ],
-      "3": [
+      "2": [
         14
       ],
+      "3": [],
       "4": [
         15
       ]
     },
     "stance_attivate": {
-      "1": [],
+      "1": [
+        5
+      ],
       "2": [],
-      "3": [],
+      "3": [
+        5,
+        32
+      ],
       "4": []
     }
   },
@@ -218,7 +268,13 @@
     "effetti": {
       "1": [],
       "2": [],
-      "3": [],
+      "3": [
+        {
+          "tipo": "mod_statistica",
+          "statistica": "controllo",
+          "delta": 1
+        }
+      ],
       "4": []
     },
     "effetti_nel_tempo": {
@@ -305,7 +361,7 @@
   },
   {
     "nome": "Supervelocità",
-    "descrizione": "Ti muovi a velocità sovrumana: azioni extra ogni turno. Rango 1: +1 azione bonus. Rango 4: +2 azioni e +1 azione bonus.",
+    "descrizione": "Ti muovi a velocità sovrumana: riflessi aumentati (-1 al tiro per colpire di chi ti attacca), +1 azione bonus; dal rango 3 +1 azione, al 4 anche +1 bonus. Sblocca Attacco Rapido e Raffica di Pugni.",
     "rango": 4,
     "effetti": {
       "1": [
@@ -317,11 +373,18 @@
         }
       ],
       "2": [],
-      "3": [],
+      "3": [
+        {
+          "tipo": "azioni",
+          "azioni": 1,
+          "bonus": 0,
+          "risposte": 0
+        }
+      ],
       "4": [
         {
           "tipo": "azioni",
-          "azioni": 2,
+          "azioni": 1,
           "bonus": 1,
           "risposte": 0
         }
@@ -334,13 +397,13 @@
       "4": []
     },
     "attacchi": {
-      "1": [],
+      "1": [
+        18
+      ],
       "2": [
         44
       ],
-      "3": [
-        18
-      ],
+      "3": [],
       "4": []
     },
     "stance": {
@@ -352,10 +415,10 @@
       ]
     },
     "stance_attivate": {
-      "1": [],
-      "2": [
+      "1": [
         11
       ],
+      "2": [],
       "3": [],
       "4": []
     },
@@ -363,7 +426,7 @@
   },
   {
     "nome": "Anatema",
-    "descrizione": "Puoi scagliare maledizioni.",
+    "descrizione": "Puoi scagliare maledizioni: Affamare (-1 riflessi e fisico) e Affaticare (-1 azione bonus e -1 risposta) fanno danno e debilitano per 2 turni.",
     "rango": 4,
     "effetti": {
       "1": [],
@@ -490,9 +553,7 @@
     "stance_attivate": {
       "1": [],
       "2": [],
-      "3": [
-        16
-      ],
+      "3": [],
       "4": []
     },
     "id": 10
@@ -526,6 +587,11 @@
           "tipo": "locazione_extra",
           "nome": "ala_dx",
           "hp": 100
+        },
+        {
+          "tipo": "mod_statistica",
+          "statistica": "controllo",
+          "delta": 1
         }
       ],
       "4": []
@@ -565,7 +631,7 @@
   },
   {
     "nome": "2x2",
-    "descrizione": "Due braccia ti spuntano dalla schiena.",
+    "descrizione": "Due braccia ti spuntano dalla schiena (2 arti extra da 100 hp): attacchi a più colpi e, dal rango 3, un'azione extra ogni turno.",
     "rango": 4,
     "effetti": {
       "1": [
@@ -585,24 +651,32 @@
       "4": []
     },
     "effetti_nel_tempo": {
-      "1": [
+      "1": [],
+      "2": [],
+      "3": [
         {
           "effetto": 8,
           "turni": 1,
           "persistente": true
         }
       ],
-      "2": [],
-      "3": [],
-      "4": []
+      "4": [
+        {
+          "effetto": 8,
+          "turni": 1,
+          "persistente": true
+        }
+      ]
     },
     "attacchi": {
-      "1": [],
+      "1": [
+        54
+      ],
       "2": [
         6
       ],
       "3": [
-        3
+        55
       ],
       "4": [
         18
@@ -624,12 +698,26 @@
   },
   {
     "nome": "Campo di forza",
-    "descrizione": "",
+    "descrizione": "Un campo di forza ti protegge: -20% ai danni (-25% dal rango 3), armatura +25/+40 dal rango 2, Colpo di scudo che stordisce e Scudo contro la mischia. Al rango 4 un turno di invulnerabilità.",
     "rango": 4,
     "effetti": {
       "1": [],
-      "2": [],
-      "3": [],
+      "2": [
+        {
+          "tipo": "armatura",
+          "dadi": [],
+          "flat": 25,
+          "mult": 1
+        }
+      ],
+      "3": [
+        {
+          "tipo": "armatura",
+          "dadi": [],
+          "flat": 40,
+          "mult": 1
+        }
+      ],
       "4": []
     },
     "effetti_nel_tempo": {
@@ -639,10 +727,10 @@
       "4": []
     },
     "attacchi": {
-      "1": [],
-      "2": [
+      "1": [
         27
       ],
+      "2": [],
       "3": [],
       "4": []
     },
@@ -657,7 +745,9 @@
       ]
     },
     "stance_attivate": {
-      "1": [],
+      "1": [
+        32
+      ],
       "2": [],
       "3": [
         16
@@ -669,7 +759,7 @@
   {
     "id": 14,
     "nome": "Supersoldato",
-    "descrizione": "Addestramento sovrumano: mirare costa 1 azione bonus invece di 1 azione.",
+    "descrizione": "Addestramento sovrumano: mirare costa 1 azione bonus invece di 1 azione; sblocca Raffica controllata e Tiro di precisione e la mira migliora con il rango (+1/+1/+2 al tiro per colpire).",
     "rango": 4,
     "effetti": {
       "1": [
@@ -688,9 +778,13 @@
       "4": []
     },
     "attacchi": {
-      "1": [],
+      "1": [
+        52
+      ],
       "2": [],
-      "3": [],
+      "3": [
+        53
+      ],
       "4": []
     },
     "stance": {
@@ -719,7 +813,13 @@
     "effetti": {
       "1": [],
       "2": [],
-      "3": [],
+      "3": [
+        {
+          "tipo": "mod_statistica",
+          "statistica": "controllo",
+          "delta": 1
+        }
+      ],
       "4": []
     },
     "effetti_nel_tempo": {
@@ -876,7 +976,18 @@
         }
       ],
       "2": [],
-      "3": [],
+      "3": [
+        {
+          "tipo": "mod_statistica",
+          "statistica": "mente",
+          "delta": 1
+        },
+        {
+          "tipo": "mod_statistica",
+          "statistica": "controllo",
+          "delta": 1
+        }
+      ],
       "4": []
     },
     "effetti_nel_tempo": {
@@ -969,7 +1080,7 @@
   {
     "id": 20,
     "nome": "Geocinesi",
-    "descrizione": "Piega la roccia e la terra al proprio volere, corazzandosi. Al rango 4 rende immuni a tutti i danni di tipo contundente.",
+    "descrizione": "Piega la roccia e la terra, corazzandosi: -15% ai danni contundenti, barriera e armatura dal rango 3. Al rango 4 rende immuni a tutti i danni di tipo contundente.",
     "rango": 4,
     "effetti": {
       "1": [
@@ -980,7 +1091,19 @@
         }
       ],
       "2": [],
-      "3": [],
+      "3": [
+        {
+          "tipo": "resistenza",
+          "tipo_danno": "contundente",
+          "valore": 15
+        },
+        {
+          "tipo": "armatura",
+          "dadi": [],
+          "flat": 10,
+          "mult": 1
+        }
+      ],
       "4": []
     },
     "effetti_nel_tempo": {
@@ -1012,7 +1135,9 @@
     "stance_attivate": {
       "1": [],
       "2": [],
-      "3": [],
+      "3": [
+        32
+      ],
       "4": [
         28
       ]

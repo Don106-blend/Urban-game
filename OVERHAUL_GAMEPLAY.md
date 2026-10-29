@@ -5,6 +5,70 @@
 
 ---
 
+## 0. Esito dell'implementazione (2026-10-28)
+
+> **Stato.** Fasi 0–4 applicate. `python balance.py tutto --n 10000 --seed 99` → **0 metriche fuori fascia** (con altri semi M8, M3 e un paio di poteri oscillano di ±1 punto e stanno sul bordo della loro fascia). Il progetto non è un repository git: l'originale è in `..\Urban-game-main_BACKUP_pre-overhaul` e **non ho fatto commit**. `save/` non è stato toccato da test né harness (confrontato byte per byte con il backup); l'unico intervento sui dati reali, su tua conferma, è l'azzeramento di `save/cpu_profile.json` (copia in `save/cpu_profile.json.bak`); l'app, al primo avvio, migra il salvataggio reale (§0.2).
+> Tutto ciò che segue è misurato col harness sul vero `DuelloWeb`; le sezioni 1–14 qui sotto restano il brief originale (descrivono lo stato *prima*).
+
+### 0.1 Metriche, prima e dopo
+
+| ID | Prima (§3) | **Dopo** | Fascia |
+|---|---|---|---|
+| M1 durata di un duello pari, mediana / p90 round | 13 / 25 | **6 / 13** | 6–8 / ≤ 14 |
+| M2 P(colpire) a ranghi pari | 45% | 45% | 45% |
+| M3 vittoria con +1 / +2 / +3 ranghi | 92 / 99 / 99% | **71 / 83 / 92%** | 68–75 / 82–88 / 90–94% |
+| M4 mira sempre contro chi non mira, testa / busto | 27 / 3% | **60 / 38%** | 55–62 / ≥ 35% |
+| M5 oggetto contro nudo | Pistola 89, Spada 48, Casco 98, Armatura 80 | **tutti i 15 tra 56 e 70%** (Pistola 70, Spada 64, Casco 62, Armatura 69, A.R.K. 68) | 55–75% (target 58–72) |
+| M6 poteri, round-robin a ranghi pari | r1 34–82%, r3 21–84% | **r1 e r3: tutti i 20 tra 44 e 58%**, peggior matchup ≥ 34% (r1) / ≥ 31% (r3) | 44–58%, worst ≥ 30% |
+| M7 duelli pari decisi dalla testa | 92% | **47%** | ≤ 75% |
+| M8 chi è avanti di ≥ 10 hp critici al round 3 vince | 66% | **68%** | 58–68% |
+| M9 eroe L5 senza equip contro la CPU L5 | 27% | **46%** (L1 50, L3 50, L8 39, L12/L16 37) | 42–50% |
+| M10 eccezioni / duelli non finiti | `KeyError` ricorrente / 0 | **0 / 0** su 99.960 duelli casuali con equip a budget illimitato; 0 eccezioni in 2.490 tornei Evo interi | 0 / 0 |
+
+Il harness riproduce la baseline del brief: sull'albero originale dà 13/26 round, 90/98/99% di M3, Pistola 89 / Spada 50 / Casco 97 / Armatura 80 e 93% di duelli decisi dalla testa. Per M8 l'hp "critico" è testa+busto (con gli hp totali la baseline vale 57%, non 66%: la definizione del brief non era riproducibile alla lettera).
+
+### 0.2 Cosa è stato fatto e dove ho deviato dal piano (con la misura che lo giustifica)
+
+**Fase 0.** 0.1 il DoT con locazione sparita non fa più crollare il duello. 0.2 l'attacco sostituito resta nell'elenco ma è *oscurato* finché il sostituto è utilizzabile (`Personaggio.attacchi_visibili/attacchi_giocabili`; il menu mostra solo i visibili, la CPU solo i giocabili). 0.3 stance: *Resistenza* ora riduce del 25%, *mira migliorata* / *Occhio attento* / *cecchino* sono bonus al proprio tiro (+1/+1/+2) — ho applicato i default del §0.3, da confermare. 0.4 `URBAN_SAVE_DIR`: test e harness lavorano su una cartella temporanea. 0.5 `test_combat.py` importa da `engine`; `combat.py` **è stato eliminato** su tua conferma (l'originale resta nel backup).
+
+**Regole di base (Fasi 1 e 3A), con tre deviazioni dal piano.**
+1. **3 azioni base, non 2.** Il brief misurava con una difesa quasi casuale (75% schivata / 60% parata a prescindere dal tiro). Con la difesa a valore atteso (4D) la parata — che dimezza *e* sposta il colpo sugli arti — è dominante: a 2 azioni un duello pari durava **16–33 round**, a 3 dura 6–7. È una sola costante (`AZIONI_BASE`), ma tutti gli altri numeri sono tarati su di essa.
+2. **Testa 80, busto 120, bersaglio casuale pesato (busto ×2).** Con testa 50 e danni ≥ 50 ogni colpo la uccideva: M7 85–91% e M3 (66/77/86%) fuori fascia; il .md consentiva di alzare la testa. Il busto più grosso toglie la lotteria. I salvataggi si migrano da soli (`hp_versione`, proporzionale: un eroe sano resta sano, uno ferito resta ferito in proporzione).
+3. **Mira: penalità 1, mira "di turno", Colpo pesante non mirabile.** `MIRA_PENALITA = 1` è la leva di riserva prevista (§12). Con la mira consumata dal primo colpo valeva meno di tre Pugni (mirando al busto si vinceva il 20–30%); con il pesante mirabile, "mira + pesante" riempiva un turno da 3 azioni e batteva ogni strategia (**76% di media, 84% contro il Pugno**) perché il pesante non si para né si devia. Ora la mira vale per tutti i colpi mirabili del turno e il pesante no.
+- 1B: scala dei ranghi 0/1/2/3, modificatori in pip ridimensionati (−1 per arto ferito, Riflessi Fulminei −2, Stordimento −1, rango "sfondato" −1 per rango). 1D: resistenze in percentuale (tetto 75%).
+- 3A: **Colpo pesante** (2 azioni, 70 danni, non parabile, non mirabile) accanto al Pugno (40 danni, era 35): contro due Pugni vince il 56%. Se fosse parabile sarebbe sempre peggiore (la parata lo dimezza). Matrice completa tra le strategie del kit base: `python balance.py decisioni`; la migliore (mira alla testa + Pugni, 64% di media, +8 punti nel caso peggiore) è voluta da M4.
+
+**Contenuti (Fase 2).**
+- **Slot di danno** (`tools/fase2_attacchi.py`, ogni attacco fuori fascia ha una motivazione): un colpo in mischia si può parare, uno a distanza no — a pari danno i ranged vincevano molto di più (senza il solo attacco Scheggie da 140 Pelle Invincibile passava dal 76% al 52% al rango 3). Nella fascia di ogni slot la mischia sta in alto (fino a +15%), il singolo a distanza al 60–80%; split ≤ 270 totali, nessun ultimate senza cooldown.
+- **Poteri** (`tools/fase2_poteri.py`): Pelle Invincibile armatura 15/25/30/50 (era 55/170/575/1450); i poteri senza offensiva di slot stavano al 30–36%, ora hanno un'offensiva o un passivo: Supervelocità (Attacco Rapido, riflessi aumentati permanenti, +1 azione dal r3 e non +2), Campo di forza (Colpo di scudo che stordisce, stance Barriera, armatura), Assorbi Energia (danni distribuiti **permanenti** con ritorsione, armatura), Supersoldato (2 attacchi nuovi), Super Forza (+1 mischia, resistenza dal r2), 2x2 (attacchi **multi-colpo**: la risposta è una sola), Anatema (debuff che fanno danno). Il rango 3 di Telecinesi / Electrocinesi / Hydrocinesi / Ali / Geocinesi aveva solo stance a durata e cooldown e stava al 37–44%. Nuovi attacchi 52–56, nuova stance 32.
+- **Oggetti** (`tools/fase2_oggetti.py`): la Retina Cibernetica sostituiva la testa con 50 hp (ora 100, la base è 80); lo Stabilizzatore dava +2 stamina, inutile a chi non ha poteri (ora rigenerazione); l'EMP costava più di quanto rendeva (ora 3 turni, 1 stamina, 2 usi); Casco da lotta 150¤ e −10%; Giubbotto 50 hp; Braccio prostetico con Pugno cibernetico.
+- Gli script ricostruiscono **esattamente** `data/` partendo dall'originale (verificato): ordine `fase1_dati`, `fase3_dati`, `fase2_poteri`, `fase2_oggetti`, `fase2_attacchi --applica`.
+
+**IA, CPU, economia (Fase 4).**
+- **4D** IA a valore atteso (`DuelloWeb.scegli_difesa / ev_attacco / scegli_attacco`): sceglie se bruciare la risposta adesso o tenerla per il secondo colpo, dove parare (l'arto con più hp, non a caso: il .md segnalava l'asimmetria con l'umano) e l'attacco per danno atteso *per azione*; stessa funzione per la CPU e per il harness.
+- **4A** la CPU compra con un **budget** (`budget_cpu`, 12% dei crediti attesi, tetto 800¤) con gli stessi vincoli del negozio. **4B** bias **per personaggio** (±2 livelli, rientro di 1 ogni 3 duelli). **4C** survey a tre stati (Sì / No / Non so, default "non so" che non sposta nulla); le manopole della CPU hanno limiti (anche in lettura, quindi un profilo saturo come quello che c'era nel save veniva riportato a 0.9/0.6/0.8/0.9 senza riscriverlo; `bias_matchmaking` non viene più letto; il profilo reale è poi stato azzerato, §0.3).
+- **§9** `valuta()` pesi (3, 1, 2) e quote da una logistica (P = σ(0,036·Δvaluta + 3,0·Δhp), quota = 1,1/P), calibrate su ~44.000 duelli veri; vale anche per gli scontri CPU-CPU del torneo.
+- **UI** (`static/duello.js`): `AZ x/3`, costo in azioni e probabilità di colpire su ogni attacco, schermata di difesa con l'attacco in arrivo, il suo tiro, le azioni che restano all'avversario e la probabilità di ogni risposta (tutto dal server), dove parare con gli hp, "Fine turno" in evidenza, `CPU_DELAY` 1000 ms, survey a tre stati. **Editor**: `costo_azioni`, `parabile`, `dadi` preservati, guida alle fasce di slot con avvisi, resistenze in %, pip.
+
+### 0.3 Decisioni e punti ancora da confermare (le domande del §12)
+1. **`combat.py`** (Tkinter): **eliminato su tua conferma** (era una seconda implementazione con le regole vecchie). L'originale è in `..\Urban-game-main_BACKUP_pre-overhaul\combat.py`; per simulare duelli c'è `balance.py`.
+2. **`save/cpu_profile.json`**: **azzerato ai default** (0.8 / 0.35 / 0.5 / 0.7) su tua conferma. La versione precedente, satura (0.95 su tutto, +20 di bias perché "non spuntato" valeva "no"), è in `save/cpu_profile.json.bak`.
+3. **Stance 16/29/30/31**: applicati i default del §0.3 — da confermare che l'intenzione fosse quella.
+4. **994.240¤**: invariati nel save (probabile `/debug/crediti`); ricordalo se fai prove d'economia.
+5. **Migrazione**: al primo avvio `app.py` riscrive `save/state.json` con gli hp ricalcolati e `hp_versione: 2` (backup disponibile).
+6. **3 azioni**: se preferisci 2, va rifatta la taratura (duelli a 16–33 round).
+
+### 0.4 Limiti
+- r2 e r4 dei poteri non erano richiesti: stanno tra 41 e 62% ma al r4 alcuni peggiori matchup scendono sotto il 30%.
+- Le misure sono IA contro IA: un giocatore umano può difendersi meglio o peggio. La "carriera" (4E) non è stata simulata; a stima, con 200 XP a duello il primo Token arriva in ~5 duelli e nei primi 30 si ottengono ~4 ranghi più ~4 oggetti (≈ 1 upgrade ogni 3–4 duelli): non ho toccato XP né Token.
+- M3, M4 e M8 stanno vicini al bordo della fascia: M3 e M4 si contendono lo stesso margine (alzare la mira abbassa il peso del rango).
+- L'editor è provato con un round-trip automatico di 144 voci, non a mano. Le idee 3B non sono state applicate (nessuna metrica le giustificava).
+
+### 0.5 Come riprodurre
+`python test_combat.py` · `python test_editor.py` · `python balance.py tutto --n 10000 --seed 99` (~4 minuti, 16 core) · una cella: `python balance.py poteri --solo "Super Forza"`. Dettagli in `README.md`.
+
+---
+
 ## 1. Missione
 
 Rendere i duelli **più decisionali, più brevi e più equilibrati** senza snaturare il gioco. Oggi un duello tra eroi pari dura 13 round (mediana), si decide quasi sempre per fortuna sulla testa (92% delle morti), un rango in più su tutte le statistiche vale una vittoria quasi certa (92%) e pochi oggetti/poteri valgono più di tutto il resto. L'obiettivo non è aggiungere sistemi: è far sì che ogni turno abbia scelte vere e che nessuna fonte di potenza (rango, potere, oggetto) schiacci le altre.
@@ -23,6 +87,8 @@ Rendere i duelli **più decisionali, più brevi e più equilibrati** senza snatu
 ---
 
 ## 2. Come funziona oggi (fatti verificati)
+
+*(Stato **prima** dell'overhaul, sul commit `0f51b9d`: per lo stato attuale vedi §0.)*
 
 | Area | Regola attuale | Dove |
 |---|---|---|
@@ -48,18 +114,18 @@ Rendere i duelli **più decisionali, più brevi e più equilibrati** senza snatu
 
 ## 3. Diagnosi misurata e criteri di accettazione
 
-| ID | Metrica | Oggi | Dopo Fase 1 (provato) | Target finale |
-|---|---|---|---|---|
-| M1 | Durata di un duello pari (stat e skill 1, solo Pugno): mediana / p90 round | 13 / 25 | 7 / 14 | mediana 6–8, p90 ≤ 14 |
-| M2 | P(colpire) a ranghi pari | 45% | 45% | 45% (non toccare) |
-| M3 | Vittoria con +1 / +2 / +3 ranghi su tutte le stat e skill | 92 / 99 / 99% | 68 / 84 / 91% | 68–75 / 82–88 / 90–94% |
-| M4 | Mira sempre (poi attacca) contro chi non mira: testa / busto | 27 / 3% | 57 / 18% | testa 55–62%, busto ≥ 35% (dopo Fase 2) |
-| M5 | Oggetto contro nudo, ranghi pari: Pistola / Spada / Casco / Armatura da combattimento | 89 / 48 / 98 / 80% | 75 / 49 / 78 / 67% | ognuno 58–72%, crescente col prezzo |
-| M6 | Potere contro il campo (round-robin, ranghi pari) | 34–82% (r1), 21–84% (r3) | non misurato | ogni potere 44–58%, peggior matchup ≥ 30% |
-| M7 | Duelli (pari) decisi dalla testa | 92% | 91% | indicatore: ≤ 75% dopo Fase 2 |
-| M8 | Rimonta: chi è avanti di ≥ 10 punti hp al round 3 vince | 66% | 62% | 58–68% (**non** aggiungere meccaniche di rimonta) |
-| M9 | Eroe di livello L senza equip contro la CPU di pari livello (L5) | 27% | non misurato | 42–50% |
-| M10 | Eccezioni / duelli non finiti su 100.000 duelli simulati | `KeyError` ricorrente / 0 | – | 0 / 0 |
+| ID | Metrica | Oggi | Dopo Fase 1 (provato) | **Finale (misurato, §0)** | Target finale |
+|---|---|---|---|---|---|
+| M1 | Durata di un duello pari (stat e skill 1, solo Pugno): mediana / p90 round | 13 / 25 | 7 / 14 | **6 / 13** | mediana 6–8, p90 ≤ 14 |
+| M2 | P(colpire) a ranghi pari | 45% | 45% | 45% | 45% (non toccare) |
+| M3 | Vittoria con +1 / +2 / +3 ranghi su tutte le stat e skill | 92 / 99 / 99% | 68 / 84 / 91% | **71 / 83 / 92%** | 68–75 / 82–88 / 90–94% |
+| M4 | Mira sempre (poi attacca) contro chi non mira: testa / busto | 27 / 3% | 57 / 18% | **60 / 38%** | testa 55–62%, busto ≥ 35% (dopo Fase 2) |
+| M5 | Oggetto contro nudo, ranghi pari: Pistola / Spada / Casco / Armatura da combattimento | 89 / 48 / 98 / 80% | 75 / 49 / 78 / 67% | **56–70% (tutti 15)** | ognuno 58–72%, crescente col prezzo |
+| M6 | Potere contro il campo (round-robin, ranghi pari) | 34–82% (r1), 21–84% (r3) | non misurato | **44–58% (r1 e r3)** | ogni potere 44–58%, peggior matchup ≥ 30% |
+| M7 | Duelli (pari) decisi dalla testa | 92% | 91% | **47%** | indicatore: ≤ 75% dopo Fase 2 |
+| M8 | Rimonta: chi è avanti di ≥ 10 punti hp al round 3 vince | 66% | 62% | **68%** | 58–68% (**non** aggiungere meccaniche di rimonta) |
+| M9 | Eroe di livello L senza equip contro la CPU di pari livello (L5) | 27% | non misurato | **46%** | 42–50% |
+| M10 | Eccezioni / duelli non finiti su 100.000 duelli simulati | `KeyError` ricorrente / 0 | – | **0 / 0** | 0 / 0 |
 
 ### Cause, con l'evidenza
 
@@ -288,7 +354,7 @@ Test (`test_combat.py`): un blocco `# ---- overhaul fase N ----` per regola nuov
 | `combat.py` | eliminare | Allinearlo (non consigliato) |
 | Meccaniche di rimonta | **No** (M8 è già sano) | – |
 
-**Da chiedere all'utente prima di agire**: (1) l'intenzione delle stance 16/29/30/31 (§0.3); (2) se `combat.py` serve ancora; (3) se resettare `save/cpu_profile.json` (è un dato suo); (4) l'origine dei 994.240¤ nel save (probabile `/debug/crediti`): non influisce sul bilanciamento ma falsa ogni test d'economia fatto sul save reale — usare sempre crediti iniziali puliti.
+**(Esito: vedi §0.3.) Da chiedere all'utente prima di agire**: (1) l'intenzione delle stance 16/29/30/31 (§0.3); (2) se `combat.py` serve ancora; (3) se resettare `save/cpu_profile.json` (è un dato suo); (4) l'origine dei 994.240¤ nel save (probabile `/debug/crediti`): non influisce sul bilanciamento ma falsa ogni test d'economia fatto sul save reale — usare sempre crediti iniziali puliti.
 
 ---
 

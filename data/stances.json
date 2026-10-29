@@ -110,28 +110,28 @@
   {
     "id": 5,
     "nome": "Assorbi Energie",
-    "descrizione": "Tutti i danni subiti vengono suddivisi tra tutte le parti del corpo.",
+    "descrizione": "Tutti i danni subiti vengono suddivisi tra tutte le parti del corpo e chi ti colpisce brucia per 2 turni.",
     "attivo_default": false,
     "durata": {
       "tipo": "fissa",
-      "turni": 2
+      "turni": 3
     },
     "modificatori": [
       {
         "tipo": "distribuisci_danni"
-      },
-      {
-        "tipo": "resistenza",
-        "tipo_danno": "tutto",
-        "valore": 0
       }
     ],
     "effetti_applicati": [],
-    "trigger": "attivo",
+    "trigger": "vieni_colpito",
     "cooldown_turni": 1,
     "usi_limitati": false,
     "usi_massimi": 1,
-    "effetti_avversario": []
+    "effetti_avversario": [
+      {
+        "effetto": 1,
+        "turni": 2
+      }
+    ]
   },
   {
     "id": 6,
@@ -222,7 +222,7 @@
   },
   {
     "nome": "Riflessi Aumentati",
-    "descrizione": "I tuoi riflessi sono aumentati, sei più difficile da colpire",
+    "descrizione": "I tuoi riflessi sono aumentati, sei più difficile da colpire: -1 al tiro per colpire dell'avversario.",
     "attivo_default": false,
     "durata": {
       "tipo": "fissa",
@@ -232,7 +232,7 @@
     "modificatori": [
       {
         "tipo": "colpire_avversario",
-        "flat": -2,
+        "flat": -1,
         "dado_proprio": "",
         "dado_avversario": ""
       }
@@ -246,7 +246,7 @@
   },
   {
     "nome": "Riflessi Fulminei",
-    "descrizione": "sei estremamente rapido e pronto a tutto",
+    "descrizione": "Sei estremamente rapido e pronto a tutto: -2 al tiro per colpire dell'avversario per un turno.",
     "attivo_default": false,
     "durata": {
       "tipo": "fissa",
@@ -259,7 +259,7 @@
     "modificatori": [
       {
         "tipo": "colpire_avversario",
-        "flat": -5,
+        "flat": -2,
         "dado_proprio": "",
         "dado_avversario": ""
       }
@@ -342,7 +342,7 @@
   },
   {
     "nome": "Resistenza",
-    "descrizione": "",
+    "descrizione": "Il corpo regge i colpi: -25% a tutti i danni subiti finché dura la stance.",
     "attivo_default": false,
     "durata": {
       "tipo": "fissa",
@@ -356,7 +356,7 @@
       {
         "tipo": "resistenza",
         "tipo_danno": "tutto",
-        "valore": 0
+        "valore": 25
       }
     ],
     "effetti_applicati": [],
@@ -366,7 +366,7 @@
   {
     "id": 17,
     "nome": "Corazza",
-    "descrizione": "Ti copri di armatura: hp extra (1 dado controllo x10) finché dura la stance.",
+    "descrizione": "Ti copri di armatura: hp extra (1 dado controllo x8) finché dura la stance.",
     "attivo_default": false,
     "durata": {
       "tipo": "fissa",
@@ -381,7 +381,7 @@
         "tipo": "armatura",
         "flat": 0,
         "dado_proprio": "controllo",
-        "mult": 10,
+        "mult": 8,
         "locazione": "tutte"
       }
     ],
@@ -655,7 +655,7 @@
   },
   {
     "nome": "mira migliorata",
-    "descrizione": "la tua mira è finalmente decente",
+    "descrizione": "La tua mira è finalmente decente: +1 al tuo tiro per colpire.",
     "attivo_default": false,
     "durata": {
       "tipo": "contrapposta"
@@ -666,7 +666,7 @@
     "usi_massimi": 1,
     "modificatori": [
       {
-        "tipo": "colpire_avversario",
+        "tipo": "colpire_proprio",
         "flat": 1,
         "dado_proprio": "",
         "dado_avversario": ""
@@ -678,7 +678,7 @@
   },
   {
     "nome": "Occhio attento",
-    "descrizione": "",
+    "descrizione": "Occhio attento: +1 al tuo tiro per colpire.",
     "attivo_default": false,
     "durata": {
       "tipo": "contrapposta"
@@ -689,8 +689,8 @@
     "usi_massimi": 1,
     "modificatori": [
       {
-        "tipo": "colpire_avversario",
-        "flat": 0,
+        "tipo": "colpire_proprio",
+        "flat": 1,
         "dado_proprio": "",
         "dado_avversario": ""
       }
@@ -701,7 +701,7 @@
   },
   {
     "nome": "cecchino",
-    "descrizione": "",
+    "descrizione": "Cecchino: +2 al tuo tiro per colpire.",
     "attivo_default": false,
     "durata": {
       "tipo": "contrapposta"
@@ -712,8 +712,8 @@
     "usi_massimi": 1,
     "modificatori": [
       {
-        "tipo": "colpire_avversario",
-        "flat": 4,
+        "tipo": "colpire_proprio",
+        "flat": 2,
         "dado_proprio": "",
         "dado_avversario": ""
       }
@@ -721,5 +721,27 @@
     "effetti_applicati": [],
     "effetti_avversario": [],
     "id": 31
+  },
+  {
+    "id": 32,
+    "descrizione": "Un campo di forza costante: -20% a tutti i danni subiti.",
+    "attivo_default": false,
+    "durata": {
+      "tipo": "contrapposta"
+    },
+    "trigger": "attivo",
+    "cooldown_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "modificatori": [
+      {
+        "tipo": "resistenza",
+        "tipo_danno": "tutto",
+        "valore": 20
+      }
+    ],
+    "effetti_applicati": [],
+    "effetti_avversario": [],
+    "nome": "Barriera"
   }
 ]
