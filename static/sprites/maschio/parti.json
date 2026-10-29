@@ -2,6 +2,7 @@
   "vista": "profilo",
   "rivolto": "destra",
   "canvas": [48, 111],
+  "piedi": { "parte": "stinco", "riga": 26, "sovrapposizione": 3 },
   "colori": { "contorno": "#262626", "ombra": "#6a6a6a", "base": "#8e8e8e", "luce": "#b2b2b2", "riflesso": "#d8d8d8" },
   "giunti": {
     "cima": [21, 2], "collo_alto": [21, 19], "vita": [20, 37], "anca": [20, 55],

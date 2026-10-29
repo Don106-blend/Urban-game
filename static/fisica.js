@@ -1,388 +1,316 @@
-/* Urban — fisica dei combattenti.
-   Uno scheletro a particelle (verlet) con ossa rigide, masse, cerniere, pavimento e muri, tenuto in piedi da
-   "muscoli" (molle PD verso una posa bersaglio). I colpi sono impulsi di velocita' sulla locazione colpita e sul
-   corpo intero: il combattente rincula, scivola, fa dei passi per non cadere e, calmato, torna a piedi dov'era.
-   Una locazione `storpiata` perde i muscoli e fa il ragdoll da sola; senza gambe il corpo si siede e si puntella
-   sulle braccia; da morto tutti i muscoli si spengono e, fermo, il corpo si addormenta (niente piu' calcoli,
-   niente piu' tremolii). Nessun DOM: gira in Node (v. test_fisica.js) e nel browser (arena.js).
-   Coordinate = pixel dello sprite (48x111, v. static/sprites/maschio/parti.json); -x = indietro. */
+/* Urban — motore fisico 2D a corpi rigidi.
+   Pensato per i combattenti (ragdoll articolati) ma generico: corpi fatti di capsule, giunti a cerniera con limiti
+   e motori PD, contatti con pavimento e muri (attrito di Coulomb, rimbalzo), gravita'. Nessun DOM: gira in Node
+   (v. test_fisica.js) e nel browser (pupazzo.js, arena.js).
+
+   Il risolutore e' quello "soft step" di Box2D 3 (Erin Catto): ogni passo si divide in sotto-passi; a ogni
+   sotto-passo si integrano le velocita', si applicano i vincoli come molle implicite (stabili per qualunque
+   rigidezza e rapporto di massa), si integrano le posizioni e si rilassano i vincoli senza correzione di posizione.
+   I contatti sono "speculativi": un corpo veloce non attraversa mai il pavimento. I motori dei giunti sono molle
+   smorzate sull'angolo relativo (frequenza + smorzamento, con coppia massima): sono i "muscoli" dei pupazzi.
+
+   Unita': pixel dello sprite, secondi, radianti. Y verso il basso, angoli positivi in senso orario (come il CSS).
+   Corpo.x/y = centro di massa; le forme sono capsule {ax, ay, bx, by, r} nel sistema locale del corpo. */
 const Fisica = (() => {
-  const G = 0.3;            // gravita' (px per passo^2, passo = 1/60 s)
-  const PAV = 111;          // pavimento: bordo inferiore dello sprite
-  const ITER = 12;          // iterazioni dei vincoli per passo
-  const SMORZ = 0.995;      // smorzamento globale della velocita'
-  const ATTRITO = 0.8;      // quota di velocita' orizzontale che resta a chi tocca terra: si scivola, ma ci si ferma
-  const VMAX = 3;           // velocita' massima di un colpo sulla locazione (px/passo)
-  const POSA_BASSA = 2;     // il bacino sta 2 px sotto la posizione a gambe tese: guardia, ginocchia un po' piegate
-  const RX = 2;             // raggio contro i muri
-  // passi
-  const PASSO_DUR = 10;     // durata di un passo (passi di simulazione)
-  const PASSO_ALT = 6;      // quanto si alza il piede
-  const PASSO_MAX = 12;     // lunghezza massima di un passo verso casa
-  const PASSO_PAUSA = 2;    // pausa tra un passo e il successivo
-  const SOGLIA_BIL = 5;     // se il bacino si allontana tanto dai piedi, si fa un passo per riprenderlo
-  const SOGLIA_CASA = 0.9;  // si torna a casa finche' un piede e' piu' lontano di cosi'
-  const CALMA_CASA = 30;    // passi senza colpi prima di tornare al posto di partenza
+  const PI2 = Math.PI * 2;
+  const lim = (x, a, b) => (x < a ? a : x > b ? b : x);
 
-  // locazione di gioco -> particelle che la muovono
-  const LOC = {
-    testa: ["cima"],
-    busto: ["collo_alto", "vita", "anca", "anca_dx", "anca_sx", "spalla_dx", "spalla_sx"],
-    braccio_dx: ["gomito_dx", "polso_dx"], braccio_sx: ["gomito_sx", "polso_sx"],
-    gamba_dx: ["ginocchio_dx", "caviglia_dx"], gamba_sx: ["ginocchio_sx", "caviglia_sx"],
-  };
-  const LOC_DI = {};
-  for (const [l, ps] of Object.entries(LOC)) ps.forEach(p => { LOC_DI[p] = l; });
-
-  // raggio di contatto col pavimento (la caviglia ha il piede sotto: 9 px, come a riposo)
-  const RAGGIO = {cima: 8, collo_alto: 4, vita: 6, anca: 6, anca_dx: 6, anca_sx: 6, spalla_dx: 4, spalla_sx: 4,
-                  gomito_dx: 3, gomito_sx: 3, polso_dx: 3, polso_sx: 3, ginocchio_dx: 4, ginocchio_sx: 4,
-                  caviglia_dx: 9, caviglia_sx: 9};
-  // masse relative: il bacino e' pesante, mani e testa leggere (nei vincoli, chi pesa meno si sposta di piu')
-  const MASSA = {cima: 1, collo_alto: 2, vita: 5, anca: 5, anca_dx: 3.5, anca_sx: 3.5, spalla_dx: 1.6, spalla_sx: 1.6,
-                 gomito_dx: 0.6, gomito_sx: 0.6, polso_dx: 0.35, polso_sx: 0.35, ginocchio_dx: 1.5, ginocchio_sx: 1.5,
-                 caviglia_dx: 2.5, caviglia_sx: 2.5};
-  // muscoli: [rigidita' kp, smorzamento kd, moltiplicatore della rigidita' verticale] della molla verso il bersaglio.
-  // Il bacino e' morbido in orizzontale (puo' essere spinto) e saldo in verticale (non si affloscia).
-  const MUSCOLO = {
-    cima: [0.008, 0.08], collo_alto: [0.02, 0.13], vita: [0.03, 0.17, 2.5], anca: [0.03, 0.17, 2.5],
-    anca_dx: [0.02, 0.13, 2.5], anca_sx: [0.02, 0.13, 2.5], spalla_dx: [0, 0], spalla_sx: [0, 0],
-    gomito_dx: [0.015, 0.11], gomito_sx: [0.015, 0.11], polso_dx: [0.012, 0.1], polso_sx: [0.012, 0.1],
-    ginocchio_dx: [0.06, 0.22], ginocchio_sx: [0.06, 0.22], caviglia_dx: [0.12, 0.3, 1.5], caviglia_sx: [0.12, 0.3, 1.5],
-  };
-  // quanto del proprio peso regge il muscolo (le braccia pendono un po' e oscillano come pendoli)
-  const COMP = {gomito_dx: 0.85, gomito_sx: 0.85, polso_dx: 0.85, polso_sx: 0.85};
-  // corpi rigidi (tutte le distanze fisse): bacino e parte alta del busto, incernierati in vita
-  const GRUPPI = [["vita", "anca", "anca_dx", "anca_sx"], ["vita", "collo_alto", "spalla_dx", "spalla_sx"]];
-  // distanze minime (frazione di quella a riposo): niente teste nel petto, gambe o braccia ripiegate del tutto
-  // (con la locazione dell'arto: quando e' storpiato il limite si abbassa, cosi' una gamba molle puo' ripiegarsi
-  // sotto il corpo che si siede invece di fare da puntello)
-  const LIMITI = [["cima", "vita", 0.75], ["collo_alto", "anca", 0.7], ["spalla_dx", "polso_dx", 0.3, "braccio_dx"],
-                  ["spalla_sx", "polso_sx", 0.3, "braccio_sx"], ["anca_dx", "caviglia_dx", 0.5, "gamba_dx"],
-                  ["anca_sx", "caviglia_sx", 0.5, "gamba_sx"]];
-  // arti: [base, giunto di mezzo, estremo, verso della cerniera: +1 piega in avanti (ginocchio), -1 indietro (gomito)]
-  const ARTI = {
-    gamba_dx: ["anca_dx", "ginocchio_dx", "caviglia_dx", 1], gamba_sx: ["anca_sx", "ginocchio_sx", "caviglia_sx", 1],
-    braccio_dx: ["spalla_dx", "gomito_dx", "polso_dx", -1], braccio_sx: ["spalla_sx", "gomito_sx", "polso_sx", -1],
-  };
-  // dove va un colpo: peso dell'impulso su ogni particella della locazione colpita
-  const PESI = {
-    testa: {cima: 1.2, collo_alto: 0.35},
-    busto: {collo_alto: 1, spalla_dx: 1, spalla_sx: 1, cima: 0.7, vita: 0.45, anca: 0.25},
-    braccio_dx: {gomito_dx: 0.9, polso_dx: 1.3, spalla_dx: 0.15}, braccio_sx: {gomito_sx: 0.9, polso_sx: 1.3, spalla_sx: 0.15},
-    gamba_dx: {ginocchio_dx: 1, caviglia_dx: 1.7, anca_dx: 0.25}, gamba_sx: {ginocchio_sx: 1, caviglia_sx: 1.7, anca_sx: 0.25},
-  };
-  // quanto il colpo solleva (invece di spingere soltanto): una gamba colpita stacca il piede da terra
-  const SOLLEVA = {gamba_dx: 2, gamba_sx: 2};
-
-  const lim = (x, a, b) => Math.min(b, Math.max(a, x));
-  const LATI = ["dx", "sx"];
-
-  /* giunto di mezzo di un arto a due ossa, con base H ed estremo A fissati: cerchio-cerchio, dalla parte `dir` */
-  function ik(H, A, l1, l2, dir) {
-    const dx = A.x - H.x, dy = A.y - H.y, d = Math.hypot(dx, dy) || 1e-6;
-    const dd = Math.min(d, l1 + l2 - 1e-3);
-    const a = (l1 * l1 - l2 * l2 + dd * dd) / (2 * dd);
-    const h = Math.sqrt(Math.max(0, l1 * l1 - a * a));
-    const ux = dx / d, uy = dy / d;
-    return {x: H.x + ux * a + dir * uy * h, y: H.y + uy * a - dir * ux * h};
+  /* coefficienti di un vincolo morbido: da frequenza propria e smorzamento a (bias, massa, impulso) */
+  function morbido(hz, zeta, h) {
+    if (hz <= 0) return {bias: 0, massa: 1, impulso: 0};
+    const w = PI2 * hz, a1 = 2 * zeta + h * w, a2 = h * w * a1, a3 = 1 / (1 + a2);
+    return {bias: w / a1, massa: a2 * a3, impulso: a3};
   }
 
-  class Scheletro {
-    /* giunti: {nome: [x, y]} a riposo; ossa: [[da, a], ...] (da parti.json) */
-    constructor(giunti, ossa) {
-      this.R = {}; this.P = {};
-      for (const [k, [x, y]] of Object.entries(giunti)) {
-        this.R[k] = {x, y};
-        this.P[k] = {x, y, px: x, py: y, r: RAGGIO[k] || 3, im: 1 / (MASSA[k] || 1)};
-      }
-      const d = (a, b) => Math.hypot(this.R[a].x - this.R[b].x, this.R[a].y - this.R[b].y);
-      this.d = d;
-      this.vinc = [];                                   // [a, b, lunghezza, solo-minimo, locazione]
-      ossa.forEach(([a, b]) => this.vinc.push([a, b, d(a, b), false]));
-      GRUPPI.forEach(g => g.forEach((a, i) => g.slice(i + 1).forEach(b => this.vinc.push([a, b, d(a, b), false]))));
-      LIMITI.forEach(([a, b, f, loc]) => this.vinc.push([a, b, d(a, b) * f, true, loc]));
-      this.gain = {}; this.gainT = {};                  // forza dei muscoli per locazione: attuale e voluta
-      for (const l of Object.keys(LOC)) { this.gain[l] = 1; this.gainT[l] = 1; }
-      this.piede = {};                                  // dove e' piantato ogni piede e come sta camminando
-      for (const l of LATI) {
-        const c = this.R["caviglia_" + l];
-        this.piede[l] = {x: c.x, tx: c.x, ty: c.y, stato: "p", t: 0, x0: c.x, x1: c.x, vivo: true};
-      }
-      this.muro = [-1e9, 1e9];                          // limiti orizzontali dove puo' stare (la finestra dell'arena)
-      this.t = 0;
-      this.calma = 999;                                 // passi dall'ultimo colpo
-      this.pausa = 0;                                   // pausa tra due passi
-      this.rilascio = 0;                                // passi in cui i muscoli cedono (colpo incassato, salto)
-      this.nPassi = 0;                                  // passi fatti finora
-      this.morto = false;
-      this.ancoraX = null;
-      this.dorme = false;                               // un morto fermo non si calcola piu'
-      this.fermo = 0;
-    }
+  /* momento d'inerzia di un'asta (lunghezza L, spessore 2r) di massa m, attorno al suo centro */
+  const asta = (L, m, r = 0) => m * (L * L / 12 + r * r / 4);
 
-    /* ---- eventi ---- */
+  class Corpo {
+    constructor(o) {
+      this.nome = o.nome || "";
+      this.x = o.x; this.y = o.y; this.a = o.a || 0;
+      this.vx = 0; this.vy = 0; this.w = 0;
+      this.m = o.m; this.I = o.I;
+      this.im = o.statico ? 0 : 1 / o.m; this.iI = o.statico ? 0 : 1 / o.I;   // statico: non si muove mai
+      this.forme = o.forme || [];
+      this.mu = o.mu ?? 0.9;              // attrito col terreno
+      this.e = o.e ?? 0.1;                // rimbalzo
+      this.fx = 0; this.fy = 0; this.tau = 0;   // forze esterne per il prossimo passo (si azzerano da sole)
+      this.dmpL = o.dmpL ?? 0.02;         // smorzamento lineare (1/s)
+      this.dmpA = o.dmpA ?? 0.25;         // smorzamento angolare (1/s)
+      this.px = this.x; this.py = this.y; this.pa = this.a;      // posa del passo precedente (per interpolare)
+      this.x0 = this.x; this.y0 = this.y; this.a0 = this.a;      // posa a inizio passo (per i contatti)
+      this.terra = 0;                     // impulso normale sul pavimento nell'ultimo passo: 0 = in volo
+      this.scivola = 0;                   // velocita' di scivolamento sul pavimento nell'ultimo passo
+    }
+    /* punto locale -> mondo */
+    mondo(lx, ly) {
+      const c = Math.cos(this.a), s = Math.sin(this.a);
+      return [this.x + c * lx - s * ly, this.y + s * lx + c * ly];
+    }
+    /* velocita' (mondo) del punto locale */
+    velocita(lx, ly) {
+      const c = Math.cos(this.a), s = Math.sin(this.a), rx = c * lx - s * ly, ry = s * lx + c * ly;
+      return [this.vx - this.w * ry, this.vy + this.w * rx];
+    }
+  }
+
+  /* cerniera tra A e B. Gli ancoraggi sono locali. `rif` = angolo relativo (B - A) a riposo; `lim` = [min, max]
+     dell'angolo relativo a `rif`. Il motore PD (hz > 0) porta l'angolo relativo a `obiettivo` come una molla
+     smorzata, con coppia al piu' `coppiaMax`. `attrito` = smorzamento viscoso (coppia per rad/s). */
+  class Giunto {
+    constructor(A, B, ancA, ancB, o = {}) {
+      this.A = A; this.B = B;
+      this.lax = ancA[0]; this.lay = ancA[1]; this.lbx = ancB[0]; this.lby = ancB[1];
+      this.rif = o.rif ?? 0;
+      this.lim = o.lim || null;
+      this.nome = o.nome || "";
+      this.hz = 0; this.zeta = 1; this.coppiaMax = 0; this.obiettivo = 0;
+      this.attrito = o.attrito ?? 0;
+      this.ix = 0; this.iy = 0; this.iMot = 0; this.iLo = 0; this.iHi = 0;   // impulsi accumulati (warm start)
+    }
+    get angolo() { return this.B.a - this.A.a - this.rif; }
+    /* il motore: frequenza, smorzamento, coppia massima, angolo voluto */
+    motore(hz, zeta, coppiaMax, obiettivo) {
+      this.hz = hz; this.zeta = zeta; this.coppiaMax = coppiaMax; this.obiettivo = obiettivo;
+    }
+  }
+
+  class Mondo {
+    constructor(o = {}) {
+      this.g = o.g ?? 1100;                  // px/s^2
+      this.pavimento = o.pavimento ?? 111;   // y del terreno
+      this.muro = [-1e9, 1e9];               // limiti orizzontali (x minimo, x massimo)
+      this.sotto = o.sotto ?? 4;             // sotto-passi per passo
+      this.corpi = []; this.giunti = [];
+      this.hzContatto = o.hzContatto ?? 30;
+      this.zetaContatto = o.zetaContatto ?? 10;
+      this.hzGiunto = o.hzGiunto ?? 60;
+      this.zetaGiunto = o.zetaGiunto ?? 2;
+      this.spinta = o.spinta ?? 260;         // velocita' massima con cui un contatto espelle una penetrazione (px/s)
+      this.tolleranza = o.tolleranza ?? 0.25;  // penetrazione tollerata (px)
+      this.vmax = 6000; this.wmax = 80;
+      this.contatti = []; this.memoria = new Map();   // contatti del passo e impulsi del passo prima
+      this.dorme = false; this.fermo = 0; this.sonno = o.sonno ?? false;
+      this.t = 0;
+    }
+    corpo(o) { const c = new Corpo(o); this.corpi.push(c); return c; }
+    giunto(A, B, ancA, ancB, o) { const j = new Giunto(A, B, ancA, ancB, o); this.giunti.push(j); return j; }
     sveglia() { this.dorme = false; this.fermo = 0; }
 
-    /* limiti orizzontali (nelle coordinate dello sprite): i muri della finestra, il corpo non esce */
-    muri(min, max) {
-      this.muro = [min, max];
+    /* impulso (jx, jy) applicato al punto (px, py) del mondo di un corpo */
+    impulso(c, px, py, jx, jy) {
+      c.vx += c.im * jx; c.vy += c.im * jy;
+      c.w += c.iI * ((px - c.x) * jy - (py - c.y) * jx);
       this.sveglia();
     }
 
-    /* velocita' (vx, vy) in piu' a una particella */
-    spingi(nome, vx, vy = 0) {
-      const p = this.P[nome];
-      if (p) { p.px -= vx; p.py -= vy; this.sveglia(); }
+    /* contatti col pavimento e coi muri: un punto per ogni estremo di ogni capsula */
+    _collide(dt) {
+      const out = this.contatti; out.length = 0;
+      const PAV = this.pavimento, [xmin, xmax] = this.muro;
+      this.corpi.forEach((b, bi) => {
+        const sp = Math.hypot(b.vx, b.vy) + Math.abs(b.w) * 30;
+        const margine = 3 + sp * dt * 1.5;               // contatti speculativi: si vede in anticipo cosa si toccera'
+        b.forme.forEach((f, fi) => {
+          for (let e = 0; e < 2; e++) {
+            const [px, py] = b.mondo(e ? f.bx : f.ax, e ? f.by : f.ay), r = f.r;
+            // 0 = pavimento, 1 = muro sinistro, 2 = muro destro
+            const s0 = PAV - (py + r), s1 = (px - r) - xmin, s2 = xmax - (px + r);
+            if (s0 < margine) out.push(this._contatto(b, (bi * 16 + fi * 2 + e) * 3, px, py + r, 0, -1, s0));
+            if (s1 < margine) out.push(this._contatto(b, (bi * 16 + fi * 2 + e) * 3 + 1, px - r, py, 1, 0, s1));
+            if (s2 < margine) out.push(this._contatto(b, (bi * 16 + fi * 2 + e) * 3 + 2, px + r, py, -1, 0, s2));
+          }
+        });
+      });
+      // (la memoria dei contatti del passo prima serve solo al warm start: si rifa' a ogni passo)
+      this.memoria = new Map(out.map(c => [c.chiave, c]));
     }
 
-    /* colpo subito: impulso proporzionale al danno sulla locazione colpita (tutto il corpo se `split`), piu' lo
-       spostamento di tutto il corpo: rincula, scivola e fa dei passi per restare in piedi */
-    colpisci(loc, danno, split = false) {
-      const v = Math.min(VMAX, 0.15 + danno * 0.02);
-      const pesi = split ? Object.assign({}, ...Object.values(PESI)) : PESI[loc];
-      if (!pesi) return;
-      const su = SOLLEVA[loc] ?? 0.12;
-      for (const [k, w] of Object.entries(pesi)) this.spingi(k, -v * w * (split ? 0.5 : 1), -v * w * su);
-      for (const k of Object.keys(this.P)) this.spingi(k, -v * 1.4, 0);
-      this.calma = 0;
-      this.rilascio = Math.max(this.rilascio, 4 + Math.min(10, danno * 0.15));
+    _contatto(b, chiave, px, py, nx, ny, s0) {
+      const rx = px - b.x, ry = py - b.y, tx = -ny, ty = nx;
+      const rn = rx * ny - ry * nx, rt = rx * ty - ry * tx;
+      const vx = b.vx - b.w * ry, vy = b.vy + b.w * rx;
+      const prec = this._precedenti && this._precedenti.get(chiave);
+      return {
+        b, chiave, nx, ny, tx, ty, rx, ry, s0,
+        mn: 1 / (b.im + b.iI * rn * rn), mt: 1 / (b.im + b.iI * rt * rt),
+        vrel: vx * nx + vy * ny,
+        iN: prec ? prec.iN : 0, iT: prec ? prec.iT : 0, iNmax: 0,
+      };
     }
 
-    /* chi attacca si sporge e fa un passo avanti: spalle, braccia, testa e tutto il corpo */
-    affonda(forza = 1) {
-      for (const k of ["spalla_dx", "polso_dx", "gomito_dx", "cima", "collo_alto"]) this.spingi(k, 0.8 * forza);
-      this.spingi("vita", 0.25 * forza);
-      for (const k of Object.keys(this.P)) this.spingi(k, 0.9 * forza, 0);
-      this.calma = 0;
-      this.rilascio = Math.max(this.rilascio, 3);
-    }
-
-    /* attacco a distanza: il braccio si alza e punta, il corpo sente il rinculo */
-    spara() {
-      this.spingi("polso_dx", 1.4, -0.9); this.spingi("gomito_dx", 0.8, -0.5);
-      for (const k of Object.keys(this.P)) this.spingi(k, -0.35, 0);
-      this.calma = 0;
-    }
-
-    /* schivata: un salto all'indietro, i piedi staccano da terra e si atterra piu' lontano */
-    schiva() {
-      for (const k of Object.keys(this.P)) this.spingi(k, -1.3, -1.9);
-      this.calma = 0;
-      this.rilascio = Math.max(this.rilascio, 12);
-    }
-
-    /* parata o colpo che non fa danni: le braccia si alzano e il busto cede un poco */
-    para() {
-      for (const k of ["polso_dx", "gomito_dx", "polso_sx", "gomito_sx", "collo_alto"]) this.spingi(k, -0.9, -0.5);
-      for (const k of Object.keys(this.P)) this.spingi(k, -0.3, 0);
-      this.calma = 0;
-    }
-
-    /* una locazione e' storpiata (o guarita): i muscoli si spengono (o riaccendono) in pochi passi */
-    storpia(loc, si, subito = false) {
-      if (!(loc in this.gain)) return;
-      const eraSana = this.gainT[loc] > 0.5;
-      this.gainT[loc] = si ? 0 : 1;
-      if (subito) this.gain[loc] = this.gainT[loc];
-      if (si && eraSana && loc.startsWith("gamba")) {             // cedendo, il piede scivola avanti (e il ginocchio con lui)
-        this.spingi("caviglia_" + loc.slice(6), 1.6, -0.3);
-        this.spingi("ginocchio_" + loc.slice(6), 0.9);
-      }
-      this.sveglia();
-    }
-
-    /* porta la velocita' orizzontale media del corpo (pesata sulle masse) a `vx`: le spinte interne (la parte alta
-       indietro, i piedi avanti) non devono far andare il corpo da nessuna parte per conto loro */
-    _porta(vx) {
-      let q = 0, m = 0;
-      for (const p of Object.values(this.P)) { q += (p.x - p.px) / p.im; m += 1 / p.im; }
-      const d = vx - q / m;
-      for (const p of Object.values(this.P)) p.px -= d;
-    }
-
-    /* il colpo di grazia: i muscoli si spengono tutti e la parte alta vola indietro, i piedi scivolano avanti */
-    muori(danno = 20) {
-      this.morto = true;
-      for (const l of Object.keys(this.gain)) { this.gainT[l] = 0; this.gain[l] = 0; }
-      const f = lim(1 + danno * 0.004, 1, 1.4);                  // piu' danno, caduta un po' piu' violenta
-      for (const k of ["cima", "collo_alto", "spalla_dx", "spalla_sx", "polso_dx", "polso_sx"]) this.spingi(k, -1.5 * f);
-      this.spingi("cima", -0.6 * f); this.spingi("vita", -0.8 * f); this.spingi("anca", -0.4 * f);
-      this.spingi("ginocchio_dx", 1.2); this.spingi("ginocchio_sx", 1);
-      this.spingi("caviglia_dx", 2.6); this.spingi("caviglia_sx", 2.2);
-      this._porta(-0.8 * f);                                      // il corpo, nel complesso, cade all'indietro
-    }
-
-    /* ---- simulazione ---- */
-    /* macchina dei passi: ogni piede e' piantato in un punto del pavimento oppure e' in volo verso uno nuovo.
-       Si fa un passo (uno alla volta, solo con due gambe sane) quando il bacino si e' allontanato troppo da un
-       piede (si rincorre il bacino spinto via) oppure, da calmi, quando i piedi non sono a casa (si ritorna). */
-    _passi() {
-      const P = this.P, R = this.R, g = this.gain;
-      this.calma++;
-      this.pausa--;
-      for (const l of LATI) {
-        const f = this.piede[l], k = "caviglia_" + l;
-        if (g["gamba_" + l] < 0.5) { f.vivo = false; f.stato = "p"; f.tx = P[k].x; f.ty = R[k].y; continue; }
-        if (!f.vivo) { f.vivo = true; f.x = P[k].x; f.stato = "p"; }
-        if (f.stato === "s") {
-          f.t++;
-          const u = Math.min(1, f.t / PASSO_DUR);
-          f.tx = f.x0 + (f.x1 - f.x0) * u * u * (3 - 2 * u);
-          f.ty = R[k].y - PASSO_ALT * Math.sin(Math.PI * u);
-          if (u >= 1) { f.stato = "p"; f.x = f.x1; this.pausa = PASSO_PAUSA; }
-        } else {
-          // appena colpito, il piede si pianta dove e' scivolato; da calmo resta dov'e'
-          if (this.calma < CALMA_CASA && Math.abs(P[k].x - f.x) > 2) f.x = P[k].x;
-          f.tx = f.x; f.ty = R[k].y;
-        }
-      }
-      if (this.morto || this.pausa > 0) return;
-      if (LATI.some(l => g["gamba_" + l] < 0.8 || this.piede[l].stato === "s")) return;
-      // prima l'equilibrio: se il bacino e' finito fuori dall'appoggio dei piedi (spinto via), il piede da quel lato
-      // fa un passo per riprenderlo, e atterra un po' avanti nel verso della spinta
-      const X = P.anca.x;
-      const appoggio = LATI.map(l => ({l, b: this.piede[l].x - (R["caviglia_" + l].x - R.anca.x)})).sort((a, b) => a.b - b.b);
-      let scelto = null, mira = 0;
-      const lato = X < appoggio[0].b - SOGLIA_BIL ? appoggio[0] : X > appoggio[1].b + SOGLIA_BIL ? appoggio[1] : null;
-      if (lato) {
-        scelto = lato.l;
-        mira = X + (R["caviglia_" + scelto].x - R.anca.x) + lim((P.anca.x - P.anca.px) * 6, -6, 6);
-      }
-      // poi, da calmi, verso casa: si muove il piede piu' lontano
-      if (!scelto && this.calma >= CALMA_CASA) {
-        let lontano = SOGLIA_CASA;
-        for (const l of LATI) {
-          const d = R["caviglia_" + l].x - this.piede[l].x;
-          if (Math.abs(d) > lontano) { lontano = Math.abs(d); scelto = l; mira = this.piede[l].x + lim(d, -PASSO_MAX, PASSO_MAX); }
-        }
-      }
-      if (!scelto) return;
-      const f = this.piede[scelto];
-      f.x1 = lim(mira, f.x - 14, f.x + 14);
-      if (Math.abs(f.x1 - f.x) < 0.5) return;
-      f.stato = "s"; f.t = 0; f.x0 = P["caviglia_" + scelto].x;
-      this.nPassi++;
-    }
-
-    /* posa bersaglio dei muscoli, dallo stato attuale: bacino sopra i piedi, busto e testa sopra la vita VERA,
-       piedi dove li dice la macchina dei passi, braccia penzoloni. Senza gambe il bacino scende a terra e le
-       braccia si puntellano. */
-    _bersagli() {
-      const R = this.R, P = this.P, g = this.gain, T = {};
-      const sosteg = (g.gamba_dx + g.gamba_sx) / 2;              // 1 = due gambe, 0 = nessuna
-      const D = sosteg >= 0.5 ? POSA_BASSA + (1 - sosteg) * 3     // quanto cala il bacino (47 = seduto)
-        : POSA_BASSA + 1.5 + (0.5 - sosteg) * 2 * (47.5 - POSA_BASSA - 1.5);
-      const seduto = lim((0.5 - sosteg) * 2, 0, 1);
-      const resp = Math.sin(this.t * 0.05), dondolo = Math.sin(this.t * 0.031);   // respiro e dondolio: solo in orizzontale
-      const avanti = seduto * 5;                                  // seduto ci si china sulle braccia
-      // il bacino sta sopra la media dei piedi (quello in volo conta per dove atterra)
-      const xs = LATI.filter(l => g["gamba_" + l] >= 0.5)
-        .map(l => this.piede[l].tx - (R["caviglia_" + l].x - R.anca.x));
-      if (xs.length) this.ancoraX = null;                         // senza piedi sani il bacino resta dove le gambe hanno ceduto
-      else if (this.ancoraX == null) this.ancoraX = P.anca.x;
-      const bx = xs.length ? xs.reduce((a, b) => a + b) / xs.length : this.ancoraX;
-      for (const k of ["vita", "anca", "anca_dx", "anca_sx"]) T[k] = {x: bx + R[k].x - R.anca.x, y: R[k].y + D};
-      T.collo_alto = {x: P.vita.x + R.collo_alto.x - R.vita.x + avanti + resp * 0.3 * (1 - seduto),
-                      y: P.vita.y + R.collo_alto.y - R.vita.y};
-      T.cima = {x: P.collo_alto.x + R.cima.x - R.collo_alto.x + avanti * 0.4 + dondolo * 0.6 * (1 - seduto),
-                y: P.collo_alto.y + R.cima.y - R.collo_alto.y};
-      for (const [loc, [b, m, e, dir]] of Object.entries(ARTI)) {
-        let fine;
-        if (loc.startsWith("gamba")) {
-          const f = this.piede[loc.slice(6)];
-          fine = {x: f.tx, y: f.ty};
-        } else {
-          const fase = loc.endsWith("dx") ? 0 : 2.1;
-          // braccia rilassate: un filo piu' corte della lunghezza piena (gomito appena piegato) e un po' di dondolio
-          const penzola = {x: P[b].x + R[e].x - R[b].x + Math.sin(this.t * 0.027 + fase) * 1.8 * (1 - seduto),
-                           y: P[b].y + R[e].y - R[b].y - 1.5};
-          fine = {x: penzola.x + 7 * seduto, y: seduto > 0 ? Math.min(penzola.y, PAV - 3) : penzola.y};
-        }
-        T[e] = fine;
-        T[m] = ik(P[b], fine, this.d(b, m), this.d(m, e), dir);
-      }
-      return T;
-    }
-
-    passo() {
-      if (this.dorme) return;
-      this.t++;
-      const P = this.P, g = this.gain;
-      for (const l in g) {
-        const dg = this.gainT[l] - g[l];
-        g[l] = Math.abs(dg) < 0.01 ? this.gainT[l] : g[l] + dg * 0.12;
-      }
-      this.rilascio = Math.max(0, this.rilascio - 1);
-      const mus = 1 - 0.85 * lim(this.rilascio / 6, 0, 1);       // i muscoli cedono un istante a ogni colpo
-      this._passi();
-      const T = this._bersagli();
-      for (const [k, p] of Object.entries(P)) {
-        const gk = g[LOC_DI[k]], [kp, kd, fy = 1] = MUSCOLO[k], tg = T[k];
-        const vx = (p.x - p.px) * SMORZ, vy = (p.y - p.py) * SMORZ;
-        let ax = 0, ay = G * (1 - gk * (COMP[k] ?? 1));            // il muscolo regge (quasi tutto) il peso
-        if (tg && gk > 0) {
-          const m = gk * mus;
-          ax += m * (kp * (tg.x - p.x) - kd * vx);
-          ay += m * (kp * fy * (tg.y - p.y) - kd * Math.sqrt(fy) * vy);
-        }
-        p.px = p.x; p.py = p.y; p.x += vx + ax; p.y += vy + ay;
-      }
-      const [xmin, xmax] = this.muro;
-      const urto = new Set();
-      for (let it = 0; it < ITER; it++) {
-        for (const [a, b, len0, minimo, loc] of this.vinc) {
-          const A = P[a], B = P[b];
-          const dx = B.x - A.x, dy = B.y - A.y, d = Math.hypot(dx, dy) || 1e-6;
-          const len = loc ? len0 * (0.2 + 0.8 * g[loc]) : len0;
-          if (minimo && d >= len) continue;
-          const c = (d - len) / d, wa = A.im / (A.im + B.im), wb = 1 - wa;   // chi pesa meno si sposta di piu'
-          A.x += dx * c * wa; A.y += dy * c * wa; B.x -= dx * c * wb; B.y -= dy * c * wb;
-        }
-        for (const [b, m, e, dir] of Object.values(ARTI)) {        // cerniere: ginocchio avanti, gomito indietro
-          const H = P[b], K = P[m], A = P[e];
-          const dx = A.x - H.x, dy = A.y - H.y, d = Math.hypot(dx, dy);
-          if (d < 1e-6) continue;
-          const nx = dir * dy / d, ny = -dir * dx / d;             // lato in cui deve piegare
-          const s = (K.x - H.x) * nx + (K.y - H.y) * ny;
-          if (s < 0) {                                              // (la correzione si ripartisce: nessuna spinta netta)
-            const c = -s * 0.5;
-            K.x += c * nx; K.y += c * ny; H.x -= c * nx * 0.5; H.y -= c * ny * 0.5; A.x -= c * nx * 0.5; A.y -= c * ny * 0.5;
+    _giuntiRisolvi(h, bias, S) {
+      for (const j of this.giunti) {
+        const A = j.A, B = j.B, mA = A.im, mB = B.im, iA = A.iI, iB = B.iI, ie = iA + iB;
+        const cA = Math.cos(A.a), sA = Math.sin(A.a), cB = Math.cos(B.a), sB = Math.sin(B.a);
+        const rax = cA * j.lax - sA * j.lay, ray = sA * j.lax + cA * j.lay;
+        const rbx = cB * j.lbx - sB * j.lby, rby = sB * j.lbx + cB * j.lby;
+        // ---- motore PD sull'angolo relativo
+        if (ie > 0) {
+          const axial = 1 / ie, cdot = B.w - A.w;
+          if (j.hz > 0 && j.coppiaMax > 0) {
+            // la frequenza vale per l'inerzia *attorno al giunto* (Steiner), non attorno al centro di massa:
+            // un arto che ruota su un perno e' piu' pigro del suo momento d'inerzia proprio
+            const iAg = iA > 0 ? 1 / (1 / iA + (rax * rax + ray * ray) / mA) : 0;
+            const iBg = iB > 0 ? 1 / (1 / iB + (rbx * rbx + rby * rby) / mB) : 0;
+            const Sd = morbido(j.hz, j.zeta, h), C = B.a - A.a - j.rif - j.obiettivo;
+            let imp = -(1 / (iAg + iBg)) * Sd.massa * (cdot + Sd.bias * C) - Sd.impulso * j.iMot;
+            const mx = j.coppiaMax * h, nuovo = lim(j.iMot + imp, -mx, mx);
+            imp = nuovo - j.iMot; j.iMot = nuovo;
+            A.w -= iA * imp; B.w += iB * imp;
+          }
+          if (j.attrito > 0) {                            // smorzamento viscoso implicito
+            const imp = -(B.w - A.w) * (h * j.attrito) / (1 + h * j.attrito * ie);
+            A.w -= iA * imp; B.w += iB * imp;
+          }
+          // ---- limiti
+          if (j.lim) {
+            const ang = B.a - A.a - j.rif;
+            let C = ang - j.lim[0], b = 0, ms = 1, is = 0;                // minimo
+            if (C > 0) b = C / h;
+            else if (bias) { b = S.bias * C; ms = S.massa; is = S.impulso; }
+            let imp = -axial * ms * (B.w - A.w + b) - is * j.iLo;
+            let nuovo = Math.max(j.iLo + imp, 0);
+            imp = nuovo - j.iLo; j.iLo = nuovo;
+            A.w -= iA * imp; B.w += iB * imp;
+            C = j.lim[1] - ang; b = 0; ms = 1; is = 0;                    // massimo
+            if (C > 0) b = C / h;
+            else if (bias) { b = S.bias * C; ms = S.massa; is = S.impulso; }
+            imp = -axial * ms * (A.w - B.w + b) - is * j.iHi;
+            nuovo = Math.max(j.iHi + imp, 0);
+            imp = nuovo - j.iHi; j.iHi = nuovo;
+            A.w += iA * imp; B.w -= iB * imp;
           }
         }
-        for (const [k, p] of Object.entries(P)) {
-          if (p.y > PAV - p.r) p.y = PAV - p.r;
-          if (p.x < xmin + RX) { p.x = xmin + RX; urto.add(k); }
-          else if (p.x > xmax - RX) { p.x = xmax - RX; urto.add(k); }
+        // ---- cerniera: i due ancoraggi restano uniti
+        const dvx = B.vx - B.w * rby - A.vx + A.w * ray, dvy = B.vy + B.w * rbx - A.vy - A.w * rax;
+        let bx = 0, by = 0, ms = 1, is = 0;
+        if (bias) {
+          bx = S.bias * (B.x + rbx - A.x - rax); by = S.bias * (B.y + rby - A.y - ray);
+          ms = S.massa; is = S.impulso;
         }
-      }
-      for (const [k, p] of Object.entries(P)) {
-        if (urto.has(k)) p.px = p.x;                                // il muro ferma
-        // attrito a terra, e da fermi si sta fermi
-        if (p.y >= PAV - p.r - 0.01) {
-          p.px = p.x - (p.x - p.px) * ATTRITO;
-          if (Math.abs(p.x - p.px) < 0.02) p.px = p.x;
-        }
-      }
-      // un corpo morto, fermo, si addormenta: niente piu' micro-movimenti
-      if (this.morto) {
-        const fermo = Object.values(P).every(p => Math.hypot(p.x - p.px, p.y - p.py) < 0.04);
-        this.fermo = fermo ? this.fermo + 1 : 0;
-        if (this.fermo > 30) {
-          for (const p of Object.values(P)) { p.px = p.x; p.py = p.y; }
-          this.dorme = true;
-        }
+        const k11 = mA + mB + ray * ray * iA + rby * rby * iB;
+        const k12 = -ray * rax * iA - rby * rbx * iB;
+        const k22 = mA + mB + rax * rax * iA + rbx * rbx * iB;
+        let det = k11 * k22 - k12 * k12; det = det !== 0 ? 1 / det : 0;
+        const ex = dvx + bx, ey = dvy + by;
+        const ix = -ms * det * (k22 * ex - k12 * ey) - is * j.ix, iy = -ms * det * (k11 * ey - k12 * ex) - is * j.iy;
+        j.ix += ix; j.iy += iy;
+        A.vx -= mA * ix; A.vy -= mA * iy; A.w -= iA * (rax * iy - ray * ix);
+        B.vx += mB * ix; B.vy += mB * iy; B.w += iB * (rbx * iy - rby * ix);
       }
     }
 
-    assesta(n) { for (let i = 0; i < n; i++) this.passo(); }
+    _giuntiWarm() {
+      for (const j of this.giunti) {
+        const A = j.A, B = j.B;
+        const cA = Math.cos(A.a), sA = Math.sin(A.a), cB = Math.cos(B.a), sB = Math.sin(B.a);
+        const rax = cA * j.lax - sA * j.lay, ray = sA * j.lax + cA * j.lay;
+        const rbx = cB * j.lbx - sB * j.lby, rby = sB * j.lbx + cB * j.lby;
+        const axial = j.iMot + j.iLo - j.iHi;
+        A.vx -= A.im * j.ix; A.vy -= A.im * j.iy; A.w -= A.iI * (rax * j.iy - ray * j.ix + axial);
+        B.vx += B.im * j.ix; B.vy += B.im * j.iy; B.w += B.iI * (rbx * j.iy - rby * j.ix + axial);
+      }
+    }
 
-    /* tutto fermo (o quasi)? */
-    quieto(soglia = 0.05) {
-      return this.dorme || Object.values(this.P).every(p => Math.hypot(p.x - p.px, p.y - p.py) < soglia);
+    _contattiRisolvi(h, bias, S) {
+      const inv = 1 / h;
+      for (const c of this.contatti) {
+        const b = c.b;
+        // separazione attuale: quella a inizio passo piu' quanto il punto si e' mosso lungo la normale
+        const da = b.a - b.a0, cs = Math.cos(da), sn = Math.sin(da);
+        const rx = cs * c.rx - sn * c.ry, ry = sn * c.rx + cs * c.ry;
+        const s = c.s0 + (b.x - b.x0 + rx - c.rx) * c.nx + (b.y - b.y0 + ry - c.ry) * c.ny;
+        let vb = 0, ms = 1, is = 0;
+        if (s > 0) vb = s * inv;                                             // speculativo
+        else if (bias) {
+          vb = Math.max(S.bias * (s + this.tolleranza), -this.spinta);
+          if (s + this.tolleranza > 0) vb = 0;
+          ms = S.massa; is = S.impulso;
+        }
+        // attrito per primo: la non penetrazione e' piu' importante
+        let vx = b.vx - b.w * c.ry, vy = b.vy + b.w * c.rx;
+        const vt = vx * c.tx + vy * c.ty;
+        let imp = -c.mt * vt;
+        const mx = b.mu * c.iN, nuovoT = lim(c.iT + imp, -mx, mx);
+        imp = nuovoT - c.iT; c.iT = nuovoT;
+        b.vx += b.im * imp * c.tx; b.vy += b.im * imp * c.ty; b.w += b.iI * (c.rx * c.ty - c.ry * c.tx) * imp;
+        // normale
+        vx = b.vx - b.w * c.ry; vy = b.vy + b.w * c.rx;
+        const vn = vx * c.nx + vy * c.ny;
+        imp = -c.mn * ms * (vn + vb) - is * c.iN;
+        const nuovoN = Math.max(c.iN + imp, 0);
+        imp = nuovoN - c.iN; c.iN = nuovoN; c.iNmax = Math.max(c.iNmax, nuovoN);
+        b.vx += b.im * imp * c.nx; b.vy += b.im * imp * c.ny; b.w += b.iI * (c.rx * c.ny - c.ry * c.nx) * imp;
+      }
+    }
+
+    _contattiWarm() {
+      for (const c of this.contatti) {
+        const b = c.b, px = c.iN * c.nx + c.iT * c.tx, py = c.iN * c.ny + c.iT * c.ty;
+        b.vx += b.im * px; b.vy += b.im * py; b.w += b.iI * (c.rx * py - c.ry * px);
+      }
+    }
+
+    /* rimbalzo: a fine passo, chi ha urtato forte rimbalza in proporzione a `e` */
+    _rimbalzo() {
+      for (const c of this.contatti) {
+        const b = c.b;
+        if (c.vrel > -70 || c.iNmax === 0 || b.e === 0) continue;
+        const vx = b.vx - b.w * c.ry, vy = b.vy + b.w * c.rx, vn = vx * c.nx + vy * c.ny;
+        let imp = -c.mn * (vn + b.e * c.vrel);
+        const nuovo = Math.max(c.iN + imp, 0);
+        imp = nuovo - c.iN; c.iN = nuovo;
+        b.vx += b.im * imp * c.nx; b.vy += b.im * imp * c.ny; b.w += b.iI * (c.rx * c.ny - c.ry * c.nx) * imp;
+      }
+    }
+
+    /* un passo di `dt` secondi, in `sotto` sotto-passi */
+    passo(dt) {
+      if (this.dorme) { this.corpi.forEach(b => { b.px = b.x; b.py = b.y; b.pa = b.a; b.fx = b.fy = b.tau = 0; }); return; }
+      const n = this.sotto, h = dt / n, corpi = this.corpi;
+      this.dt = h;                                    // durata di un sotto-passo: gli impulsi accumulati sono per questa durata
+      for (const b of corpi) { b.px = b.x; b.py = b.y; b.pa = b.a; b.x0 = b.x; b.y0 = b.y; b.a0 = b.a; }
+      this._precedenti = this.memoria;
+      this._collide(dt);
+      const Sc = morbido(this.hzContatto, this.zetaContatto, h);
+      const Sg = morbido(this.hzGiunto, this.zetaGiunto, h);
+      for (let i = 0; i < n; i++) {
+        for (const b of corpi) {
+          if (b.im === 0) continue;
+          b.vx += h * (b.fx * b.im); b.vy += h * (this.g + b.fy * b.im); b.w += h * b.tau * b.iI;
+          b.vx /= 1 + h * b.dmpL; b.vy /= 1 + h * b.dmpL; b.w /= 1 + h * b.dmpA;
+          b.vx = lim(b.vx, -this.vmax, this.vmax); b.vy = lim(b.vy, -this.vmax, this.vmax); b.w = lim(b.w, -this.wmax, this.wmax);
+        }
+        this._giuntiWarm(); this._contattiWarm();
+        this._giuntiRisolvi(h, true, Sg); this._contattiRisolvi(h, true, Sc);
+        for (const b of corpi) { if (b.im === 0) continue; b.x += h * b.vx; b.y += h * b.vy; b.a += h * b.w; }
+        this._giuntiRisolvi(h, false, Sg); this._contattiRisolvi(h, false, Sc);
+      }
+      this._rimbalzo();
+      for (const b of corpi) { b.fx = b.fy = b.tau = 0; b.terra = 0; b.scivola = 0; }
+      for (const c of this.contatti) {
+        if (c.ny === -1) {
+          c.b.terra += c.iN;
+          const vt = Math.abs(c.b.vx - c.b.w * c.ry);
+          if (c.iN > 0) c.b.scivola = Math.max(c.b.scivola, vt);
+        }
+      }
+      this.t += dt;
+      // sonno: se tutto e' fermo da un po' non si calcola piu' (niente tremolii, niente costi)
+      if (this.sonno) {
+        const fermo = corpi.every(b => Math.hypot(b.vx, b.vy) < 1.5 && Math.abs(b.w) < 0.04);
+        this.fermo = fermo ? this.fermo + 1 : 0;
+        if (this.fermo > 40) {
+          this.dorme = true;
+          for (const b of corpi) { b.vx = b.vy = b.w = 0; }
+          for (const j of this.giunti) { j.ix = j.iy = j.iMot = j.iLo = j.iHi = 0; }
+        }
+      }
     }
   }
 
-  return {Scheletro, LOC, PAV};
+  return {Mondo, Corpo, Giunto, asta, morbido, lim, PI2};
 })();
 if (typeof module !== "undefined") module.exports = Fisica;

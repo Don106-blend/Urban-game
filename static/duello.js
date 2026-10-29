@@ -344,7 +344,8 @@ function effettiNuoviEventi() {
   const maxN = evs.length ? evs[evs.length - 1].n : 0;
   if (ultimoEffetto === null) { ultimoEffetto = maxN; return; }  // primo disegno: niente replay
   for (const ev of evs) {
-    if (ev.n <= ultimoEffetto || ev.tipo !== "colpo") continue;
+    if (ev.n <= ultimoEffetto) continue;
+    if (ev.tipo !== "colpo") { if (ev.tipo === "mira" || ev.tipo === "potere" || ev.tipo === "stance") Arena.evento(ev); continue; }
     Arena.colpo(ev);
     const corner = document.querySelector(ev.chi === "p" ? ".corner-cpu" : ".corner-player");
     if (!corner) continue;

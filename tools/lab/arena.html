@@ -1,0 +1,67 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Laboratorio arena</title>
+<!-- Banco di prova della fisica dei combattenti: carica gli stessi script del gioco (static/fisica.js, pupazzo.js,
+     arena.js) con uno stato finto, e permette di fotografare una scena a passi di simulazione (nel browser di prova
+     requestAnimationFrame non gira). Uso: python -m http.server 5056 dalla radice del progetto, poi
+     http://localhost:5056/tools/lab/arena.html e `lab.striscia(...)` dalla console. -->
+<style>
+  body { margin: 0; background: #14171c; color: #cfd6e0; font: 12px system-ui, sans-serif; }
+  .arena { --s: 2; position: relative; width: 1000px; height: 300px; margin: 10px; overflow: hidden;
+           border: 1px solid #262b33; border-radius: 12px; }
+  .arena canvas.tela { position: absolute; left: 0; top: 0; image-rendering: pixelated; }
+  #strip { margin: 10px; display: block; }
+</style>
+<div id="d-arena" class="arena"></div>
+<canvas id="strip" width="10" height="10"></canvas>
+<script>
+  // (con un numero di versione: il server di prova non dice quando rileggere i file)
+  const v = Date.now();
+  for (const f of ["fisica", "pupazzo", "arena"]) document.write(`<script src="/static/${f}.js?v=${v}"><\/script>`);
+</script>
+<script>
+  const HPMAX = {testa: 80, busto: 120, braccio_sx: 100, braccio_dx: 100, gamba_sx: 100, gamba_dx: 100};
+  function pg(nome, hp = {}, crippled = []) {
+    const o = {nome, hp: {}};
+    for (const [l, m] of Object.entries(HPMAX)) o.hp[l] = {val: hp[l] ?? m, max: m, protesi: false, crippled: crippled.includes(l)};
+    return o;
+  }
+  const lab = {
+    S: {player: pg("Elia Nakamura"), cpu: pg("Vera Greco")},
+    async pronto() {
+      Arena.update(lab.S);
+      while (!Arena.lati().p) await new Promise(r => setTimeout(r, 50));
+      lab.passi(60);
+    },
+    passi(n) { Arena.passi(n); },
+    /* una scena: stato finto (hp, arti storpi...), un colpo (o piu') al fotogramma `quando`, e il foglio dei fotogrammi */
+    scena(evs, {n = 12, ogni = 5, quando = 1, stato, ...opz} = {}) {
+      if (stato) lab.S = stato; else lab.S = {player: pg("Elia Nakamura"), cpu: pg("Vera Greco")};
+      Arena.reset(lab.S);
+      Arena.passi(60);
+      const lista = Array.isArray(evs) ? evs : evs ? [evs] : [];
+      lab.striscia(n, ogni, {...opz, azione: i => { if (i === quando) lista.forEach(e => (e.tipo && e.tipo !== "colpo" ? Arena.evento(e) : Arena.colpo(e))); }});
+      document.getElementById("strip").scrollIntoView();
+    },
+    /* un foglio di fotogrammi (ogni `ogni` passi di simulazione), ritagliati attorno ai combattenti e rimpiccioliti
+       per stare in uno screenshot: `cols` per riga, celle larghe `cella` px */
+    striscia(n, ogni, {x0 = 0.2, x1 = 0.62, cols = 4, cella = 190, azione} = {}) {
+      const c = document.querySelector("#d-arena canvas"), st = document.getElementById("strip");
+      const cw = Math.round((x1 - x0) * c.width), ch = c.height, k = cella / cw, ph = Math.round(ch * k);
+      const righe = Math.ceil(n / cols);
+      st.width = cella * cols; st.height = ph * righe;
+      st.style.width = st.width + "px"; st.style.height = st.height + "px";
+      const sx = st.getContext("2d");
+      sx.fillStyle = "#14171c"; sx.fillRect(0, 0, st.width, st.height);
+      sx.imageSmoothingEnabled = true; sx.imageSmoothingQuality = "high";
+      for (let i = 0; i < n; i++) {
+        if (azione) azione(i);
+        Arena.passi(i === 0 ? 0 : ogni);
+        const cx = (i % cols) * cella, cy = Math.floor(i / cols) * ph;
+        sx.drawImage(c, Math.round(x0 * c.width), 0, cw, ch, cx, cy, cella, ph);
+        sx.strokeStyle = "#333"; sx.strokeRect(cx + 0.5, cy + 0.5, cella - 1, ph - 1);
+        sx.fillStyle = "#fff"; sx.font = "12px sans-serif"; sx.fillText(String(i * ogni), cx + 5, cy + 14);
+      }
+    },
+  };
+</script>

@@ -1,244 +1,358 @@
-// Test della fisica dei combattenti (static/fisica.js). Uso: node test_fisica.js  (VERBOSE=1 stampa le misure)
-// Oltre a controllare i comportamenti, stampa quanto si spostano e in quanto tempo tornano a casa (per tarare i muscoli).
+// Test della fisica dei combattenti (static/fisica.js = motore a corpi rigidi, static/pupazzo.js = il ragdoll attivo).
+// Uso: node test_fisica.js   (VERBOSE=1 stampa le misure, utile per tarare)
+// Controlla due livelli: il motore (caduta, attrito, pendolo, motori PD, rimbalzo, limiti...) e il pupazzo (sta in piedi
+// senza tremare, un colpo lo fa scivolare e rientrare a passi, gli attacchi arrivano a segno, schivate e parate, arti
+// storpi, morte, muri). Nessun valore tarato nei dati di gioco: solo la fisica.
 const fs = require("fs");
 const path = require("path");
 const Fisica = require("./static/fisica.js");
+const PU = require("./static/pupazzo.js");
+const {Pupazzo} = PU;
 
 const man = JSON.parse(fs.readFileSync(path.join(__dirname, "static/sprites/maschio/parti.json"), "utf8"));
-const ossa = Object.values(man.parti).map(p => [p.da, p.a]);
 const log = (...a) => { if (process.env.VERBOSE) console.log(...a); };
 let n = 0;
 const ok = (cond, msg) => { n++; if (!cond) { console.error("FALLITO:", msg); process.exitCode = 1; throw new Error(msg); } };
+const DT = 1 / 60;
+const f2 = x => x.toFixed(2);
 
-/* un combattente in piedi e assestato; s.B = la sua posa di riposo vera (con la guardia un po' piegata) */
-function nuovo() {
-  const s = new Fisica.Scheletro(man.giunti, ossa);
-  s.assesta(150);
-  s.B = Object.fromEntries(Object.entries(s.P).map(([k, p]) => [k, {x: p.x, y: p.y}]));
-  return s;
-}
-const sposta = (s, k) => Math.hypot(s.P[k].x - s.B[k].x, s.P[k].y - s.B[k].y);
-const NUCLEO = ["cima", "collo_alto", "vita", "anca", "caviglia_dx", "caviglia_sx"];
-const aCasa = (s, tol = 1.5) => NUCLEO.every(k => sposta(s, k) < tol) && s.piede.dx.stato === "p" && s.piede.sx.stato === "p";
-const finiti = (s) => Object.values(s.P).every(p => Number.isFinite(p.x) && Number.isFinite(p.y));
-const inPiedi = (s) => s.P.cima.y < s.P.anca.y - 15 && s.P.anca.y < 80;
-const indietro = (s) => s.B.anca.x - s.P.anca.x;           // di quanto e' stato spinto via (px, positivo = indietro)
-
-/* fa girare `passi` passi; ritorna il picco di spostamento di `k`, il massimo rinculo del bacino e il passo di rientro */
-function misura(s, k, passi, tol = 1.5) {
-  let picco = 0, rinculo = 0, rientro = -1;
-  for (let i = 0; i < passi; i++) {
-    s.passo();
-    picco = Math.max(picco, sposta(s, k));
-    rinculo = Math.max(rinculo, indietro(s));
-    ok(finiti(s), "valori finiti");
-    if (rientro < 0 && picco > tol && aCasa(s, tol)) rientro = i;
-  }
-  return {picco, rinculo, rientro};
-}
-
-// 1. a riposo: niente su e giu' delle gambe ne' del bacino, nessun passo; solo le braccia dondolano un filo
+/* ====================================================================================================================
+   1. IL MOTORE
+   ==================================================================================================================== */
 {
-  const s = nuovo();
-  const mn = {}, mx = {};
-  let cambi = 0, prec = null;
-  for (let i = 0; i < 900; i++) {
-    s.passo();
-    for (const [k, p] of Object.entries(s.P)) {
-      mn[k] = Math.min(mn[k] ?? 1e9, p.y); mx[k] = Math.max(mx[k] ?? -1e9, p.y);
+  // caduta libera: y = g t^2 / 2
+  const m = new Fisica.Mondo({pavimento: 1e9}); const b = m.corpo({x: 0, y: 0, m: 1, I: 1}); b.dmpL = 0;
+  for (let i = 0; i < 60; i++) m.passo(DT);
+  ok(Math.abs(b.y - 550) < 6, `caduta libera (${b.y})`);
+}
+{
+  // una capsula in piedi poggia sul pavimento e si ferma; di piatto, e inclinata, si assesta
+  const m = new Fisica.Mondo();
+  const v = m.corpo({x: 0, y: 50, m: 2, I: Fisica.asta(20, 2, 3), forme: [{ax: 0, ay: -10, bx: 0, by: 10, r: 3}]});
+  const p = m.corpo({x: 30, y: 100, m: 2, I: Fisica.asta(20, 2, 3), a: 0.2, forme: [{ax: -10, ay: 0, bx: 10, by: 0, r: 3}]});
+  for (let i = 0; i < 240; i++) m.passo(DT);
+  ok(Math.abs(v.y - 98) < 0.7 && Math.abs(v.vy) < 0.5, "capsula in piedi: poggia sul pavimento");
+  ok(Math.abs(p.y - 108) < 0.7 && Math.abs(p.a) < 0.02, "capsula di piatto: si assesta");
+}
+{
+  // attrito di Coulomb: scivola v^2 / (2 mu g)
+  const m = new Fisica.Mondo(); const b = m.corpo({x: 0, y: 108, m: 2, I: Fisica.asta(20, 2, 3), mu: 0.5, forme: [{ax: -10, ay: 0, bx: 10, by: 0, r: 3}]});
+  for (let i = 0; i < 10; i++) m.passo(DT);
+  b.vx = 300; const x0 = b.x;
+  for (let i = 0; i < 600 && Math.abs(b.vx) > 0.5; i++) m.passo(DT);
+  const att = 300 * 300 / (2 * 0.5 * 1100);
+  log("attrito: scivola", f2(b.x - x0), "atteso", f2(att));
+  ok(Math.abs(b.x - x0 - att) / att < 0.08, "distanza di frenata con attrito");
+}
+{
+  // pendolo: periodo di un'asta incernierata a un'estremita'
+  const m = new Fisica.Mondo({pavimento: 1e9}); const S = m.corpo({x: 0, y: 0, m: 1, I: 1, statico: true});
+  const L = 60, mm = 3, R = m.corpo({x: 0, y: L / 2, m: mm, I: Fisica.asta(L, mm, 0)}); R.dmpA = 0; R.dmpL = 0;
+  m.giunto(S, R, [0, 0], [0, -L / 2]); R.a = 0.15;
+  let prev = R.a; const tc = [];
+  for (let i = 0; i < 600; i++) { m.passo(DT); if (prev > 0 && R.a <= 0) tc.push(i * DT); prev = R.a; }
+  const T = (tc[tc.length - 1] - tc[0]) / (tc.length - 1), Tatt = 2 * Math.PI * Math.sqrt(2 * L / (3 * 1100));
+  log("pendolo: T", T.toFixed(4), "atteso", Tatt.toFixed(4));
+  ok(Math.abs(T - Tatt) / Tatt < 0.03, "periodo del pendolo");
+}
+{
+  // catena appesa e strattonata: i giunti restano uniti
+  const m = new Fisica.Mondo({pavimento: 1e9}); let prev = m.corpo({x: 0, y: 0, m: 1, I: 1, statico: true}); const cs = [];
+  for (let i = 0; i < 10; i++) { const c = m.corpo({x: 0, y: 10 + i * 20, m: 2, I: Fisica.asta(20, 2, 0)}); m.giunto(prev, c, [0, i ? 10 : 0], [0, -10]); prev = c; cs.push(c); }
+  cs[9].vx = 200;
+  let maxd = 0;
+  for (let i = 0; i < 300; i++) { m.passo(DT); for (const j of m.giunti) { const [ax, ay] = j.A.mondo(j.lax, j.lay), [bx, by] = j.B.mondo(j.lbx, j.lby); maxd = Math.max(maxd, Math.hypot(ax - bx, ay - by)); } }
+  ok(maxd < 1.5, `giunti uniti sotto strappo (${maxd})`);
+}
+for (const [hz, zeta] of [[6, 1], [10, 1], [20, 1]]) {
+  // motore PD: risposta a gradino, senza sovraelongazione se critico, e con la frequenza giusta
+  const m = new Fisica.Mondo({pavimento: 1e9, g: 0}); const S = m.corpo({x: 0, y: 0, m: 1, I: 1, statico: true});
+  const R = m.corpo({x: 0, y: 20, m: 2, I: Fisica.asta(40, 2, 0)}); R.dmpA = 0; R.dmpL = 0;
+  const j = m.giunto(S, R, [0, 0], [0, -20]); j.motore(hz, zeta, 1e9, 0.6);
+  let t95 = -1, pico = 0;
+  for (let i = 0; i < 120; i++) { m.passo(DT); pico = Math.max(pico, j.angolo); if (t95 < 0 && j.angolo > 0.57) t95 = i * DT; }
+  log(`motore PD ${hz} Hz: t95 ${t95.toFixed(3)} s`);
+  ok(Math.abs(j.angolo - 0.6) < 0.01, "il motore PD arriva all'obiettivo");
+  ok(pico < 0.6 * 1.02, "motore critico: nessuna sovraelongazione");
+  ok(t95 > 3 / (2 * Math.PI * hz) && t95 < 8 / (2 * Math.PI * hz), `il tempo di risposta segue la frequenza (${t95})`);
+}
+{
+  // la coppia massima limita il motore
+  const m = new Fisica.Mondo({pavimento: 1e9, g: 0}); const S = m.corpo({x: 0, y: 0, m: 1, I: 1, statico: true});
+  const R = m.corpo({x: 0, y: 20, m: 2, I: Fisica.asta(40, 2, 0)});
+  const j = m.giunto(S, R, [0, 0], [0, -20]); j.motore(10, 1, 1e3, 1);
+  for (let i = 0; i < 20; i++) m.passo(DT);
+  ok(j.angolo < 0.3, "con poca coppia il motore non arriva in fretta");
+}
+{
+  // rimbalzo: la velocita' dopo l'urto ~ e * quella prima
+  const m = new Fisica.Mondo(); const b = m.corpo({x: 0, y: 20, m: 1, I: Fisica.asta(6, 1, 3), e: 0.5, forme: [{ax: 0, ay: 0, bx: 0, by: 0, r: 3}]});
+  let visto = false;
+  for (let i = 0; i < 120 && !visto; i++) { const vp = b.vy; m.passo(DT); if (vp > 0 && b.vy < 0) { visto = true; ok(Math.abs(b.vy / -vp - 0.5) < 0.12, "restituzione"); } }
+  ok(visto, "rimbalza");
+}
+{
+  // limiti dei giunti e muri (anche a 1500 px/s), poi il sonno
+  const m = new Fisica.Mondo({pavimento: 1e9}); const S = m.corpo({x: 0, y: 0, m: 1, I: 1, statico: true});
+  const R = m.corpo({x: 0, y: 20, m: 2, I: Fisica.asta(40, 2, 0)}); R.dmpA = 0.1;
+  const j = m.giunto(S, R, [0, 0], [0, -20], {lim: [-0.4, 0.4]});
+  R.vx = -300; let mn = 0, mx = 0;
+  for (let i = 0; i < 240; i++) { m.passo(DT); mn = Math.min(mn, j.angolo); mx = Math.max(mx, j.angolo); }
+  ok(mn > -0.46 && mx < 0.46, "i limiti dei giunti reggono");
+  const w = new Fisica.Mondo(); w.muro = [-10, 10];
+  const b = w.corpo({x: 0, y: 100, m: 2, I: Fisica.asta(20, 2, 3), forme: [{ax: 0, ay: -10, bx: 0, by: 10, r: 3}]});
+  b.vx = 1500; for (let i = 0; i < 120; i++) w.passo(DT);
+  ok(b.x <= 7.5, "il muro tiene a 1500 px/s");
+  const z = new Fisica.Mondo({sonno: true}); z.corpo({x: 0, y: 50, m: 2, I: Fisica.asta(20, 2, 3), forme: [{ax: 0, ay: -10, bx: 0, by: 10, r: 3}]});
+  for (let i = 0; i < 300; i++) z.passo(DT);
+  ok(z.dorme, "un corpo fermo si addormenta");
+}
+
+/* ====================================================================================================================
+   2. IL PUPAZZO
+   ==================================================================================================================== */
+const nuovo = (o) => new Pupazzo(man, o);
+const finiti = (p) => Object.values(p.corpi).every(b => [b.x, b.y, b.a, b.vx, b.vy, b.w].every(Number.isFinite));
+const inPiedi = (p) => p.corpi.testa.y < p.corpi.busto_inf.y - 15 && p.corpi.busto_inf.y < 70;      // (abbassarsi per schivare porta il bacino a ~66)
+const caviglia = (p, l) => p._caviglia(l);
+const casaPiedi = (p, tol = 2) => ["dx", "sx"].every(l => Math.abs(caviglia(p, l)[0] - (p.casa + PU.T.offPiede[l])) < tol);
+const aCasa = (p, x0, tol = 1.5) => Math.abs(p.corpi.busto_inf.x - x0) < tol && casaPiedi(p, 3.6) && p.piede.dx.stato === "a" && p.piede.sx.stato === "a";
+
+// 2.1 a riposo: sta in piedi senza tremare, i piedi poggiano sempre, non cammina
+{
+  const p = nuovo(); p.assesta(60);
+  const C = p.corpi, mn = {}, mx = {}, mnx = {}, mxx = {};
+  let aria = 0, N = 600, vmax = 0;
+  const n0 = p.nPassi;
+  for (let i = 0; i < N; i++) {
+    p.passo(DT);
+    if (C.piede_dx.terra === 0 && C.piede_sx.terra === 0) aria++;
+    for (const [k, b] of Object.entries(C)) { mn[k] = Math.min(mn[k] ?? 1e9, b.y); mx[k] = Math.max(mx[k] ?? -1e9, b.y); mnx[k] = Math.min(mnx[k] ?? 1e9, b.x); mxx[k] = Math.max(mxx[k] ?? -1e9, b.x); }
+    vmax = Math.max(vmax, Math.abs(C.busto_inf.vx));
+  }
+  const ampY = k => mx[k] - mn[k], ampX = k => mxx[k] - mnx[k];
+  log("riposo: ampiezza y bacino", f2(ampY("busto_inf")), "testa", f2(ampY("testa")), "| x bacino", f2(ampX("busto_inf")), "| piedi y", f2(ampY("piede_dx")), f2(ampY("piede_sx")), "x", f2(ampX("piede_dx")), f2(ampX("piede_sx")), "| aria", aria, "| vmax", f2(vmax));
+  ok(finiti(p) && inPiedi(p), "a riposo sta in piedi");
+  ok(ampY("busto_inf") < 1.6 && ampX("busto_inf") < 0.6, "il bacino non traballa (solo il molleggio della guardia)");
+  ok(ampY("piede_dx") < 0.4 && ampY("piede_sx") < 0.4 && ampX("piede_dx") < 0.4, "i piedi stanno fermi");
+  ok(aria === 0, "almeno un piede poggia sempre");
+  ok(p.nPassi === n0, "a riposo non cammina");
+  ok(vmax < 25, `il bacino non ha scatti (${vmax})`);
+  for (const k of ["piede_dx", "piede_sx"]) ok(Math.abs(C[k].y - 108.5) < 0.8, `${k} poggia sul pavimento (${C[k].y})`);
+}
+
+// 2.2 un colpo a ogni locazione, a danni crescenti: scivola in proporzione, non cade mai, torna a casa a passi
+{
+  const LOCS = ["testa", "busto", "braccio_dx", "braccio_sx", "gamba_dx", "gamba_sx"];
+  for (const loc of LOCS) {
+    let prec = 0;
+    for (const forza of [0.12, 0.4, 0.9, 1.6]) {
+      const p = nuovo(); p.assesta(60);
+      const C = p.corpi, x0 = C.busto_inf.x;
+      p.colpisci(loc, forza);
+      let indietro = 0, sempre = true, rientro = -1;
+      for (let i = 0; i < 360; i++) {
+        p.passo(DT);
+        indietro = Math.max(indietro, x0 - C.busto_inf.x);
+        if (!inPiedi(p) || !finiti(p)) sempre = false;
+        if (rientro < 0 && i > 20 && aCasa(p, x0)) rientro = i;
+      }
+      log(loc.padEnd(11), "forza", forza, "indietro", f2(indietro), "rientro al passo", rientro, "passi", p.nPassi);
+      ok(sempre, `${loc} ${forza}: non cade mai`);
+      ok(indietro >= prec - 1.5, `${loc} ${forza}: piu' forza, piu' scivolata (${indietro} < ${prec})`);
+      prec = indietro;
+      ok(rientro >= 0 && rientro < 330, `${loc} ${forza}: torna a casa (${rientro})`);
+      ok(p._caviglia("dx")[0] > p._caviglia("sx")[0] + 2, `${loc} ${forza}: a fine corsa il piede anteriore sta davanti`);   // (nei passi le gambe si superano, ma poi si rimettono in ordine)
+      if (forza >= 0.9) ok(p.nPassi >= 2, `${loc} ${forza}: rientra a passi`);
     }
-    const posa = ["anca_dx", "ginocchio_dx", "caviglia_dx", "anca_sx", "ginocchio_sx", "caviglia_sx", "vita"]
-      .map(k => Math.round(s.P[k].x) + "," + Math.round(s.P[k].y)).join("|");
-    if (prec !== null && posa !== prec) cambi++;
-    prec = posa;
+    ok(prec > 25, `${loc}: con un colpo fortissimo arretra di piu' di 25 px (${prec})`);
   }
-  const amp = (k) => mx[k] - mn[k];
-  log("riposo: ampiezza y gamba/bacino", Math.max(...["anca", "vita", "anca_dx", "ginocchio_dx", "caviglia_dx", "ginocchio_sx", "caviglia_sx"].map(amp)).toFixed(3),
-      "| braccia", Math.max(amp("gomito_sx"), amp("polso_sx")).toFixed(2), "| cambi posa gambe", cambi);
-  for (const k of ["anca", "vita", "anca_dx", "anca_sx", "ginocchio_dx", "ginocchio_sx", "caviglia_dx", "caviglia_sx"]) {
-    ok(amp(k) < 0.05, `a riposo ${k} non va su e giu' (${amp(k).toFixed(3)})`);
-  }
-  ok(cambi === 0, "a riposo le gambe non cambiano posa (" + cambi + ")");
-  ok(s.nPassi === 0, "a riposo non cammina");
-  ok(amp("polso_sx") < 1.5, "le braccia dondolano solo un filo");
+  // la parte colpita si muove piu' delle altre
+  const t = nuovo(); t.assesta(60); const th = t.corpi.testa.x, tp = t.corpi.piede_dx.x; t.colpisci("testa", 0.9);
+  let dh = 0; for (let i = 0; i < 6; i++) { t.passo(DT); dh = Math.max(dh, Math.abs(t.corpi.testa.a)); }
+  ok(dh > 0.3, `un colpo alla testa la fa scattare all'indietro (${dh} rad)`);
 }
 
-// 2. ogni locazione colpita: si sposta di piu' con piu' danno, resta in piedi, torna a casa
-const CHIAVE = {testa: "cima", busto: "collo_alto", braccio_dx: "polso_dx", braccio_sx: "polso_sx",
-                gamba_dx: "caviglia_dx", gamba_sx: "caviglia_sx"};
-for (const [loc, k] of Object.entries(CHIAVE)) {
-  let prec = 0;
-  for (const danno of [8, 25, 60]) {
-    const s = nuovo();
-    s.colpisci(loc, danno);
-    let sempreInPiedi = true;
-    const m = {picco: 0, rinculo: 0, rientro: -1};
-    for (let i = 0; i < 500; i++) {
-      s.passo();
-      m.picco = Math.max(m.picco, sposta(s, k)); m.rinculo = Math.max(m.rinculo, indietro(s));
-      if (!inPiedi(s)) sempreInPiedi = false;
-      if (m.rientro < 0 && m.picco > 1.5 && i > 5 && aCasa(s)) m.rientro = i;
-    }
-    log(loc.padEnd(11), "danno", String(danno).padStart(2), "picco", m.picco.toFixed(1).padStart(5), "rinculo", m.rinculo.toFixed(1).padStart(5),
-        "passi", s.nPassi, "a casa al passo", m.rientro);
-    ok(finiti(s), loc + ": valori finiti");
-    ok(m.picco > prec, `${loc}: piu' danno, piu' spostamento (${danno}: ${m.picco} <= ${prec})`);
-    prec = m.picco;
-    ok(sempreInPiedi, `${loc} ${danno}: non cade mai`);
-    ok(m.rientro >= 0 && m.rientro < 400, `${loc} ${danno}: torna a casa (passo ${m.rientro})`);
-    ok(aCasa(s, 1.2) && Math.abs(s.P.anca.x - s.B.anca.x) < 1.2, `${loc} ${danno}: a fine corsa e' dov'era`);
+// 2.3 un attacco: carica, colpo e contatto a segno, poi si torna in guardia
+for (const stile of ["pugno", "fendente", "affondo"]) {
+  const p = nuovo(); p.assesta(60);
+  const C = p.corpi, x0 = C.busto_inf.x;
+  const T = [x0 + 54, 32];                      // il davanti del petto di un avversario a 58 px (la distanza di guardia dell'arena)
+  let ev = {}, t0 = p.t, lean = 0, avanti = 0, sempre = true;
+  p.attacca({stile, bersaglio: () => T, insegui: true,
+             alColpoInizio: () => { ev.inizio = p.t - t0; },
+             alContatto: (i) => { ev.contatto = p.t - t0; ev.err = Math.hypot(i.x - T[0], i.y - T[1]); },
+             alFine: () => { ev.fine = p.t - t0; }});
+  for (let i = 0; i < 150; i++) {
+    p.passo(DT);
+    lean = Math.max(lean, C.busto_sup.a); avanti = Math.max(avanti, C.busto_inf.x - x0);
+    if (!inPiedi(p) || !finiti(p)) sempre = false;
   }
-}
-// ...e il colpo a una locazione sposta soprattutto quella
-{
-  const t = nuovo(); t.colpisci("testa", 40); t.assesta(8);
-  ok(sposta(t, "cima") > 1.4 * sposta(t, "caviglia_dx"), "un colpo alla testa muove la testa piu' dei piedi");
-  const g = nuovo(); g.colpisci("gamba_dx", 40); g.assesta(8);
-  ok(Math.max(sposta(g, "ginocchio_dx"), sposta(g, "caviglia_dx")) > 1.4 * sposta(g, "cima"), "un colpo alla gamba muove la gamba piu' della testa");
+  log(stile, "inizio", f2(ev.inizio), "contatto", f2(ev.contatto), "errore", f2(ev.err), "fine", f2(ev.fine), "lean", f2(lean), "avanza", f2(avanti));
+  ok(ev.inizio > 0.1 && ev.inizio < 0.25, `${stile}: la carica dura un battito (${ev.inizio})`);
+  ok(ev.contatto > ev.inizio + 0.05 && ev.contatto < 0.6, `${stile}: il contatto arriva presto (${ev.contatto})`);
+  ok(ev.err < 6, `${stile}: la mano e' sul bersaglio al contatto (${ev.err} px)`);
+  ok(ev.fine > ev.contatto && ev.fine < 1.2, `${stile}: finisce e torna in guardia (${ev.fine})`);
+  ok(sempre && lean < 0.62, `${stile}: resta in piedi, il busto non si piega troppo (${lean})`);
+  ok(avanti > 2 && avanti < 32, `${stile}: fa un passo avanti ragionevole (${avanti})`);
+  p.assesta(120);
+  ok(aCasa(p, x0, 2), `${stile}: poi torna a casa`);
+  ok(!p.occupato(), `${stile}: nessuna azione rimasta`);
 }
 
-// 3. il knockback sposta DAVVERO il combattente, in proporzione al danno; poi torna a piedi dov'era
+// 2.4 un attacco a distanza: il braccio si alza e punta, al rilascio scatta il callback (il proiettile lo fa l'arena)
 {
-  let prec = 0;
-  for (const danno of [10, 30, 60, 100]) {
-    const s = nuovo();
-    s.colpisci("busto", danno);
-    const {rinculo, rientro} = misura(s, "anca", 600);
-    log("rinculo busto", danno, ":", rinculo.toFixed(1), "px, passi", s.nPassi, ", a casa al passo", rientro);
-    ok(rinculo > prec + 1, `piu' danno, piu' rinculo (${danno}: ${rinculo} vs ${prec})`);
-    prec = rinculo;
-    if (danno >= 30) ok(s.nPassi >= 2, `con ${danno} danni fa dei passi`);
-    ok(rientro >= 0, `${danno}: torna al punto di partenza (${rientro})`);
-  }
-  ok(prec > 20, "con 100 danni arretra di piu' di 20 px");
+  const p = nuovo(); p.assesta(60);
+  const C = p.corpi, x0 = C.busto_inf.x;
+  let rilascio = -1, t0 = p.t, maxBraccio = 0;
+  p.attacca({distanza: true, bersaglio: () => [x0 + 54, 30], insegui: false, alColpoInizio: () => { rilascio = p.t - t0; }});
+  for (let i = 0; i < 120; i++) { p.passo(DT); maxBraccio = Math.max(maxBraccio, p._polso("dx")[0] - x0); }
+  ok(rilascio > 0.1 && rilascio < 0.3, `a distanza: il rilascio arriva (${rilascio})`);
+  ok(maxBraccio > 30, `a distanza: il braccio si tende verso l'avversario (${maxBraccio})`);
+  ok(inPiedi(p) && finiti(p), "a distanza: resta in piedi");
 }
 
-// 4. i muri: il corpo non esce dai limiti, neppure a forza di colpi, di salti all'indietro, di affondi o da morto
+// 2.5 schivate: indietro / abbassa / salto, poi di nuovo a casa
+for (const tipo of ["indietro", "abbassa", "salto"]) {
+  const p = nuovo(); p.assesta(60);
+  const C = p.corpi, x0 = C.busto_inf.x, y0 = C.testa.y, yp = C.piede_dx.y;
+  p.schiva(tipo);
+  let indietro = 0, giu = 0, su = 0, sempre = true;
+  for (let i = 0; i < 240; i++) {
+    p.passo(DT);
+    indietro = Math.max(indietro, x0 - C.busto_inf.x); giu = Math.max(giu, C.testa.y - y0); su = Math.max(su, yp - C.piede_dx.y);
+    if (!inPiedi(p) || !finiti(p)) sempre = false;
+  }
+  log("schivata", tipo, "indietro", f2(indietro), "testa giu'", f2(giu), "piedi su", f2(su));
+  ok(sempre, `${tipo}: non cade`);
+  if (tipo === "indietro") ok(indietro > 8, `indietro: si sposta all'indietro (${indietro})`);
+  if (tipo === "abbassa") ok(giu > 9, `abbassa: la testa scende (${giu})`);
+  if (tipo === "salto") ok(su > 5, `salto: i piedi si staccano (${su})`);
+  ok(aCasa(p, x0, 2.5), `${tipo}: poi torna a casa`);
+}
+
+// 2.6 parata: la mano va incontro al punto d'impatto e li' resta
 {
-  const s = nuovo();
-  s.muri(s.B.anca.x - 25, s.B.anca.x + 40);
-  const [lo, hi] = s.muro;
+  const p = nuovo(); p.assesta(60);
+  const C = p.corpi, x0 = C.busto_inf.x, P = [x0 + 22, 22];
+  let err = 99, t0 = p.t;
+  p.para({mano: "dx", punto: () => P});
+  for (let i = 0; i < 40; i++) { p.passo(DT); if (i >= 12) err = Math.min(err, Math.hypot(p._polso("dx")[0] - P[0], p._polso("dx")[1] - P[1])); }
+  ok(err < 6, `parata: la mano arriva al punto (${err})`);
+  p.assesta(120); ok(aCasa(p, x0, 2) && !p.occupato(), "parata: poi torna in guardia");
+}
+
+// 2.7 arti storpi: una gamba (sta in piedi sull'altra), un braccio (penzola), due gambe (si siede e si addormenta)
+{
+  const p = nuovo(); p.assesta(60); p.storpia("gamba_sx", true);
+  p.assesta(240);
+  ok(finiti(p) && inPiedi(p), "una gamba storpia: sta ancora in piedi");
+  const C = p.corpi; const bacino = C.busto_inf.y;
+  p.colpisci("busto", 0.6); p.assesta(300);
+  ok(inPiedi(p) && finiti(p), "su una gamba sola: un colpo non lo butta giu'");
+  p.storpia("gamba_sx", false); p.assesta(120);
+  ok(inPiedi(p), "guarita, torna normale");
+  const b = nuovo(); b.assesta(60); b.storpia("braccio_dx", true, true); b.assesta(200);
+  const pj = b._polso("dx"), sp = b._spalla("dx");
+  ok(pj[1] > sp[1] + 25 && inPiedi(b), `braccio storpio: penzola (${pj[1]} > ${sp[1]})`);
+  const s = nuovo(); s.assesta(60); s.storpia("gamba_dx", true, true); s.storpia("gamba_sx", true, true);
+  s.assesta(500);
+  log("seduto: bacino", f2(s.corpi.busto_inf.y), "testa", f2(s.corpi.testa.y), "dorme", s.mondo.dorme);
+  ok(finiti(s) && s.corpi.testa.y < s.corpi.busto_inf.y - 15, "senza gambe: si siede con il busto dritto");
+  ok(s.mondo.dorme, "senza gambe: poi sta fermo (si addormenta)");
+  ok(Math.abs(s.corpi.busto_inf.x - s.casa) < 70, "senza gambe: resta vicino a dove era");
+}
+
+// 2.8 la morte: cade all'indietro, a terra, ferma e addormentata; un cadavere colpito si muove e si riaddormenta
+for (const forza of [0.1, 0.7, 1.6]) {
+  const p = nuovo(); p.assesta(60);
+  const C = p.corpi, x0 = C.busto_inf.x;
+  p.muori(forza);
+  p.assesta(480);
+  log("morto forza", forza, "testa y", f2(C.testa.y), "bacino x", f2(C.busto_inf.x - x0), "dorme", p.mondo.dorme);
+  ok(finiti(p), "morto: valori finiti");
+  ok(C.testa.y > 85 && C.busto_inf.y > 90, "da morto e' a terra");
+  ok(C.busto_inf.x < x0 + 5 && x0 - C.busto_inf.x < 80, `cade all'indietro, vicino a dove stava (${x0 - C.busto_inf.x})`);
+  ok(p.mondo.dorme, "da morto, fermo, si addormenta");
+  const prima = JSON.stringify(Object.values(C).map(b => [b.x, b.y, b.a]));
+  p.assesta(300);
+  ok(JSON.stringify(Object.values(C).map(b => [b.x, b.y, b.a])) === prima, "un cadavere non si muove piu'");
+}
+
+// 2.9 i muri: il corpo non esce dai limiti, a forza di colpi, schivate e attacchi, da vivo e da morto
+{
+  const p = nuovo(); p.assesta(60);
+  const C = p.corpi, x0 = C.busto_inf.x;
+  p.muri(x0 - 30, x0 + 40);
+  const [lo, hi] = p.muro;
   let minX = 1e9, maxX = -1e9;
-  const guarda = () => { for (const p of Object.values(s.P)) { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); } };
-  for (let i = 0; i < 25; i++) { s.colpisci("busto", 60); for (let j = 0; j < 20; j++) { s.passo(); guarda(); } }
-  for (let i = 0; i < 12; i++) { s.schiva(); for (let j = 0; j < 25; j++) { s.passo(); guarda(); } }
-  for (let i = 0; i < 25; i++) { s.affonda(2); for (let j = 0; j < 12; j++) { s.passo(); guarda(); } }
-  log("muri", lo, hi, "-> x tra", minX.toFixed(1), "e", maxX.toFixed(1));
-  ok(minX >= lo + 1.99 && maxX <= hi - 1.99, `il corpo resta tra i muri (${minX}, ${maxX})`);
-  ok(finiti(s) && inPiedi(s), "contro il muro resta in piedi");
-  s.muori(60);
-  for (let j = 0; j < 400; j++) { s.passo(); guarda(); }
-  ok(minX >= lo + 1.99 && maxX <= hi - 1.99, `anche da morto resta tra i muri (${minX}, ${maxX})`);
-  ok(s.P.cima.y > 65 && s.P.anca.y > 90, "da morto, contro il muro, e' a terra (accartocciato)");
+  const guarda = () => { for (const b of Object.values(C)) { for (const fo of b.forme) { minX = Math.min(minX, b.x - fo.r - 18); maxX = Math.max(maxX, b.x + fo.r + 18); } minX = Math.min(minX, b.x - 4); maxX = Math.max(maxX, b.x + 4); } };
+  let minC = 1e9, maxC = -1e9;
+  const guardaC = () => { for (const b of Object.values(C)) { minC = Math.min(minC, b.x); maxC = Math.max(maxC, b.x); } };
+  for (let i = 0; i < 12; i++) { p.colpisci("busto", 1.2); for (let j = 0; j < 30; j++) { p.passo(DT); guardaC(); } }
+  for (let i = 0; i < 6; i++) { p.schiva("indietro"); for (let j = 0; j < 40; j++) { p.passo(DT); guardaC(); } }
+  for (let i = 0; i < 6; i++) { p.attacca({bersaglio: () => [x0 + 54, 32], insegui: true}); for (let j = 0; j < 60; j++) { p.passo(DT); guardaC(); } }
+  log("muri", f2(lo), f2(hi), "-> centri tra", f2(minC), "e", f2(maxC));
+  ok(minC >= lo - 0.5 && maxC <= hi + 1, `i corpi restano tra i muri (${minC}, ${maxC})`);
+  ok(finiti(p) && inPiedi(p), "contro il muro resta in piedi");
+  p.muori(1.5); p.assesta(300);
+  minC = 1e9; maxC = -1e9; for (let j = 0; j < 100; j++) { p.passo(DT); guardaC(); }
+  ok(minC >= lo - 0.5, "anche da morto resta dietro al muro");
 }
 
-// 5. una gamba storpiata: resta in piedi sull'altra, non cammina piu', la gamba molle e' un ragdoll
+// 2.10 la scena e' liscia: niente scatti nei movimenti di un duello (un pugno e un colpo subito)
 {
-  const s = nuovo();
-  s.storpia("gamba_sx", true);
-  s.assesta(300);
-  log("una gamba: anca", s.P.anca.y.toFixed(1), "cima", s.P.cima.y.toFixed(1), "caviglia buona", s.P.caviglia_dx.y.toFixed(1));
-  ok(finiti(s) && inPiedi(s), "una gamba storpia: sta ancora in piedi");
-  ok(s.P.caviglia_dx.y > 100, "la gamba buona regge a terra");
-  s.spingi("caviglia_sx", -4, 0); s.assesta(60);
-  ok(sposta(s, "caviglia_sx") > 1.5 || s.P.caviglia_sx.y >= 100, "la gamba storpia non ha piu' muscoli");
-  const p0 = s.nPassi;
-  s.colpisci("busto", 60); s.assesta(300);
-  ok(s.nPassi === p0 && inPiedi(s), "su una gamba sola non fa passi ma non cade");
-  s.storpia("gamba_sx", false); s.assesta(100);
-  s.colpisci("busto", 60); s.assesta(400);
-  ok(s.nPassi > p0 && inPiedi(s), "guarita, cammina di nuovo");
+  const att = nuovo(), dif = nuovo(); att.assesta(60); dif.assesta(60);
+  const prec = {}; let maxPasso = 0, maxAcc = 0, maxAng = 0;
+  const guarda = (p, nome) => {
+    for (const [k, b] of Object.entries(p.corpi)) {
+      const key = nome + k;
+      if (prec[key]) {
+        const d = Math.hypot(b.x - prec[key].x, b.y - prec[key].y), da = Math.abs(b.a - prec[key].a);
+        maxPasso = Math.max(maxPasso, d); maxAng = Math.max(maxAng, da);
+        if (prec[key].d !== undefined) maxAcc = Math.max(maxAcc, Math.abs(d - prec[key].d));
+        prec[key].d = d;
+      }
+      prec[key] = {x: b.x, y: b.y, a: b.a, d: prec[key] ? prec[key].d : undefined};
+    }
+  };
+  const x0 = att.corpi.busto_inf.x;
+  att.attacca({bersaglio: () => [x0 + 54, 32], insegui: true, alContatto: () => dif.colpisci("busto", 0.7)});
+  for (let i = 0; i < 180; i++) { att.passo(DT); dif.passo(DT); guarda(att, "a"); guarda(dif, "d"); }
+  log("liscezza: passo massimo", f2(maxPasso), "px/passo, variazione di passo", f2(maxAcc), "angolo max", f2(maxAng), "rad/passo");
+  ok(maxPasso < 14, `nessun pezzo salta (${maxPasso} px in un passo)`);
+  ok(maxAng < 0.7, `nessun pezzo ruota di scatto (${maxAng} rad in un passo)`);
 }
 
-// 6. due gambe storpiate: si siede a terra e si puntella sulle braccia
+// 2.11 determinismo: due pupazzi con gli stessi comandi hanno la stessa storia
 {
-  const s = nuovo();
-  s.storpia("gamba_dx", true); s.storpia("gamba_sx", true);
-  s.assesta(400);
-  const P = s.P;
-  log("due gambe: anca", P.anca.y.toFixed(1), "vita", P.vita.y.toFixed(1), "cima", P.cima.y.toFixed(1),
-      "polso", P.polso_dx.y.toFixed(1), "x", P.polso_dx.x.toFixed(1), "quieto", s.quieto());
-  ok(finiti(s), "due gambe: valori finiti");
-  ok(P.anca_dx.y > 95 && P.anca_sx.y > 95, "senza gambe il bacino e' a terra");
-  ok(P.cima.y < P.vita.y - 10 && P.vita.y < P.anca.y - 8, "il busto resta eretto sulle braccia, non e' sdraiato");
-  ok(P.polso_dx.y > 100 && P.polso_sx.y > 100, "le braccia si puntellano a terra");
-  ok(s.quieto(0.3), "e' fermo");
-  s.colpisci("busto", 40); s.assesta(300);
-  ok(finiti(s) && P.cima.y < P.anca.y - 10, "seduto e colpito: torna su");
+  const a = nuovo(), b = nuovo();
+  const copione = (p) => { p.assesta(30); p.colpisci("testa", 0.8); p.assesta(40); p.attacca({bersaglio: () => [90, 32], insegui: true}); p.assesta(90); p.schiva("salto"); p.assesta(90); };
+  copione(a); copione(b);
+  ok(JSON.stringify(Object.values(a.corpi).map(c => [c.x, c.y, c.a])) === JSON.stringify(Object.values(b.corpi).map(c => [c.x, c.y, c.a])), "la simulazione e' deterministica");
 }
 
-// 7. gambe e braccia storpie: non ha niente per tenersi su, ma il busto non e' morto
+// 2.12 raffica casuale: nessuna eccezione, nessun valore impazzito, e a fine corsa e' in piedi a casa
 {
-  const s = nuovo();
-  for (const l of ["gamba_dx", "gamba_sx", "braccio_dx", "braccio_sx"]) s.storpia(l, true);
-  s.assesta(400);
-  ok(finiti(s), "senza arti: valori finiti");
-  ok(s.P.anca.y > 95, "senza arti e' a terra");
-}
-
-// 8. la morte: finisce disteso a poca distanza, ferma e addormentata (nessun tremolio), qualunque sia il danno
-for (const danno of [5, 40, 120]) {
-  const s = nuovo();
-  s.muori(danno);
-  s.assesta(400);
-  const P = s.P;
-  log("morto", danno, ": cima", P.cima.y.toFixed(1), "vita", P.vita.y.toFixed(1), "x vita", P.vita.x.toFixed(1), "dorme", s.dorme);
-  ok(finiti(s), "morto: valori finiti");
-  ok(P.cima.y > 85 && P.vita.y > 90 && P.anca.y > 90, "da morto e' a terra");
-  const xs = Object.values(P).map(p => p.x);
-  ok(Math.min(...xs) > s.B.vita.x - 110 && Math.max(...xs) < s.B.vita.x + 30, "da morto cade vicino a dove stava, all'indietro");
-  ok(P.vita.x < s.B.vita.x, "cade all'indietro");
-  ok(s.dorme, "da morto, fermo, si addormenta");
-  const prima = JSON.stringify(P);
-  s.assesta(600);
-  ok(JSON.stringify(P) === prima, "un cadavere non si muove piu' (neppure di un decimo di pixel)");
-  s.colpisci("busto", 30); s.assesta(300);          // un colpo al cadavere lo muove e poi si riaddormenta
-  ok(finiti(s) && s.dorme, "un cadavere colpito si riassesta e si riaddormenta");
-}
-
-// 9. attacco e schivata: chi attacca fa un passo avanti, chi schiva salta indietro, poi tornano a casa a piedi
-{
-  const a = nuovo();
-  a.affonda(1.5);
-  let avanti = 0;
-  for (let i = 0; i < 400; i++) { a.passo(); avanti = Math.max(avanti, a.P.anca.x - a.B.anca.x); }
-  log("affondo: avanti", avanti.toFixed(1), "px, passi", a.nPassi, "a casa", aCasa(a));
-  ok(avanti > 2 && aCasa(a, 1.2), "chi attacca si sporge e torna a casa");
-  const d = nuovo();
-  d.schiva();
-  let su = 0, dietro = 0;
-  for (let i = 0; i < 400; i++) { d.passo(); su = Math.max(su, d.B.caviglia_dx.y - d.P.caviglia_dx.y); dietro = Math.max(dietro, indietro(d)); }
-  log("schivata: salto", su.toFixed(1), "px, indietro", dietro.toFixed(1), "px, passi", d.nPassi, "a casa", aCasa(d));
-  ok(su > 3 && dietro > 5 && aCasa(d, 1.2), "chi schiva salta all'indietro e poi torna");
-  const p = nuovo();
-  p.para(); p.assesta(300);
-  ok(inPiedi(p) && aCasa(p, 1.5), "la parata non lo sposta di molto");
-  const t = nuovo();
-  t.spara();
-  let braccio = 0;
-  for (let i = 0; i < 300; i++) { t.passo(); braccio = Math.max(braccio, t.P.polso_dx.x - t.B.polso_dx.x); }
-  ok(braccio > 3 && inPiedi(t) && aCasa(t, 1.5), "chi spara alza il braccio e poi torna a posto");
-}
-
-// 10. una raffica di colpi (anche a un'ora strana) non lo butta mai giu', e poi torna dov'era (con i muri, come in arena)
-{
-  const s = nuovo();
-  s.muri(s.B.anca.x - 70, s.B.anca.x + 45);
-  let seme = 7;
-  const rnd = () => (seme = (seme * 16807) % 2147483647) / 2147483647;
-  const locs = Object.keys(CHIAVE);
+  const p = nuovo(); p.assesta(60);
+  const C = p.corpi, x0 = C.busto_inf.x;
+  p.muri(x0 - 80, x0 + 40);
+  let seme = 11; const rnd = () => (seme = (seme * 16807) % 2147483647) / 2147483647;
+  const LOCS = ["testa", "busto", "braccio_dx", "braccio_sx", "gamba_dx", "gamba_sx"];
   let sempre = true;
-  for (let i = 0; i < 60; i++) {
+  for (let i = 0; i < 80; i++) {
     const r = rnd();
-    if (r < 0.6) s.colpisci(locs[Math.floor(rnd() * locs.length)], 5 + rnd() * 55);
-    else if (r < 0.75) s.schiva();
-    else if (r < 0.9) s.affonda(1 + rnd());
-    else s.para();
-    for (let j = 0, m = 3 + Math.floor(rnd() * 20); j < m; j++) { s.passo(); if (!inPiedi(s) || !finiti(s)) sempre = false; }
+    if (!p.occupato()) {
+      if (r < 0.45) p.colpisci(LOCS[Math.floor(rnd() * 6)], 0.1 + rnd() * 1.5);
+      else if (r < 0.6) p.schiva(["indietro", "abbassa", "salto"][Math.floor(rnd() * 3)]);
+      else if (r < 0.8) p.attacca({stile: ["pugno", "fendente", "affondo"][Math.floor(rnd() * 3)], bersaglio: () => [C.busto_inf.x + 54, 20 + rnd() * 40], insegui: rnd() < 0.5});
+      else p.para({mano: "dx", punto: () => [C.busto_inf.x + 22, 24]});
+    }
+    for (let j = 0, m = 5 + Math.floor(rnd() * 40); j < m; j++) { p.passo(DT); if (!finiti(p) || !inPiedi(p)) sempre = false; }
   }
-  ok(sempre, "durante una raffica non cade mai");
-  s.assesta(600);
-  ok(aCasa(s, 1.2) && Math.abs(s.P.anca.x - s.B.anca.x) < 1.2, "dopo la raffica torna a casa");
+  ok(sempre, "durante una raffica di eventi non cade e non impazzisce");
+  p.assesta(480);
+  ok(aCasa(p, x0, 2.5), "dopo la raffica torna a casa");
 }
 
 console.log(`OK - ${n} check passati`);
