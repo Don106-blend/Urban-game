@@ -1,0 +1,226 @@
+{
+ "descrizione": "Aspetto del corpo maschile: capigliature, maglie, pantaloni e texture dei colori. Vedi STILE_SPRITE.md sez. 13.",
+ "texture": {
+  "vestiti": "colori_vestiti.png",
+  "capelli": "colori_capelli.png"
+ },
+ "capelli": [
+  {
+   "id": "m1",
+   "nome": "Rasato",
+   "sesso": "M",
+   "file": "capelli_m1.png",
+   "offset": [
+    -10,
+    -10
+   ]
+  },
+  {
+   "id": "m2",
+   "nome": "Corto",
+   "sesso": "M",
+   "file": "capelli_m2.png",
+   "offset": [
+    -10,
+    -10
+   ]
+  },
+  {
+   "id": "m3",
+   "nome": "Spazzola",
+   "sesso": "M",
+   "file": "capelli_m3.png",
+   "offset": [
+    -10,
+    -10
+   ]
+  },
+  {
+   "id": "m4",
+   "nome": "Ciuffo",
+   "sesso": "M",
+   "file": "capelli_m4.png",
+   "offset": [
+    -10,
+    -10
+   ]
+  },
+  {
+   "id": "m5",
+   "nome": "Mohicano",
+   "sesso": "M",
+   "file": "capelli_m5.png",
+   "offset": [
+    -10,
+    -10
+   ]
+  },
+  {
+   "id": "m6",
+   "nome": "Pettinato",
+   "sesso": "M",
+   "file": "capelli_m6.png",
+   "offset": [
+    -10,
+    -10
+   ]
+  },
+  {
+   "id": "m7",
+   "nome": "Ricci",
+   "sesso": "M",
+   "file": "capelli_m7.png",
+   "offset": [
+    -10,
+    -10
+   ]
+  },
+  {
+   "id": "m8",
+   "nome": "Chignon alto",
+   "sesso": "M",
+   "file": "capelli_m8.png",
+   "offset": [
+    -10,
+    -10
+   ]
+  },
+  {
+   "id": "f1",
+   "nome": "Caschetto",
+   "sesso": "F",
+   "file": "capelli_f1.png",
+   "offset": [
+    -10,
+    -10
+   ]
+  },
+  {
+   "id": "f2",
+   "nome": "Lunghi lisci",
+   "sesso": "F",
+   "file": "capelli_f2.png",
+   "offset": [
+    -10,
+    -10
+   ]
+  },
+  {
+   "id": "f3",
+   "nome": "Coda alta",
+   "sesso": "F",
+   "file": "capelli_f3.png",
+   "offset": [
+    -10,
+    -10
+   ]
+  },
+  {
+   "id": "f4",
+   "nome": "Treccia",
+   "sesso": "F",
+   "file": "capelli_f4.png",
+   "offset": [
+    -10,
+    -10
+   ]
+  },
+  {
+   "id": "f5",
+   "nome": "Chignon basso",
+   "sesso": "F",
+   "file": "capelli_f5.png",
+   "offset": [
+    -10,
+    -10
+   ]
+  },
+  {
+   "id": "f6",
+   "nome": "Frangia e lunghi",
+   "sesso": "F",
+   "file": "capelli_f6.png",
+   "offset": [
+    -10,
+    -10
+   ]
+  },
+  {
+   "id": "f7",
+   "nome": "Ricci lunghi",
+   "sesso": "F",
+   "file": "capelli_f7.png",
+   "offset": [
+    -10,
+    -10
+   ]
+  },
+  {
+   "id": "f8",
+   "nome": "Pixie",
+   "sesso": "F",
+   "file": "capelli_f8.png",
+   "offset": [
+    -10,
+    -10
+   ]
+  }
+ ],
+ "maglie": [
+  {
+   "id": "canottiera",
+   "nome": "Canottiera",
+   "pezzi": {
+    "busto_sup": "maglia_canottiera_busto_sup.png",
+    "busto_inf": "maglia_canottiera_busto_inf.png"
+   }
+  },
+  {
+   "id": "tshirt",
+   "nome": "T-shirt",
+   "pezzi": {
+    "busto_sup": "maglia_tshirt_busto_sup.png",
+    "busto_inf": "maglia_tshirt_busto_inf.png",
+    "braccio_sup": "maglia_tshirt_braccio_sup.png"
+   }
+  },
+  {
+   "id": "lunga",
+   "nome": "Maniche lunghe",
+   "pezzi": {
+    "busto_sup": "maglia_lunga_busto_sup.png",
+    "busto_inf": "maglia_lunga_busto_inf.png",
+    "braccio_sup": "maglia_lunga_braccio_sup.png",
+    "avambraccio": "maglia_lunga_avambraccio.png"
+   }
+  }
+ ],
+ "pantaloni": [
+  {
+   "id": "corti",
+   "nome": "Pantaloncini",
+   "pezzi": {
+    "busto_inf": "pantaloni_corti_busto_inf.png",
+    "coscia": "pantaloni_corti_coscia.png"
+   }
+  },
+  {
+   "id": "tre_quarti",
+   "nome": "Tre quarti",
+   "pezzi": {
+    "busto_inf": "pantaloni_tre_quarti_busto_inf.png",
+    "coscia": "pantaloni_tre_quarti_coscia.png",
+    "stinco": "pantaloni_tre_quarti_stinco.png"
+   }
+  },
+  {
+   "id": "lunghi",
+   "nome": "Lunghi",
+   "pezzi": {
+    "busto_inf": "pantaloni_lunghi_busto_inf.png",
+    "coscia": "pantaloni_lunghi_coscia.png",
+    "stinco": "pantaloni_lunghi_stinco.png"
+   }
+  }
+ ]
+}

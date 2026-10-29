@@ -367,11 +367,12 @@ for (const forza of [0.1, 0.7, 1.6]) {
     ok(b.readUInt32BE(0) === 0x89504e47, `${file}: e' un PNG`);
     const w = b.readUInt32BE(16), h = b.readUInt32BE(20), tipo = b[25], bpp = tipo === 6 ? 4 : 1;
     ok(b[24] === 8 && (tipo === 6 || tipo === 3) && b[28] === 0, `${file}: 8 bit, a palette o RGBA, senza interlaccio`);
-    const idat = []; let trns = null;
+    const idat = []; let trns = null, plte = null;
     for (let o = 8; o < b.length;) {
       const len = b.readUInt32BE(o), t = b.toString("latin1", o + 4, o + 8);
       if (t === "IDAT") idat.push(b.subarray(o + 8, o + 8 + len));
       if (t === "tRNS") trns = b.subarray(o + 8, o + 8 + len);
+      if (t === "PLTE") plte = b.subarray(o + 8, o + 8 + len);
       o += 12 + len;
     }
     const raw = zlib.inflateSync(Buffer.concat(idat)), px = Buffer.alloc(w * h * bpp), riga = w * bpp;
@@ -386,7 +387,11 @@ for (const forza of [0.1, 0.7, 1.6]) {
     }
     const alfa = new Uint8Array(w * h);
     for (let i = 0; i < w * h; i++) alfa[i] = tipo === 6 ? px[i * 4 + 3] : (trns && px[i] < trns.length ? trns[px[i]] : 255);
-    return {w, h, alfa};
+    // canale rosso di ogni pixel: gli sprite a indici (capelli, vestiti) usano solo i 5 grigi del corpo (v. STILE_SPRITE.md sez. 4)
+    const rosso = new Uint8Array(w * h);
+    for (let i = 0; i < w * h; i++) rosso[i] = tipo === 6 ? px[i * 4] : plte[px[i] * 3];
+    const rgb = (i) => tipo === 6 ? [px[i * 4], px[i * 4 + 1], px[i * 4 + 2]] : [plte[px[i] * 3], plte[px[i] * 3 + 1], plte[px[i] * 3 + 2]];
+    return {w, h, alfa, rosso, rgb};
   };
   let pezzi = 0;
   for (const [nome, p] of Object.entries(man.parti)) {
@@ -407,6 +412,46 @@ for (const forza of [0.1, 0.7, 1.6]) {
   }
   ok(pezzi === Object.keys(man.parti).length, "ogni pezzo ha il suo interno");
   log("interno: ", pezzi, "pezzi con scheletro e carne");
+
+  // ---- aspetto: capigliature, maglie, pantaloni e texture dei colori (aspetto.json)
+  const asp = JSON.parse(fs.readFileSync(path.join(__dirname, "static/sprites/maschio/aspetto.json"), "utf8"));
+  const GRIGI = new Set([38, 106, 142, 178, 216]);
+  const soloIndici = (img, file) => {
+    for (let i = 0; i < img.w * img.h; i++) if (img.alfa[i] && !GRIGI.has(img.rosso[i])) ok(false, `${file}: un colore che non e' uno dei 5 indici (R=${img.rosso[i]})`);
+    return true;
+  };
+  ok(asp.capelli.length === 16, "16 capigliature");
+  ok(asp.capelli.filter((c) => c.sesso === "M").length === 8 && asp.capelli.filter((c) => c.sesso === "F").length === 8, "8 maschili e 8 femminili");
+  ok(asp.capelli.every((c) => ["M", "F", "unisex"].includes(c.sesso)) && new Set(asp.capelli.map((c) => c.id)).size === 16, "ogni capigliatura ha un id e un tag di sesso valido");
+  const testa = png("testa.png");
+  for (const c of asp.capelli) {
+    const img = png(c.file);
+    ok(img.w >= testa.w && img.h >= testa.h, `${c.id}: la tela dei capelli contiene la testa`);
+    soloIndici(img, c.file);
+    // il PNG dei capelli copre l'angolo alto-sinistro della testa a `offset` (negativo = fuori dalla testa): niente sul bordo, che deve restare vuoto
+    ok(c.offset[0] < 0 && c.offset[1] < 0 && c.offset[0] + img.w > testa.w && c.offset[1] + img.h > testa.h, `${c.id}: l'offset porta la testa dentro la tela`);
+    let sul = 0; for (let x = 0; x < img.w; x++) sul += (img.alfa[x] + img.alfa[(img.h - 1) * img.w + x] > 0 ? 1 : 0);
+    for (let y = 0; y < img.h; y++) sul += (img.alfa[y * img.w] + img.alfa[y * img.w + img.w - 1] > 0 ? 1 : 0);
+    ok(sul === 0, `${c.id}: i capelli non toccano il bordo della tela`);
+    ok(img.rosso.some((v, i) => img.alfa[i] && v === 38) && img.rosso.some((v, i) => img.alfa[i] && v >= 142), `${c.id}: ha contorno e toni di capello`);
+  }
+  for (const [tipo, lista] of [["maglie", asp.maglie], ["pantaloni", asp.pantaloni]]) {
+    ok(lista.length === 3, `3 ${tipo}`);
+    for (const g of lista) for (const [parte, file] of Object.entries(g.pezzi)) {
+      const img = png(file), dx = png(`${parte}${parte.startsWith("busto") ? "" : "_dx"}.png`), sx = man.parti[`${parte}_sx`] ? png(`${parte}_sx.png`) : dx;
+      ok(img.w === dx.w && img.h === dx.h && img.w === sx.w && img.h === sx.h, `${file}: stessa dimensione del pezzo (il lato dx e sx usano lo stesso PNG)`);
+      soloIndici(img, file);
+      let dentro = true, pieni = 0;
+      for (let i = 0; i < img.w * img.h; i++) if (img.alfa[i]) { pieni++; if (!dx.alfa[i]) dentro = false; }
+      ok(dentro && pieni > 15, `${file}: sta dentro la sagoma del pezzo (${pieni} px)`);
+    }
+  }
+  // le texture: una striscia di colori; nei vestiti il bianco e' la sezione piu' stretta
+  const tv = png(asp.texture.vestiti), tc = png(asp.texture.capelli);
+  ok(tv.w >= 100 && tc.w >= 100, "le texture sono abbastanza larghe da campionare");
+  const bianchi = []; for (let x = 0; x < tv.w; x++) if (Math.min(...tv.rgb(x)) > 225 && tv.alfa[x]) bianchi.push(x);
+  ok(bianchi.length >= 1 && bianchi.length <= 0.04 * tv.w, `nei vestiti il bianco e' una sezione stretta (${bianchi.length}/${tv.w})`);
+  log("aspetto: 16 capigliature, 3 maglie, 3 pantaloni; texture", tv.w, "e", tc.w);
 }
 
 console.log(`OK - ${n} check passati`);

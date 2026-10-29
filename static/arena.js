@@ -19,6 +19,7 @@ const Arena = (() => {
   const BORDO = 14;                 // fascia del pavimento in fondo all'arena (px schermo)
 
   let man = null, parti = null;     // parti.json e i pezzi caricati
+  let asp = null;                   // aspetto.json + sprite di capelli e vestiti + texture dei colori (null = non disponibile)
   const locEstesa = {};             // locazione -> {y0, y1}: righe dello sprite intero che occupa
   const lati = {};                  // "p" | "c" -> combattente
   let tela = null, ctx = null, arenaEl = null;
@@ -73,6 +74,54 @@ const Arena = (() => {
       const l = locEstesa[p.loc] = locEstesa[p.loc] || {y0: 1e9, y1: 0};
       l.y0 = Math.min(l.y0, p.y0); l.y1 = Math.max(l.y1, p.y0 + p.h);
     }
+    await caricaAspetto();
+  }
+
+  /* capigliature, maglie, pantaloni e le due texture dei colori (static/sprites/maschio/aspetto.json). Senza, i combattenti
+     restano nudi e pelati: il resto del gioco funziona uguale. */
+  async function caricaAspetto() {
+    try {
+      const m = await (await fetch(BASE + "aspetto.json")).json();
+      const L = async (f) => { const r = await leggi(f); return r && {w: r.tela.width, h: r.tela.height, px: r.px}; };
+      const tex = {vestiti: await L(m.texture.vestiti), capelli: await L(m.texture.capelli)};
+      const capelli = {}, maglie = {}, pantaloni = {};
+      await Promise.all([
+        ...m.capelli.map(async c => { capelli[c.id] = {...c, img: await L(c.file)}; }),
+        ...[["maglie", maglie], ["pantaloni", pantaloni]].flatMap(([k, dest]) => m[k].map(async g => {
+          dest[g.id] = {...g, img: Object.fromEntries(await Promise.all(Object.entries(g.pezzi).map(async ([parte, f]) => [parte, await L(f)])))};
+        }))]);
+      asp = tex.vestiti && tex.capelli ? {tex, capelli, maglie, pantaloni} : null;
+    } catch (e) { asp = null; }
+  }
+
+  /* ---- colori: l'aspetto di un personaggio porta solo un `seed`; i colori si campionano dalle texture (x = u * larghezza, con u
+     derivato dal seed): le sezioni larghe della texture dei vestiti escono spesso, quella stretta (bianco) quasi mai. Da un
+     colore si ricava una rampa k,a,b,c,d con la stessa logica dei 5 indici del corpo. */
+  const mescola = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+  const U = (seed, tag) => hash((seed >>> 0) % 1000003, (seed >>> 20) & 0xfff, tag + 4242);
+  function campiona(tex, u) {
+    const x = Math.min(tex.w - 1, Math.floor(u * tex.w)), i = (tex.w + x) * 4;
+    return [tex.px[i], tex.px[i + 1], tex.px[i + 2]];
+  }
+  function rampa(rgb) {
+    const lum = (0.3 * rgb[0] + 0.59 * rgb[1] + 0.11 * rgb[2]) / 255;
+    let b = rgb;                                         // ne' nero ne' bianco pieni: non avrebbero ombre o luci
+    if (lum < 0.15) b = mescola(b, [255, 255, 255], (0.15 - lum) / (1 - lum));
+    else if (lum > 0.86) b = mescola(b, [0, 0, 0], (lum - 0.86) / lum);
+    const r = {b, a: mescola(b, [0, 0, 0], 0.3), k: mescola(b, [0, 0, 0], 0.62), c: mescola(b, [255, 255, 255], 0.2), d: mescola(b, [255, 255, 255], 0.42)};
+    for (const k of Object.keys(r)) r[k] = r[k].map(Math.round);
+    return r;
+  }
+  const dist2 = (a, b) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
+  const FAR = {k: "k", a: "a", b: "a", c: "b", d: "c"};       // arto lontano: un gradino piu' scuro, come la pelle
+  const SCURO = {k: "k", a: "k", b: "a", c: "b", d: "c"};      // orlo strappato di un indumento: un gradino piu' scuro
+
+  function coloriAspetto(a) {
+    const capelli = campiona(asp.tex.capelli, U(a.seed, 1)).map(v => v * (0.94 + 0.12 * U(a.seed, 5)));
+    const maglia = campiona(asp.tex.vestiti, U(a.seed, 2));
+    let pant = campiona(asp.tex.vestiti, U(a.seed, 3));
+    for (let k = 1; k < 6 && dist2(maglia, pant) < 55 * 55; k++) pant = campiona(asp.tex.vestiti, U(a.seed, 3 + 10 * k));   // maglia e pantaloni non si confondono
+    return {capelli: rampa(capelli), maglia: rampa(maglia), pantaloni: rampa(pant)};
   }
 
   /* Sotto la pelle c'e' l'interno (scheletro e viscere, poi la carne): quando una locazione va in NEGATIVO la pelle si strappa
@@ -102,6 +151,80 @@ const Arena = (() => {
     const r = new Float32Array(p.w * p.h).fill(-1);
     idx.forEach((i, n) => { r[i] = n / idx.length; });
     return L.rk[k] = r;
+  }
+
+  /* ranghi dei capelli (sprite piu' grande della testa, niente centro-ferita: solo macchie) */
+  function rangoCapelli(lato) {
+    const L = lati[lato], c = L.capelli, sem = 777 + (lato === "p" ? 0 : 97);
+    if (c.rk) return c.rk;
+    const w = c.img.w, h = c.img.h, v = new Float32Array(w * h), idx = [];
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      if (!c.img.px[i * 4 + 3]) continue;
+      v[i] = 0.7 * vn(x / 2.2, y / 2.2, sem) + 0.3 * hash(x, y, sem + 3);
+      idx.push(i);
+    }
+    idx.sort((a, b) => v[a] - v[b]);
+    c.rk = new Float32Array(w * h).fill(-1);
+    idx.forEach((i, n) => { c.rk[i] = n / idx.length; });
+    return c.rk;
+  }
+
+  /* un'immagine a indici (capelli, indumenti) -> pixel colorati con una rampa; `r` (ranghi) e `q` = quota strappata, `blood` =
+     soglia del sangue (0 = nessuno). I pixel strappati spariscono (si vede quello che sta sotto) e il bordo di quelli che restano
+     si scurisce di un gradino. `y0` serve a rendere continuo il rumore del sangue tra le due meta' di un arto. */
+  function coloraIndici(cv, img, rp, {far = false, r = null, q = 0, sangue = 0, y0 = 0, seed = 0} = {}) {
+    const cx = cv.getContext("2d"), out = cx.createImageData(img.w, img.h), w = img.w, h = img.h;
+    const op = (x, y) => x >= 0 && y >= 0 && x < w && y < h && img.px[(y * w + x) * 4 + 3] > 0;
+    const resta = (x, y) => !r || r[y * w + x] >= q;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      if (!img.px[i + 3] || !resta(x, y)) continue;
+      let g = GRIGI[img.px[i]] || "b";
+      if (far) g = FAR[g];
+      if (r && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => op(x + dx, y + dy) && !resta(x + dx, y + dy))) g = SCURO[g];
+      let col = rp[g];
+      if (sangue && g !== "k" && 0.7 * vn(x / 3, (y + y0) / 3, seed + 500) + 0.3 * hash(x, y + y0, seed + 507) < sangue) col = SANGUE[g === "a" ? "a" : g];
+      out.data.set([col[0], col[1], col[2], 255], i);
+    }
+    cx.putImageData(out, 0, 0);
+  }
+
+  /* i vestiti di un pezzo (pantaloni poi maglia): si strappano con i danni. `f` = 0 (intatto) .. 1 (strappato del tutto): vale
+     (1 - hp/max) / 0.85, cioe' a 15% degli hp della locazione l'indumento non c'e' piu'. Strappi e orli, poi sangue sugli stracci. */
+  function disegnaVestiti(lato, nome, f) {
+    const L = lati[lato], lista = L.vest[nome];
+    if (!lista) return;
+    const p = parti[nome], seed = p.loc.length * 31 + p.loc.charCodeAt(p.loc.length - 1) + (lato === "p" ? 0 : 97);
+    const r = f > 0 ? rango(lato, nome, 2) : null;
+    for (const v of lista) coloraIndici(v.tela, v.img, v.rp, {far: v.far, r, q: f, sangue: 0.85 * f, y0: p.y0, seed});
+  }
+
+  function disegnaCapelli(lato, prof) {
+    const c = lati[lato].capelli;
+    if (!c) return;
+    coloraIndici(c.tela, c.img, c.rp, prof > 0 ? {r: rangoCapelli(lato), q: quotaPelle(prof)} : {});   // a testa spaccata anche i capelli vanno
+  }
+
+  /* dai a un combattente il suo aspetto: capigliatura, maglia, pantaloni, colori dal seed */
+  function applicaAspetto(lato, a) {
+    const L = lati[lato];
+    L.vest = {}; L.capelli = null;
+    if (!asp || !a) return;
+    const col = coloriAspetto(a), base = (nome) => nome.replace(/_(dx|sx)$/, "");
+    const tela = (w, h) => { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; };
+    for (const nome of Object.keys(parti)) {
+      const lista = [];
+      for (const [tipo, scelto, rp] of [["pantaloni", a.pantaloni, col.pantaloni], ["maglie", a.maglia, col.maglia]]) {
+        const img = asp[tipo][scelto] && asp[tipo][scelto].img[base(nome)];
+        if (img) lista.push({img, rp, far: nome.endsWith("_sx"), tela: tela(img.w, img.h)});
+      }
+      if (lista.length) L.vest[nome] = lista;
+    }
+    const h = asp.capelli[a.capelli];
+    if (h && h.img) L.capelli = {img: h.img, off: h.offset, rp: col.capelli, tela: tela(h.img.w, h.img.h), rk: null};
+    for (const nome of Object.keys(parti)) disegnaVestiti(lato, nome, 0);
+    disegnaCapelli(lato, 0);
   }
 
   /* skin + sangue: una macchia di rumore decide quali pixel sono sporchi, `danno` (0..1) alza la soglia. Il rumore e' calcolato
@@ -162,7 +285,7 @@ const Arena = (() => {
 
   function costruisci(lato) {
     const pup = new Pupazzo.Pupazzo(man);
-    const L = {lato, f: lato === "p" ? 1 : -1, O: 0, pup, tele: {}, carne: {}, rk: {}, sag: {}, chiave: {}, prof: {}, lamp: {}, voci: [], nome: "",
+    const L = {lato, f: lato === "p" ? 1 : -1, O: 0, pup, tele: {}, carne: {}, rk: {}, sag: {}, chiave: {}, prof: {}, lamp: {}, voci: [], nome: "", vest: {}, capelli: null, aspKey: null,
                ko: false, ultimo: null, xNome: 0};
     for (const [nome, p] of Object.entries(parti)) {
       const c = document.createElement("canvas"); c.width = p.w; c.height = p.h;
@@ -258,6 +381,9 @@ const Arena = (() => {
         ctx.drawImage(L.carne[v.nome], 0, v.y0, tela_.width, v.h, v.ox, v.oy, tela_.width, v.h);
       }
       ctx.drawImage(tela_, 0, v.y0, tela_.width, v.h, v.ox, v.oy, tela_.width, v.h);
+      const vs = L.vest[v.nome];                                                // sopra pelle e ferite: pantaloni, poi maglia
+      if (vs) for (const o of vs) ctx.drawImage(o.tela, 0, v.y0, tela_.width, v.h, v.ox, v.oy, tela_.width, v.h);
+      if (v.nome === "testa" && L.capelli) ctx.drawImage(L.capelli.tela, v.ox + L.capelli.off[0], v.oy + L.capelli.off[1]);
       const lamp = L.lamp[pz.loc];
       if (lamp > 0) {
         ctx.globalAlpha = Math.min(1, lamp * 2.2);
@@ -532,6 +658,8 @@ const Arena = (() => {
     for (const lato of ["p", "c"]) {
       const pg = lato === "p" ? St.player : St.cpu, L = lati[lato];
       L.nome = pg.nome;
+      const chiaveAsp = JSON.stringify(pg.aspetto || null);
+      if (L.aspKey !== chiaveAsp) { L.aspKey = chiaveAsp; applicaAspetto(lato, pg.aspetto); L.chiave = {}; }
       for (const [nome, p] of Object.entries(parti)) {
         const h = pg.hp[p.loc];
         const danno = !h || h.protesi ? 0 : Math.min(1, Math.max(0, 1 - h.val / h.max));   // le protesi non sanguinano
@@ -540,6 +668,8 @@ const Arena = (() => {
         if (L.chiave[nome] !== chiave) {
           L.chiave[nome] = chiave; L.prof[p.loc] = prof;
           disegnaPelle(lato, nome, danno, prof); disegnaCarne(lato, nome, prof);
+          disegnaVestiti(lato, nome, Math.min(1, danno / 0.85));               // a 15% degli hp l'indumento e' tutto strappato
+          if (nome === "testa") disegnaCapelli(lato, prof);
         }
       }
       for (const loc of Object.keys(Pupazzo.LOC)) {

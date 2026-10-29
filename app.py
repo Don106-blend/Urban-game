@@ -13,6 +13,8 @@ from flask import (Flask, render_template, redirect, url_for, request,
 
 import math
 
+import aspetto
+import tattiche
 from engine import (BONUS_RANGO, LOCAZIONI, STATS, SKILLS, FALLBACK, MAX_POTERI, DADO_BASE,
                     MARGINE_CAP, MARGINE_FATTORE, MIRA_PENALITA, MIRA_DURA_TURNO, costo_azioni, prob_supera,
                     umanita_max,
@@ -102,8 +104,24 @@ def salva_stato():
         json.dump(STATO, f, ensure_ascii=False, indent=1)
 
 
+def assegna_aspetti(stato):
+    """Personaggi (box e contratti) senza un aspetto valido (salvataggi precedenti): ognuno riceve il suo,
+    diverso dagli altri (v. aspetto.py). Ritorna True se ha cambiato qualcosa."""
+    tutti = stato.get("personaggi", []) + stato.get("contratti", [])
+    usati = [c["aspetto"] for c in tutti if aspetto.valido(c.get("aspetto"))]
+    cambiato = False
+    for c in tutti:
+        if not aspetto.valido(c.get("aspetto")):
+            c["aspetto"] = aspetto.genera(c["nome"], usati)
+            usati.append(c["aspetto"])
+            cambiato = True
+    return cambiato
+
+
 STATO = carica_stato()
-if migra_stato(STATO):
+_cambiato = migra_stato(STATO)
+_cambiato = assegna_aspetti(STATO) or _cambiato
+if _cambiato:
     salva_stato()
 
 
@@ -127,6 +145,8 @@ def nuovo_record(p):
             "protesi": protesi_ids,
             "augments": [s["def"]["id"] for s in p.augments],
             "vittorie": 0, "sconfitte": 0, "morto": False,
+            "aspetto": getattr(p, "aspetto", None) or aspetto.genera(
+                p.nome, [c.get("aspetto") for c in STATO["personaggi"] + STATO.get("contratti", [])]),
             "last_heal": time.time()}
 
 
@@ -151,6 +171,7 @@ def umanita_usata(c):
 def record_to_pg(c):
     """Record salvato -> Personaggio pronto al duello (armatura/stance/effetti resettati)."""
     p = Personaggio(c["nome"], c.get("data_nascita", ""), c.get("bio", ""))
+    p.aspetto = c["aspetto"] if aspetto.valido(c.get("aspetto")) else aspetto.genera(c["nome"])
     p.stats.update(c.get("stats", {}))
     p.skills.update(c.get("skills", {}))
     p.hp = {l: min(c.get("hp", {}).get(l, LOCAZIONI[l]), LOCAZIONI[l]) for l in LOCAZIONI}
@@ -302,10 +323,13 @@ def costo_contratto(c):
 
 def genera_contratti():
     usati = {c["nome"] for c in STATO["personaggi"]}
+    usati_asp = [c.get("aspetto") for c in STATO["personaggi"]]
     pool = []
     for _ in range(N_CONTRATTI):
         p = eroe_base(DB["attacchi"], DB["poteri"], DB["stances"], usati)
         usati.add(p.nome)
+        p.aspetto = aspetto.genera(p.nome, usati_asp)   # ognuno ha il suo, diverso da quelli del box e degli altri contratti
+        usati_asp.append(p.aspetto)
         rec = nuovo_record(p)
         rec["costo"] = costo_contratto(rec)
         pool.append(rec)
@@ -317,6 +341,7 @@ def genera_contratti():
 def pannello(p, turno):
     return {
         "nome": p.nome, "turno": turno, "sconfitto": p.sconfitto(),
+        "aspetto": getattr(p, "aspetto", None),
         "hp": {l: {"val": p.hp[l], "max": p.hp_max[l], "arm": p.armatura.get(l, 0),
                    "crippled": l in p.crippled, "protesi": l in p.protesi_locazioni}
                for l in p.hp},
@@ -378,6 +403,10 @@ def salva_profilo():
 
 
 PROFILO = carica_profilo()
+
+# incontri registrati (le scelte del giocatore) e il modello di tattiche che la CPU ne impara: v. tattiche.py
+INCONTRI_FILE = os.path.join(SAVE_DIR, "incontri.jsonl")
+MODELLO = tattiche.Modello(tattiche.carica_incontri(INCONTRI_FILE))
 
 
 def _stato_risposta(v):
@@ -603,6 +632,7 @@ def cpu_bilanciata(giocatore, bias=0):
     c = eroe_speculare(giocatore, extra, {giocatore.nome})
     c.livello = livello
     _equipaggia_cpu(c, livello)
+    c.aspetto = aspetto.genera(c.nome, [getattr(giocatore, "aspetto", None)])   # diverso da quello del giocatore
     return c
 
 
@@ -718,6 +748,8 @@ class DuelloWeb:
         self.scommessa = None    # {"importo": int, "quota": float}
         self.sponsor = None      # uno degli elementi di SPONSOR, una volta scelto
         self.sponsor_offerte = random.sample(SPONSOR, 2) if self.arena_attiva else None
+        # le scelte del giocatore si registrano solo nel gioco vero (duello del box o torneo), mai nel harness
+        self.reg = tattiche.Registratore("torneo" if torneo is not None else "duello") if self.arena_attiva else None
         self.usato_potere = False   # per lo sponsor "stoico"/"bestia"
         self.min_hp_pct = 1.0       # hp minimi (%) toccati dal player, per "incassatore"
         self.hype = 50               # umore del pubblico, 0-100
@@ -1079,6 +1111,9 @@ class DuelloWeb:
             scelta = random.choice(opzioni)
         elif ora <= tenere or ora <= 0.5:
             scelta = "nessuna risposta"
+        t = self._tat()
+        if t is not None and perdita(colpo, loc) < PENALITA_MORTE:   # un colpo letale non si lascia al caso
+            scelta = t.scegli_risposta(tattiche.tipo_attacco(att), opzioni) or scelta
         return scelta, (l_par if scelta == "parata" else None)
 
     NOTE_DIFESA = {"nessuna risposta": "i tuoi riflessi, gratis: se falliscono il colpo ti prende",
@@ -1151,7 +1186,10 @@ class DuelloWeb:
         if not giocabili:
             return None
         punti = [(self.ev_attacco(x, a, d), x) for x in giocabili]
-        if random.random() < PROFILO["aggressivita"]:
+        t = self._tat()
+        if t is not None:  # contrasta la difesa preferita del giocatore (v. Modello.moltiplicatore_attacco)
+            punti = [(e * t.moltiplicatore_attacco(x), x) for e, x in punti]
+        if random.random() < self._prob("aggressivita", "migliore"):
             return max(punti, key=lambda t: t[0])[1]
         return random.choices([x for _, x in punti], [max(0.05, e) for e, _ in punti])[0]
 
@@ -1298,10 +1336,12 @@ class DuelloWeb:
         # senza questo guard la CPU alternava mira/attacco dimezzando i suoi danni
         # — v. feedback "non mi ha fatto danni")
         if (a.puo_mirare() and (a.mira_bonus or a.azioni >= 2)
-                and random.random() < PROFILO["mira"]):
+                and random.random() < self._prob("mira", "mira")):
             a.consuma_mira()
             critiche = [l for l in ("testa", "busto") if l in self.altro.hp]
-            a.mira = random.choice(critiche or list(self.altro.hp))
+            t = self._tat()
+            # dove mira il giocatore (se ha abitudini note), altrimenti sulle parti critiche
+            a.mira = (t.scegli_locazione(list(self.altro.hp)) if t else None) or random.choice(critiche or list(self.altro.hp))
             self.scriv(f"{a.nome} prende la mira su {a.mira}.")
             self.evento("mira", loc=a.mira)
             return
@@ -1317,7 +1357,7 @@ class DuelloWeb:
                            if s["def"].get("attivo", True) and not s["attivo"]
                            and a.puo_attivare_augment(s)
                            and (a.stamina or 0) >= (drain + s["def"].get("costo_stamina", 1)) * 2]
-            if sostenibili and random.random() < PROFILO["potere_subito"]:
+            if sostenibili and random.random() < self._prob("potere_subito", "potere"):
                 slot, azione = random.choice(sostenibili)
                 azione(a, slot)
                 return
@@ -1325,7 +1365,7 @@ class DuelloWeb:
             if scelto is not None:
                 self.usa_attacco(scelto)
                 return
-        if a.bonus > 0 and random.random() < PROFILO["stance"]:
+        if a.bonus > 0 and random.random() < self._prob("stance", "stance"):
             disponibili = [s for s in a.stance_conosciute
                            if all(x["def"]["id"] != s["id"] for x in a.stance_attive)
                            and a.puo_attivare_stance(s)]
@@ -1335,7 +1375,64 @@ class DuelloWeb:
         self.fine_turno()
 
     # ---------- API player ----------
+    # ---------- registro delle scelte del giocatore (v. tattiche.py) ----------
+    def _occasioni(self):
+        """Che cosa poteva fare il giocatore adesso (stesse condizioni che la CPU usa per scegliere)."""
+        a = self.p
+        return {"mira": a.puo_mirare() and (a.mira_bonus or a.azioni >= 2),
+                "potere": a.azioni >= 1 and (any(not s["attivo"] and a.puo_attivare_potere(s) for s in a.poteri)
+                                             or any(s["def"].get("attivo", True) and not s["attivo"]
+                                                    and a.puo_attivare_augment(s) for s in a.augments)),
+                "stance": a.bonus >= 1 and any(all(x["def"]["id"] != s["id"] for x in a.stance_attive)
+                                               and a.puo_attivare_stance(s) for s in a.stance_conosciute)}
+
+    def _pre_registro(self, dati):
+        """La decisione che il giocatore sta per prendere, con il suo contesto (prima che lo stato cambi);
+        None se non va registrata."""
+        if self.reg is None or self.finito:
+            return None
+        tipo, a, r = dati.get("tipo"), self.p, self.round
+        if tipo == "risposta" and self.fase == "risposta" and self.pending:
+            pend = self.pending
+            return {"k": "risposta", "r": r, "scelta": dati.get("scelta"), "opz": list(pend["opzioni"]),
+                    "t": tattiche.tipo_attacco(pend["att"]), "p": self.prob_difesa(self.p, pend)}
+        if self.fase != "player":
+            return None
+        occ = self._occasioni()
+        if tipo == "mira":
+            return {"k": "mira", "r": r, "occ": occ, "loc": dati.get("loc")}
+        if tipo == "attacco":
+            att = next((x for x in a.attacchi_visibili() if x["id"] == dati.get("id")), None)
+            if att is None:
+                return None
+            ev = {x["id"]: self.ev_attacco(x, a, self.cpu) for x in a.attacchi_giocabili()}
+            best = att["id"] in ev and ev[att["id"]] >= max(ev.values()) - 1e-9
+            return {"k": "attacco", "r": r, "occ": occ, "id": att["id"], "t": tattiche.tipo_attacco(att),
+                    "mirata": a.mira if att.get("can_aim") else None, "best": best}
+        if tipo in ("potere", "augment", "stance"):
+            return {"k": tipo, "r": r, "occ": occ, "id": dati.get("id")}
+        if tipo == "fine_turno":
+            return {"k": "fine_turno", "r": r, "occ": occ}
+        return None
+
     def azione_player(self, dati):
+        """Esegue un'azione del giocatore, registrandola se riesce; ritorna un messaggio d'errore o None."""
+        pre = self._pre_registro(dati)
+        err = self._azione_player(dati)
+        if pre is not None and err is None:
+            self.reg.azione(pre.pop("k"), pre.pop("r"), pre.pop("occ", None), **pre)
+        return err
+
+    def _tat(self):
+        """Il modello delle tattiche del giocatore, se questo duello ne usa uno (gioco vero, con dati a sufficienza)."""
+        return MODELLO if self.reg is not None and MODELLO.pronto else None
+
+    def _prob(self, chiave, tasso):
+        """Una manopola del profilo CPU, spostata verso le abitudini del giocatore (v. Modello.fondi)."""
+        t = self._tat()
+        return PROFILO[chiave] if t is None else t.fondi(PROFILO[chiave], tasso)
+
+    def _azione_player(self, dati):
         """Esegue un'azione del giocatore; ritorna un messaggio d'errore o None."""
         tipo = dati.get("tipo")
         if self.finito and tipo != "cpu_step":
@@ -1555,6 +1652,7 @@ class TorneoEvo:
             e = eroe_base(DB["attacchi"], DB["poteri"], DB["stances"], usati)
             usati.add(e.nome)
             e.armi_equip = []  # slot armi del torneo: vive sull'eroe, non su un record
+            e.aspetto = aspetto.genera(e.nome, [x.aspetto for x in self.eroi])   # 16 aspetti tutti diversi
             self.eroi.append(e)
         self.io = random.randrange(16)
         ordine = list(range(16))
@@ -1626,21 +1724,34 @@ class TorneoEvo:
         return pool
 
     def _evolvi_cpu(self, e, rango_nuovo):
-        """Le CPU vincitrici crescono come il giocatore, ma con scelte casuali."""
+        """Le CPU vincitrici crescono come il giocatore, a ogni round: +1 Controllo, un potere nuovo, un
+        upgrade di statistica e un oggetto di equipaggiamento. Scelgono tra le stesse offerte del
+        giocatore (2 statistiche, 3 oggetti): la statistica a caso, l'oggetto di maggior valore.
+        `e.upgrade_torneo` tiene la storia, per mostrarla."""
         e.stats["controllo"] = min(4, e.stats["controllo"] + 1)
         noti = {s["def"]["id"] for s in e.poteri}
         pool = [p for p in DB["poteri"] if p["id"] not in noti]
+        nuovi = []
         if pool and len(e.poteri) < MAX_POTERI:
-            e.poteri.append({"def": random.choice(pool),
-                             "rango": min(rango_nuovo, e.stats["controllo"]),
-                             "attivo": False})
+            pw = random.choice(pool)
+            e.poteri.append({"def": pw, "rango": min(rango_nuovo, e.stats["controllo"]), "attivo": False})
+            nuovi.append(f"potere {pw['nome']}")
         su = [s for s in self.STATS_POTENZIABILI if e.stats[s] < 4]
+        random.shuffle(su)
         if su:
-            e.stats[random.choice(su)] += 1
+            stat = random.choice(su[:2])
+            e.stats[stat] += 1
+            nuovi.append(f"+1 {stat}")
         pool_item = self._pool_item_validi(e)
-        if pool_item and random.random() < 0.5:  # come il giocatore, non sempre trova qualcosa
-            categoria, item = random.choice(pool_item)
+        random.shuffle(pool_item)
+        offerti = pool_item[:3]
+        if offerti:
+            categoria, item = max(offerti, key=lambda t: t[1].get("valore", 0))
             _applica_item_a(e, categoria, item)
+            nuovi.append(f"{categoria} {item['nome']}")
+        if not hasattr(e, "upgrade_torneo"):
+            e.upgrade_torneo = []
+        e.upgrade_torneo.append({"round": self.round, "novita": nuovi})
         self._cura_totale(e)
 
     # ---------- arena: le vincite si accumulano, si riscattano solo da campioni ----------
@@ -1788,6 +1899,8 @@ class TorneoEvo:
                      "augments": [s["def"]["nome"] for s in self.eroi[self.io].augments]},
             "avversario": (self.eroi[self.avversario_idx()].nome
                            if self.fase in ("pronto", "duello") and self.mio_match() else None),
+            "avversario_upgrade": (getattr(self.eroi[self.avversario_idx()], "upgrade_torneo", [])
+                                   if self.fase in ("pronto", "duello") and self.mio_match() else []),
             "scelte": ({"rango": self.scelte["rango"],
                         "poteri": [{"id": p["id"], "nome": p["nome"],
                                     "descrizione": p.get("descrizione", "")}
@@ -1830,12 +1943,33 @@ def forfeit_su_uscita():
         abbandona_duello()
 
 
+def _istantanea(p):
+    return {"nome": p.nome, "livello": getattr(p, "livello", 1), "valuta": valuta(p), "stats": dict(p.stats),
+            "poteri": [s["def"]["id"] for s in p.poteri]}
+
+
+def registra_incontro(d):
+    """Scrive su file l'incontro appena finito (le scelte del giocatore) e lo aggiunge al modello di
+    tattiche: da ora la CPU lo conosce. Nel harness (nessun registro) non fa nulla."""
+    if d.reg is None:
+        return
+
+    def frazione_hp(p):
+        return sum(max(0, p.hp[l]) for l in p.hp) / max(1, sum(p.hp_max.values()))
+    inc = d.reg.incontro(d.vincitore is d.p, d.round, _istantanea(d.p), _istantanea(d.cpu),
+                         frazione_hp(d.p), frazione_hp(d.cpu))
+    if inc is not None:
+        tattiche.salva_incontro(INCONTRI_FILE, inc)
+        MODELLO.aggiungi(inc)
+
+
 def chiudi_duello():
     """Applica al box i danni del duello, ricompense comprese. Idempotente."""
     d = DUELLO
     if d is None or d.chiuso or not d.finito:
         return
     d.chiuso = True
+    registra_incontro(d)
     if d.rec is None:  # duello di torneo: niente record del box da aggiornare
         return
     rec = d.rec
@@ -1906,6 +2040,12 @@ def index():
 @app.route("/sandbox")
 def sandbox():
     return render_template("sandbox.html")
+
+
+@app.route("/api/tattiche")
+def api_tattiche():
+    """Che cosa ha imparato la CPU dalle scelte del giocatore (v. tattiche.py)."""
+    return jsonify(MODELLO.sommario())
 
 
 @app.route("/torneo")

@@ -21,8 +21,12 @@
 </script>
 <script>
   const HPMAX = {testa: 80, busto: 120, braccio_sx: 100, braccio_dx: 100, gamba_sx: 100, gamba_dx: 100};
-  function pg(nome, hp = {}, crippled = []) {
-    const o = {nome, hp: {}};
+  /* l'aspetto (capelli, maglia, pantaloni, seed dei colori) come lo da il server (aspetto.py): qui a mano, per provare ogni
+     combinazione: pg("A", {}, [], {capelli: "f2", maglia: "tshirt", pantaloni: "lunghi", seed: 7}) */
+  const ASPETTO = {p: {sesso: "M", capelli: "m2", maglia: "tshirt", pantaloni: "lunghi", seed: 1234567},
+                   c: {sesso: "F", capelli: "f2", maglia: "lunga", pantaloni: "tre_quarti", seed: 98765432}};
+  function pg(nome, hp = {}, crippled = [], aspetto) {
+    const o = {nome, hp: {}, aspetto: aspetto || (nome === "Vera Greco" || nome === "Vera" ? ASPETTO.c : ASPETTO.p)};
     for (const [l, m] of Object.entries(HPMAX)) o.hp[l] = {val: hp[l] ?? m, max: m, protesi: false, crippled: crippled.includes(l)};
     return o;
   }

@@ -1725,6 +1725,201 @@ def overhaul(webapp):
     vinte = sum(tq._vince_cpu(0, 1) == 0 for _ in range(4000)) / 4000
     assert abs(vinte - atteso) < 0.03 and vinte > 0.7, (vinte, atteso)  # la logistica, non va/(va+vb)
 
+    # ---- torneo: ogni CPU vincitrice cresce come il giocatore (statistica + equipaggiamento garantiti) ----
+    random.seed(21)
+    tu = webapp.TorneoEvo()
+
+    def n_oggetti(x):
+        return len(x.armi_equip) + (1 if getattr(x, "armatura_equip_id", None) is not None else 0) + len(x.augments)
+    for e_cpu in [x for i, x in enumerate(tu.eroi) if i != tu.io][:6]:
+        stat0, ogg0 = sum(e_cpu.stats[s] for s in tu.STATS_POTENZIABILI), n_oggetti(e_cpu)
+        tu._evolvi_cpu(e_cpu, 2)
+        assert sum(e_cpu.stats[s] for s in tu.STATS_POTENZIABILI) == stat0 + 1, "un upgrade di statistica"
+        assert n_oggetti(e_cpu) == ogg0 + 1, "un oggetto di equipaggiamento, sempre"
+        assert e_cpu.upgrade_torneo[-1]["novita"], "la storia degli upgrade e' tenuta"
+    tu.fase = "duello"
+    tu.risolvi_duello(True)
+    vincitori_cpu = [m["win"] for m in tu.turni[0] if m["win"] != tu.io]
+    assert vincitori_cpu and all(n_oggetti(tu.eroi[i]) >= 1 and tu.eroi[i].upgrade_torneo for i in vincitori_cpu)
+    avv_i = tu.avversario_idx()
+    tu.fase = "pronto"
+    assert tu.stato()["avversario_upgrade"] == tu.eroi[avv_i].upgrade_torneo   # il giocatore vede cosa ha preso
+
+    # ---- tattiche: registro degli incontri e modello appreso (tattiche.py) ----
+    import tattiche as tt
+
+    def incontro(vittoria, azioni):
+        return {"vittoria": vittoria, "azioni": azioni}
+    occ_tutto = {"mira": 1, "potere": 1, "stance": 1}
+    # un giocatore che mira sempre, non accende mai poteri, schiva i colpi di mischia e usa sempre l'attacco migliore
+    giro = ([{"k": "mira", "occ": occ_tutto, "loc": "testa"}, {"k": "attacco", "occ": {"mira": 0, "potere": 1, "stance": 1}, "best": True},
+             {"k": "risposta", "t": "mischia", "scelta": "schivata", "opz": ["nessuna risposta", "parata", "schivata"]}] * 6)
+    vuoto = tt.Modello()
+    assert vuoto.sommario()["attivo"] is False and vuoto.sommario()["incontri"] == 0   # anche senza dati si puo' leggere
+    assert not vuoto.pronto and vuoto.fondi(0.5, "mira") == 0.5 and vuoto.moltiplicatore_attacco({}) == 1.0
+    assert vuoto.scegli_risposta("mischia", ["nessuna risposta", "schivata"]) is None   # senza dati: neutro
+    due = tt.Modello([incontro(True, giro)] * (tt.MIN_INCONTRI - 1))
+    assert due.fondi(0.5, "mira") == 0.5                       # sotto soglia non influenza
+    mod = tt.Modello([incontro(True, giro)] * 8 + [incontro(False, giro)] * 2)
+    assert mod.pronto and mod.tasso("mira")[0] == 1.0 and mod.tasso("potere")[0] == 0.0
+    assert mod.fondi(0.2, "mira") > 0.2 and mod.fondi(0.9, "potere") < 0.9       # scivola verso il giocatore...
+    assert mod.fondi(0.2, "mira") <= 0.2 * (1 - tt.FIDUCIA_MAX) + tt.FIDUCIA_MAX + 1e-9   # ...ma mai oltre il tetto
+    assert mod.tendenza("mischia", "schivata") == 1.0 and mod.tendenza("mischia", "parata") == 0.0
+    # contro chi schiva sempre, un attacco non schivabile vale di piu'; uno schivabile no
+    assert mod.moltiplicatore_attacco({"can_dodge": False}) > 1.0 and mod.moltiplicatore_attacco({"can_dodge": True}) == 1.0
+    # ...e contro chi non para mai, un colpo non parabile non ha vantaggio
+    assert mod.moltiplicatore_attacco({"ranged": True, "can_dodge": True}) == 1.0
+    rng = random.Random(3)
+    copie = [mod.scegli_risposta("mischia", ["nessuna risposta", "parata", "schivata"], rng) for _ in range(400)]
+    assert set(copie) <= {None, "schivata"} and "schivata" in copie and None in copie   # copia, ma non sempre
+    locs = [mod.scegli_locazione(list(LOCAZIONI), rng) for _ in range(400)]
+    assert set(locs) <= {None, "testa"} and "testa" in locs
+    assert mod.sommario()["tassi"]["mira"]["frequenza"] == 1.0 and mod.sommario()["mira"] == {"testa": 1.0}
+    # un incontro vinto pesa piu' di uno perso
+    misto = tt.Modello([incontro(True, [{"k": "mira", "occ": occ_tutto}] * 4)] * 3
+                       + [incontro(False, [{"k": "attacco", "occ": occ_tutto}] * 4)] * 3)
+    assert 0.5 < misto.tasso("mira")[0] < 1.0
+    # registro: pochi gesti = incontro non registrato; su file l'incontro si rilegge identico (righe rotte ignorate)
+    reg = tt.Registratore("duello")
+    reg.azione("mira", 1, occ_tutto, loc="testa")
+    assert reg.incontro(True, 1, {}, {}, 1.0, 0.0) is None
+    for _ in range(tt.MIN_AZIONI):
+        reg.azione("fine_turno", 2, occ_tutto)
+    inc = reg.incontro(True, 2, {"nome": "A"}, {"nome": "B"}, 0.8, 0.0)
+    assert inc and inc["vittoria"] and len(inc["azioni"]) == tt.MIN_AZIONI + 1
+    percorso = os.path.join(_SAVE_TMP, "prova_incontri.jsonl")
+    tt.salva_incontro(percorso, inc)
+    with open(percorso, "a", encoding="utf-8") as f:
+        f.write("{riga rotta\n")
+    tt.salva_incontro(percorso, inc)
+    assert tt.carica_incontri(percorso) == [inc, inc]
+
+    # integrazione: le azioni del giocatore finiscono nell'incontro registrato, e la CPU lo impara
+    _modello, _file, _salva3 = webapp.MODELLO, webapp.INCONTRI_FILE, webapp.salva_stato
+    webapp.MODELLO = tt.Modello()
+    webapp.INCONTRI_FILE = os.path.join(_SAVE_TMP, "incontri_prova.jsonl")
+    webapp.salva_stato = lambda: None
+    try:
+        rec_t = {"id": 997, "nome": "Cavia", "stats": {s: 1 for s in ("fisico", "riflessi", "mente", "sociale", "controllo")},
+                 "skills": {}, "poteri": [], "hp": dict(LOCAZIONI), "crippled": [], "livello": 1, "xp": 0, "token": 0,
+                 "toughness": 0, "equip": [], "vittorie": 0, "sconfitte": 0, "morto": False}
+        for k in range(tt.MIN_INCONTRI):
+            random.seed(100 + k)
+            dt = webapp.DuelloWeb(dict(rec_t))
+            assert dt.reg is not None and dt.reg.modo == "duello"
+            for _ in range(200):
+                if dt.finito:
+                    break
+                if dt.fase == "cpu":
+                    dt.azione_player({"tipo": "cpu_step"})
+                elif dt.fase == "risposta":
+                    assert dt.azione_player({"tipo": "risposta", "scelta": dt.pending["opzioni"][-1]}) is None
+                elif dt.fase == "player":
+                    if dt.p.puo_mirare() and dt.p.azioni >= 2 and not dt.p.mira:
+                        assert dt.azione_player({"tipo": "mira", "loc": "testa"}) is None
+                    scelta = next((x for x in dt.p.attacchi_giocabili()), None)
+                    if scelta and dt.azione_player({"tipo": "attacco", "id": scelta["id"]}) is None:
+                        continue
+                    assert dt.azione_player({"tipo": "fine_turno"}) is None
+            assert dt.azione_player({"tipo": "attacco", "id": -1}) is not None or dt.finito   # un'azione fallita non si registra
+            tipi = {a["k"] for a in dt.reg.azioni}
+            assert "attacco" in tipi and "fine_turno" in tipi, tipi
+            assert all("occ" in a for a in dt.reg.azioni if a["k"] in ("attacco", "fine_turno", "mira"))
+            assert all(a["scelta"] in a["opz"] for a in dt.reg.azioni if a["k"] == "risposta")
+            if not dt.finito:
+                dt.finito, dt.vincitore, dt.fase = True, dt.cpu, "fine"
+            webapp.DUELLO = dt
+            webapp.chiudi_duello()
+        assert len(tt.carica_incontri(webapp.INCONTRI_FILE)) == tt.MIN_INCONTRI and webapp.MODELLO.pronto
+        # da questo momento la CPU di un duello vero usa il modello (e il harness, senza registro, no)
+        d_m = webapp.DuelloWeb(dict(rec_t))
+        assert d_m._tat() is webapp.MODELLO
+        d_h = webapp.DuelloWeb(pg=webapp.eroe_livello(1), avversario=webapp.eroe_livello(1))
+        assert d_h.reg is None and d_h._tat() is None
+        for _ in range(60):   # e il duello contro il modello gira fino in fondo, senza errori
+            if d_m.finito:
+                break
+            if d_m.fase == "cpu":
+                d_m.cpu_step()
+            elif d_m.fase == "risposta":
+                d_m.risolvi_risposta(d_m.pending["opzioni"][0])
+            else:
+                d_m.fine_turno()
+    finally:
+        webapp.MODELLO, webapp.INCONTRI_FILE, webapp.salva_stato = _modello, _file, _salva3
+        webapp.DUELLO = None
+
+    # ---- aspetto: capelli, maglia, pantaloni e seed dei colori, uno diverso per ognuno (aspetto.py) ----
+    import aspetto as asp
+    man_asp = asp.manifesto()
+    tag = {c["id"]: c["sesso"] for c in man_asp["capelli"]}
+    assert len(tag) == 16 and sorted(set(tag.values())) == ["F", "M"] and list(tag.values()).count("M") == 8
+    assert asp.sesso_da_nome("Vera Greco") == "F" and asp.sesso_da_nome("Elia Nakamura") == "M"
+    assert asp.sesso_da_nome("") == "M" and asp.sesso_da_nome(None) == "M"
+    # i capelli rispettano il tag di sesso (e le capigliature unisex vanno bene a entrambi)
+    assert all(tag[asp.genera("Vera Greco")["capelli"]] == "F" for _ in range(60))
+    assert all(tag[asp.genera("Marco Kade")["capelli"]] == "M" for _ in range(60))
+    assert set(asp.capelli_ammessi("M")) == {i for i, t in tag.items() if t in ("M", "unisex")}
+    # 16 personaggi di fila: nessuna combinazione ripetuta, tutti validi, seed tutti diversi
+    random.seed(5)
+    visti = []
+    for k in range(16):
+        a = asp.genera("Mira Costa" if k % 2 else "Teo Costa", visti)
+        assert asp.valido(a), a
+        visti.append(a)
+    assert len({asp.combinazione(a) for a in visti}) == 16 and len({a["seed"] for a in visti}) == 16
+    assert not asp.valido(None) and not asp.valido({"sesso": "M"}) and not asp.valido(dict(visti[0], capelli="zz"))
+    # ...e con piu' personaggi delle combinazioni possibili non si blocca (i seed restano diversi)
+    tutte = []
+    for _ in range(80):
+        tutte.append(asp.genera("Teo Costa", tutte))
+    assert len({a["seed"] for a in tutte}) == 80
+    # box: i record nuovi hanno un aspetto, diverso da quelli gia' nel box; i contratti idem
+    _salva4, _pers, _contr = webapp.salva_stato, webapp.STATO["personaggi"], webapp.STATO.get("contratti")
+    webapp.salva_stato = lambda: None
+    try:
+        random.seed(11)
+        webapp.STATO["personaggi"] = []
+        webapp.genera_contratti()
+        pool = webapp.STATO["contratti"]
+        assert len(pool) == webapp.N_CONTRATTI and all(asp.valido(c["aspetto"]) for c in pool)
+        assert len({asp.combinazione(c["aspetto"]) for c in pool}) == len(pool)
+        assert all(tag[c["aspetto"]["capelli"]] == asp.sesso_da_nome(c["nome"]) for c in pool)
+        # vecchi salvataggi: chi non ha un aspetto lo riceve, senza toccare chi ce l'ha gia'; poi non cambia piu'
+        vecchio = [dict(c) for c in pool]
+        for c in vecchio:
+            c.pop("aspetto")
+        tenuto = dict(pool[0]["aspetto"])
+        vecchio[0]["aspetto"] = tenuto
+        st_v = {"personaggi": vecchio[:2], "contratti": vecchio[2:]}
+        assert webapp.assegna_aspetti(st_v) is True
+        assert st_v["personaggi"][0]["aspetto"] == tenuto
+        assert all(asp.valido(c["aspetto"]) for c in vecchio) and len({asp.combinazione(c["aspetto"]) for c in vecchio}) == 3
+        assert webapp.assegna_aspetti(st_v) is False
+    finally:
+        webapp.salva_stato = _salva4
+        webapp.STATO["personaggi"] = _pers
+        if _contr is None:
+            webapp.STATO.pop("contratti", None)
+        else:
+            webapp.STATO["contratti"] = _contr
+    # nel duello: il giocatore porta il suo aspetto, la CPU ne ha uno diverso, e il client lo riceve nello stato
+    rec_a = {"id": 996, "nome": "Mira Aspetto", "stats": {s: 1 for s in ("fisico", "riflessi", "mente", "sociale", "controllo")},
+             "skills": {}, "poteri": [], "hp": dict(LOCAZIONI), "crippled": [], "livello": 1, "xp": 0, "token": 0,
+             "toughness": 0, "equip": [], "vittorie": 0, "sconfitte": 0, "morto": False,
+             "aspetto": {"sesso": "F", "capelli": "f4", "maglia": "lunga", "pantaloni": "corti", "seed": 424242}}
+    d_asp = webapp.DuelloWeb(dict(rec_a))
+    assert d_asp.p.aspetto == rec_a["aspetto"] and asp.valido(d_asp.cpu.aspetto)
+    assert asp.combinazione(d_asp.cpu.aspetto) != asp.combinazione(d_asp.p.aspetto) and d_asp.cpu.aspetto["seed"] != 424242
+    stato_asp = d_asp.stato()
+    assert stato_asp["player"]["aspetto"] == rec_a["aspetto"] and stato_asp["cpu"]["aspetto"] == d_asp.cpu.aspetto
+    assert asp.valido(webapp.record_to_pg(dict(rec_a, aspetto=None)).aspetto)   # un record senza aspetto non rompe il duello
+    # torneo: 16 eroi, tutti con un aspetto valido e una combinazione diversa; il campione se lo porta nel box
+    tasp = webapp.TorneoEvo()
+    assert len({asp.combinazione(e.aspetto) for e in tasp.eroi}) == 16
+    assert all(asp.valido(e.aspetto) and tag[e.aspetto["capelli"]] == asp.sesso_da_nome(e.nome) for e in tasp.eroi)
+    assert webapp.nuovo_record(tasp.eroi[0])["aspetto"] == tasp.eroi[0].aspetto
+
 
 if __name__ == "__main__":
     main()

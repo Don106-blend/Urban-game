@@ -13,6 +13,7 @@ qualsiasi cosa**: serve a restare coerenti con il corpo base maschile (`maschio`
 |---|---|
 | Sorgente degli sprite (codice pxl, skill `pxl-pixel-art`) | `tools/sprites/maschio_base.px.js` |
 | PNG finali dei pezzi + manifest | `static/sprites/maschio/*.png`, `static/sprites/maschio/parti.json` |
+| Capelli, maglie, pantaloni e texture dei colori (sorgente, manifest, assegnazione) | `tools/sprites/maschio_aspetto.px.js`, `static/sprites/maschio/aspetto.json`, `aspetto.py` (sez. 13) |
 | Interno (scheletro, viscere, muscolo) sotto la pelle | `static/sprites/maschio/scheletro_*.png`, `carne_*.png` (sorgente: fondo di `maschio_base.px.js`, v. sez. 11) |
 | Anteprima (grigio + due ricolorazioni) | `tools/sprites/anteprima_maschio.png` |
 | Disegno nel duello (canvas), sangue, ricolorazione, scambi, effetti | `static/arena.js` |
@@ -24,10 +25,13 @@ qualsiasi cosa**: serve a restare coerenti con il corpo base maschile (`maschio`
 Rigenerare i PNG (da `tools/sprites/`, `PXL` = `node <skill pxl>/bin/pxl.js`):
 
 ```
-PXL build tools/sprites/maschio_base.px.js --out <cartella temporanea>
+PXL build tools/sprites/maschio_aspetto.px.js --out <cartella temporanea>
 ```
 
-poi copiare `<out>/sprites/*.png` in `static/sprites/maschio/` (ci sono anche `scheletro_*` e `carne_*`). La scena `assemblato` (48x111) e lo sheet
+(`maschio_aspetto.px.js` include il corpo base: un solo build rigenera TUTTO, pelle, interno, capelli, vestiti e texture; con
+`maschio_base.px.js` da solo si ottiene soltanto il corpo e l'interno.)
+
+poi copiare `<out>/sprites/*.png` in `static/sprites/maschio/` (ci sono anche `scheletro_*`, `carne_*`, `capelli_*`, `maglia_*`, `pantaloni_*`, `colori_*`). La scena `assemblato` (48x111) e lo sheet
 `parti` servono a controllare a occhio: ingrandirli senza griglia (Pillow, `Image.NEAREST`, x4-x6) prima di
 giudicare. Non usare lo `_preview` di pxl per giudicare le proporzioni: la griglia inganna.
 
@@ -155,6 +159,8 @@ poteri/oggetti; ogni personaggio e' generato proceduralmente cambiando colori e 
 6. Dichiarare overlay e offset nel manifest (nuova chiave per pezzo, es. `overlay`), non nel codice.
 7. Le locazioni sono le 6 del gioco: sangue, flash, knockback e arto "storpiato" lavorano per **locazione**,
    quindi un overlay su `avambraccio_dx` appartiene alla locazione `braccio_dx`.
+
+(Gli overlay di capelli e vestiti sono la sez. 13: seguono queste regole.)
 
 ## 9. Sangue (generato, non disegnato)
 
@@ -289,5 +295,94 @@ si scende, piu' si strappa anche la carne e restano le ossa:
 - Mettere una coppia di "raddrizzamento" sul bacino mentre i piedi sono a terra: litiga con le anche (limit cycle).
 - Far reggere tutto il peso alle gambe con un appoggio di 12 px: oscilla da un piede all'altro. Serve la molla di sostegno.
 - Aspettarsi che un piede poco carico regga una spinta orizzontale forte: scivola. La spinta e' limitata dall'attrito.
+- Capelli: contorno nero sull'attaccatura (sembra un berretto); capelli lunghi che coprono il collo; scordare `{ palette: true }` nell'`include` del file base.
+- Vestiti: ritoccare un PNG in modo che esca dalla sagoma della pelle (la maschera di strappo e' definita sui pixel della pelle).
 - Interno: ritoccare i PNG a mano invece del sorgente; disegnare ossa che escono dalla sagoma della pelle (nel sorgente si ritagliano da sole).
 - Dare agli arti storpi solo "muscoli spenti": un avambraccio in equilibrio instabile ci mette secondi a cadere.
+
+## 13. Aspetto: capelli, vestiti e colori (`maschio_aspetto.px.js`, `aspetto.json`, `aspetto.py`)
+
+Ogni personaggio ha un **aspetto**: `{"sesso", "capelli", "maglia", "pantaloni", "seed"}`. Capelli, maglia e pantaloni sono overlay
+(sez. 8) **a indici** come il corpo (k contorno, a ombra, b base, c luce, d riflesso): il colore non e' nei PNG ma si ricava a runtime
+dal `seed`, campionando due texture. Tutto e' dichiarato in `static/sprites/maschio/aspetto.json` (letto sia da `arena.js` sia dal
+server, `aspetto.py`): per aggiungere una capigliatura o un indumento si disegna, si dichiara nel manifest e basta.
+
+**Ordine dei livelli, per pezzo** (dal basso): scheletro -> carne -> pelle (con sangue) -> **pantaloni -> maglia** -> (sulla testa) **capelli**.
+Gli indumenti stanno sopra il corpo e le ferite; il braccio vicino resta sopra i capelli (z del corpo).
+
+### Capigliature (16)
+- `capelli_<id>.png`, tela **32 x 50**; `offset` `[-10, -10]` = dove sta l'angolo alto-sinistro del PNG rispetto a quello di `testa.png`
+  (cioe' la testa e' a (10, 10) nella tela: spazio per ciuffi, chignon, code e capelli lunghi sulla schiena). Il bordo della tela resta vuoto.
+- Tag di **sesso** nel manifest: `"M"`, `"F"` o `"unisex"` (valida per entrambi, `aspetto.capelli_ammessi`). Oggi 8 M e 8 F, nessuna unisex.
+
+| id | nome | sesso | note |
+|---|---|---|---|
+| m1 | Rasato | M | aderente al cranio |
+| m2 | Corto | M | un po' di volume, ciocche verso la nuca |
+| m3 | Spazzola | M | cima piatta, ai lati cortissimo |
+| m4 | Ciuffo | M | la cresta sporge sulla fronte |
+| m5 | Mohicano | M | cresta centrale a punte, ai lati rasato |
+| m6 | Pettinato | M | ciuffo laterale, copre l'orecchio |
+| m7 | Ricci | M | nuvola di ricci attorno alla testa |
+| m8 | Chignon alto | M | raccolti in alto dietro, con il laccio |
+| f1 | Caschetto | F | alla mascella |
+| f2 | Lunghi lisci | F | sulla schiena fino a meta' busto |
+| f3 | Coda alta | F | la coda scende dietro la testa |
+| f4 | Treccia | F | treccia segmentata lungo la schiena |
+| f5 | Chignon basso | F | crocchia sulla nuca |
+| f6 | Frangia e lunghi | F | frangia piena, lunghi a scalare |
+| f7 | Ricci lunghi | F | volume e cascata di ricci |
+| f8 | Pixie | F | corto, ciuffo lungo sulla fronte |
+
+- Come sono fatti (sorgente): `bande([[y, x_dietro, x_davanti], ...])` = profilo a righe interpolato (come il busto), `disco`, `tubo` (code,
+  trecce, chignon), poi luce (`toon`), **fili** (ciocche, linee `a`) e **rifl** (riflessi `d`) a mano. Coordinate nel **sistema della testa**
+  (x verso il viso, y in basso, 0,0 = angolo di `testa.png`, valori negativi = fuori dalla testa).
+- **Attaccatura** (`ATT`): dove i capelli lasciano il viso, riga per riga (diagonale dalla fronte alla nuca). Il **contorno scuro `k` solo
+  fuori dalla testa**: sull'attaccatura, contro la pelle, i capelli hanno solo il tono `a` (un contorno nero sulla fronte fa sembrare un berretto).
+- I capelli lunghi tengono x <= 4 all'altezza del collo (righe 15+), altrimenti coprono il collo.
+- A testa in negativo (cranio spaccato) i capelli si strappano come la pelle.
+
+### Maglie e pantaloni (3 + 3)
+- Un overlay **per pezzo base** (`busto_sup`, `busto_inf`, `braccio_sup`, `avambraccio`, `coscia`, `stinco`): **stesso canvas e stessa sagoma** del pezzo di
+  pelle (il test lo controlla: i pixel dell'indumento sono un sottoinsieme della pelle). Si ricavano dal pezzo (stessa luce, stessi toni),
+  tagliati all'orlo (`fino(riga)`: taglia, contorno `k` sul bordo nuovo, ombra `a` sopra) e con i dettagli del tessuto. Il lato lontano (`_sx`)
+  usa lo stesso PNG, **un gradino piu' scuro a runtime** (`FAR` in `arena.js`).
+
+| tipo | pezzi | dove finisce | dettagli |
+|---|---|---|---|
+| maglia **canottiera** | busto_sup, busto_inf | spalline, scollatura davanti; orlo alla riga 13 del busto basso | pieghe sul petto |
+| maglia **t-shirt** | + braccio_sup | manica alla riga 12 del braccio | colletto |
+| maglia **lunga** | + braccio_sup, avambraccio | polsino alla riga 12 dell'avambraccio (mani scoperte) | piega al gomito |
+| pantaloni **corti** | busto_inf (da riga 10), coscia | orlo alla riga 16 della coscia | risvolto, piega del ginocchio |
+| pantaloni **tre quarti** | + stinco | orlo alla riga 12 dello stinco | tasca sulla coscia |
+| pantaloni **lunghi** | + stinco | orlo alla riga 24 dello stinco (piede scoperto) | cucitura a punti |
+
+### Strappi con i danni
+`arena.js: disegnaVestiti`. Per un pezzo, `f = (1 - hp/hp_max) / 0.85` limitato a 0..1 (hp della sua **locazione**, come per il sangue):
+**a 15% degli hp l'indumento di quella locazione e' tutto strappato** (f = 1). I pixel strappati sono quelli con rango minore (stessa
+maschera a ranghi della sez. 11, `rango(lato, nome, 2)`: la quota strappata e' esattamente `f`, e cresce dai punti di ferita); sotto
+si vede quello che c'e': pelle con il sangue, poi (in negativo) carne e ossa. I pixel che restano sul bordo di uno strappo scendono di un
+gradino di tono (`SCURO`), e sugli stracci compare sangue (soglia `0.85 f`). Le protesi non si strappano.
+
+### Texture dei colori (il seed sceglie i colori)
+- `colori_vestiti.png` (151 x 4): **20 sezioni di colore di larghezza irregolare**. Piu' larga = piu' comune (jeans 22, nero 16, grigio 14 ...); la
+  piu' stretta, e rara, e' il **bianco** (2 px, circa l'1,3%). Dentro ogni sezione il colore scorre da un po' piu' scuro a un po' piu' chiaro,
+  fra due sezioni c'e' una sfumatura di 2 px (e' un *gradiente* a sezioni, non colori piatti).
+- `colori_capelli.png` (128 x 4): gradiente continuo di colori **naturali** (nero, castani, rame, biondi, platino, grigio, bianco); le tinte
+  comuni occupano molto spazio, le rare (rosso, platino, grigio) poco.
+- Campionamento (`arena.js: coloriAspetto`): `u = hash(seed, tag)` -> colonna `u * larghezza`, riga 1. Tag diversi per capelli (con un +-6% di
+  luminosita' in piu', cosi' non sono mai identici), maglia e pantaloni; se maglia e pantaloni escono troppo simili (distanza < 55) i pantaloni
+  si ricampionano. Il **seed e' l'unica cosa salvata**: ritoccare una texture cambia i colori di tutti coerentemente.
+- Da un colore a una rampa (`rampa`): base `b` (limitata a luminosita' 0,15-0,86: ne' nero ne' bianco puri), `a` = 30% verso il nero, `k` =
+  62% verso il nero, `c` = 20% verso il bianco, `d` = 42% verso il bianco. Stessi cinque indici del corpo.
+- Per cambiare i colori: `SEZIONI` e `STOP` nel sorgente, rigenerare, nessun codice da toccare.
+
+### Chi ha quale aspetto (`aspetto.py`, `app.py`)
+- `genera(nome, usati)`: sesso dal nome proprio (`sesso_da_nome`: i personaggi non hanno un campo sesso; `NOMI_FEMMINILI`), capelli adatti al
+  sesso, maglia e pantaloni a caso, seed a 32 bit. Cerca una combinazione (capelli, maglia, pantaloni) **non gia' in uso**: ogni personaggio e' unico.
+- Dove: i **record del box** (`nuovo_record`, salvato nel record), i **contratti** (diversi dal box e tra loro), i **salvataggi vecchi** (migrazione
+  `assegna_aspetti` all'avvio, una volta sola), la **CPU** di ogni duello (`cpu_bilanciata`, diversa dal giocatore), i **16 eroi del torneo**
+  (tutti diversi; il campione se lo porta nel box). Il client lo riceve in `pannello()` -> `player.aspetto` / `cpu.aspetto`.
+- Il corpo e' ancora solo il maschile: i capelli F stanno sulla stessa testa. Un futuro corpo femminile cambiera' le forme ma i capelli
+  restano compatibili se tengono la stessa testa (nomi dei pezzi, giunti, riga di taglio).
+- Prova nel laboratorio (`tools/lab/arena.html`): `pg("A", {busto: 40}, [], {capelli: "f2", maglia: "lunga", pantaloni: "corti", seed: 7})`.
