@@ -561,6 +561,14 @@ def main():
     righe_st = pst.tick_turno()
     assert not pw["attivo"]
     assert any("esausto" in r for r in righe_st)
+    # nessun potere attivo: +1 stamina a turno, fino al massimo
+    pst.stamina = 0
+    righe_rig = pst.tick_turno()
+    assert pst.stamina == 1 and any("+1" in r for r in righe_rig)
+    pst.tick_turno()
+    assert pst.stamina == 2
+    pst.stamina = pst.stamina_max()
+    assert pst.tick_turno() == [] and pst.stamina == pst.stamina_max()
 
     # disattiva_potere: annulla ciò che il potere aveva concesso
     pdis = Personaggio("Disattiva")
@@ -1177,6 +1185,10 @@ def main():
         danno_subito = hp_tot_prima - sum(dm.hp.values())
         assert danno_subito == danno_atteso, danno_subito
         assert dm.risposte == 0
+        # la schivata non si tira: il primo colpo e' "schivato" senza tiro di difesa, anche se
+        # l'attaccante tira altissimo
+        ev_schiva = next(e for e in d_multi.eventi if e["tipo"] == "colpo")
+        assert ev_schiva["esito"] == "schivato" and ev_schiva["tiro_dif"] is None
     finally:
         _eng_engine.Personaggio.tira = _tira_orig
 
@@ -1564,9 +1576,12 @@ def overhaul(webapp):
     # tiro d'attacco bassissimo: i riflessi reggono da soli, la risposta non si spreca
     scelte = [dia.scegli_difesa(ia_d, pend_di(1, 2))[0] for _ in range(200)]
     assert scelte.count("nessuna risposta") > 170
-    # tiro altissimo e nessun altro colpo in arrivo: la risposta e' gratis, si usa (parata)
+    # tiro altissimo e nessun altro colpo in arrivo: la risposta e' gratis, si usa (la schivata riesce sempre)
     scelte = [dia.scegli_difesa(ia_d, pend_di(14, 0))[0] for _ in range(200)]
-    assert scelte.count("parata") > 150
+    assert scelte.count("schivata") > 150
+    # la schivata e' certa al 100% (anche per il giocatore) e azzera la probabilita' di colpire
+    assert dia.prob_difesa(ia_d, pend_di(20, 0))["schivata"] == 1.0
+    assert dia.p_colpire_stimata(att_p, ia_a, ia_d) == 0.0 or not att_p.get("can_dodge")
     # la parata sposta il colpo sull'arto piu' sano, mai su testa/busto se ci sono arti buoni
     sc, loc_par = dia.scegli_difesa(ia_d, pend_di(14, 0, loc="testa"))
     if sc == "parata":

@@ -1043,6 +1043,8 @@ class DuelloWeb:
                  "schivata": d.bonus_tiro("acrobatica", a) + mg}
 
         def regge(opz, t_att):
+            if opz == "schivata":
+                return 1.0   # la schivata riesce sempre (v. risolvi_risposta)
             t = t_att - b_dif[opz] - pen   # serve d10 >= t
             return min(1.0, max(0.0, (DADO_BASE + 1 - t) / DADO_BASE))
 
@@ -1081,7 +1083,7 @@ class DuelloWeb:
 
     NOTE_DIFESA = {"nessuna risposta": "i tuoi riflessi, gratis: se falliscono il colpo ti prende",
                    "parata": "se fallisce il danno si dimezza e scegli dove incassarlo",
-                   "schivata": "se riesce nega tutto, se fallisce il colpo ti prende pieno"}
+                   "schivata": "riesce sempre: nega tutto il colpo (costa la risposta del round)"}
 
     def prob_difesa(self, d, pend):
         """P(il difensore regge) per ogni risposta disponibile contro il colpo in sospeso: il tiro
@@ -1092,7 +1094,8 @@ class DuelloWeb:
         base = {"nessuna risposta": d.bonus_tiro("riflessi", a),
                 "parata": d.bonus_tiro("armi_corpo_a_corpo", a),
                 "schivata": d.bonus_tiro("acrobatica", a) + d.malus_gambe()}
-        return {opz: round(min(1.0, max(0.0, (DADO_BASE + 1 - (ta - base[opz] - pen)) / DADO_BASE)), 2)
+        return {opz: 1.0 if opz == "schivata" else
+                round(min(1.0, max(0.0, (DADO_BASE + 1 - (ta - base[opz] - pen)) / DADO_BASE)), 2)
                 for opz in pend["opzioni"]}
 
     def p_colpire_stimata(self, att, a, d):
@@ -1104,7 +1107,7 @@ class DuelloWeb:
             if (not att.get("ranged") and att.get("parabile", True)) or d.ha_flag("parata_sempre"):
                 difese.append(d.bonus_tiro("armi_corpo_a_corpo", a))
             if att.get("can_dodge") and d.puo_schivare():
-                difese.append(d.bonus_tiro("acrobatica", a) + d.malus_gambe())
+                return 0.0   # la schivata riesce sempre: contro la migliore difesa non si colpisce
         k = (a.bonus_tiro(self._skill_attacco(att), d) + bonus_colpire(a, d)
              - max(difese) - pen)
         return round(prob_supera(k), 2)
@@ -1185,14 +1188,11 @@ class DuelloWeb:
                 self.scriv(f"{d.nome} para il colpo!", "miss")
         elif scelta == "schivata":
             d.risposte -= 1
-            mg = d.malus_gambe()
-            td = d.tira("acrobatica", a) + pen_mira + mg
-            self.scriv(f"{d.nome} tenta la schivata: {td} (acrobatica"
-                       + (f" +{pen_mira} mira" if pen_mira else "")
-                       + (f" {mg} gambe ferite" if mg else "") + f") contro {ta}.")
-            colpito = td < ta
-            if not colpito:
-                self.scriv(f"{d.nome} schiva!", "miss")
+            # la schivata riesce SEMPRE e non si tira: il costo e' la risposta del round, e la offrono
+            # solo gli attacchi schivabili e chi ha le gambe sane (v. puo_schivare)
+            td = None
+            colpito = False
+            self.scriv(f"{d.nome} schiva!", "miss")
         else:
             td = d.tira("riflessi", a) + pen_mira
             self.scriv(f"{d.nome} regge sui riflessi: {td} (riflessi"

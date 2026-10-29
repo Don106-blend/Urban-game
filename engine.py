@@ -523,6 +523,10 @@ class Personaggio:
                  [(s, False) for s in self.augments
                   if s["attivo"] and s["def"].get("attivo", True)]
         if not attivi:
+            # nessun potere attivo: si recupera 1 di stamina a turno
+            if self.stamina < self.stamina_max():
+                self.stamina += 1
+                return [f"Stamina: +1 ({self.stamina}/{self.stamina_max()})."]
             return []
         righe = []
         drain = sum(self._costo_stamina(s, ep) for s, ep in attivi)

@@ -212,7 +212,9 @@ function cartaColpo(ev) {
   const bersaglio = ev.split ? "tutto il corpo" : nomeLoc(ev.loc_att);
   const sottoAtt = esc((ev.skill_att || "").replace(/_/g, " ")) +
     (ev.mod_att ? ` ${ev.mod_att > 0 ? "+" : ""}${ev.mod_att} stance` : "");
-  const sottoDif = esc(ev.skill_dif) + (ev.pen_mira ? ` +${ev.pen_mira} mira` : "");
+  // la schivata non si tira: riesce sempre (tiro_dif nullo)
+  const schiva = ev.risposta === "schivata";
+  const sottoDif = schiva ? "riesce sempre" : esc(ev.skill_dif) + (ev.pen_mira ? ` +${ev.pen_mira} mira` : "");
   const colpita = ev.esito === "colpito";
   let danno = "";
   if (colpita) {
@@ -236,7 +238,7 @@ function cartaColpo(ev) {
     <div class="dadi">
       ${dado("ATTACCO", ev.tiro_att, sottoAtt, colpita ? "vince" : "")}
       <div class="dadi-vs">VS</div>
-      ${dado(esc(RISPOSTA_NOME[ev.risposta] || "Difesa").toUpperCase(), ev.tiro_dif, sottoDif, colpita ? "" : "vince")}
+      ${dado(esc(RISPOSTA_NOME[ev.risposta] || "Difesa").toUpperCase(), schiva ? "✓" : ev.tiro_dif, sottoDif, colpita ? "" : "vince")}
     </div>
     <div class="esito-colpo e-${esitoCl}">${esitoTesto}${ev.mitigato ? " · ATTUTITO" : ""}</div>
     ${danno}${eff}${dett}`;
@@ -281,7 +283,7 @@ function rigaCronaca(ev) {
       const res = ev.esito === "colpito"
         ? `<span class="c-hit">${ev.hp_persi > 0 ? "−" + ev.hp_persi + " HP" : "0 danni"}</span> a ${ev.split ? "tutto il corpo" : nomeLoc(ev.loc)}`
         : `<span class="c-miss">${et.toLowerCase()}</span>`;
-      t = `⚔ ${n} · ${esc(ev.info.nome)} <span class="muted">${ev.tiro_att} vs ${ev.tiro_dif}</span> → ${res}`;
+      t = `⚔ ${n} · ${esc(ev.info.nome)} <span class="muted">${ev.tiro_att} vs ${ev.tiro_dif ?? "✓"}</span> → ${res}`;
       break;
     }
     case "inizio": t = `⚑ Iniziativa: parte ${esc(ev.primo)}`; break;
