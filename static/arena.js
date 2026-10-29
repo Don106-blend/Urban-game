@@ -70,10 +70,15 @@ const Arena = (() => {
   function posa(L, pt) {
     for (const [nome, p] of Object.entries(man.parti)) {
       const A = pt[p.da], B = pt[p.a], A0 = man.giunti[p.da], B0 = man.giunti[p.a];
-      const th = Math.atan2(B.y - A.y, B.x - A.x) - Math.atan2(B0[1] - A0[1], B0[0] - A0[0]);
-      // posizioni intere e rotazione nulla quando e' trascurabile: i pixel restano nitidi a riposo
-      L.el[nome].style.transform =
-        `translate(${Math.round(A.x)}px,${Math.round(A.y)}px) rotate(${Math.abs(th) < 0.03 ? 0 : th}rad) translate(${-p.perno[0]}px,${-p.perno[1]}px)`;
+      let th = Math.atan2(B.y - A.y, B.x - A.x) - Math.atan2(B0[1] - A0[1], B0[0] - A0[0]);
+      th = Math.atan2(Math.sin(th), Math.cos(th));                  // sempre l'angolo piu' corto
+      // posizioni intere e rotazione "a scatti" (~3 gradi) con isteresi: un pezzo fermo non brilla di rotazioni
+      // da frazioni di pixel, e al minimo tremolio della fisica non cambia nulla
+      let q = L.ang[nome] ?? 0;
+      if (Math.abs(th - q) > 0.03) q = Math.round(th / 0.05) * 0.05;
+      L.ang[nome] = q;
+      const t = `translate(${Math.round(A.x)}px,${Math.round(A.y)}px) rotate(${q.toFixed(2)}rad) translate(${-p.perno[0]}px,${-p.perno[1]}px)`;
+      if (L.cache[nome] !== t) { L.cache[nome] = t; L.el[nome].style.transform = t; }
     }
   }
 
@@ -96,8 +101,8 @@ const Arena = (() => {
       cv[nome] = c; el[nome] = d;
     }
     const ossa = Object.values(man.parti).map(p => [p.da, p.a]);
-    lati[lato] = {fx, cv, el, danno: {}, ko: false, ultimo: null, nome: slot.querySelector(".f-nome"),
-                  sk: new Fisica.Scheletro(man.giunti, ossa)};
+    lati[lato] = {fx, cv, el, cache: {}, ang: {}, danno: {}, ko: false, ultimo: null, nome: slot.querySelector(".f-nome"),
+                  fighter: slot.querySelector(".fighter"), sk: new Fisica.Scheletro(man.giunti, ossa)};
     arenaEl.appendChild(slot);
     posa(lati[lato], lati[lato].sk.P);
   }
@@ -111,10 +116,27 @@ const Arena = (() => {
     requestAnimationFrame(ciclo);
   }
 
+  /* i muri della finestra: dietro il bordo dell'arena, davanti la linea di mezzo (i due non si attraversano).
+     Si passano alla fisica nelle coordinate dello sprite di ciascuno (la CPU e' specchiata). */
+  function muri() {
+    const s = parseFloat(arenaEl.style.getPropertyValue("--s")) || 2;
+    const A = arenaEl.getBoundingClientRect(), centro = (A.left + A.right) / 2;
+    if (A.width < 100) return;                      // arena nascosta o non ancora impaginata: si tengono i muri di prima
+    for (const [lato, L] of Object.entries(lati)) {
+      const r = L.fighter.getBoundingClientRect();
+      const locale = lato === "p" ? X => (X - r.left) / s : X => (r.right - X) / s;
+      const dietro = locale(lato === "p" ? A.left + 1 : A.right - 1), davanti = locale(centro);
+      // margini: gli sprite escono dalle giunture (schiena, mani, piedi lunghi 15 px verso l'avversario)
+      const lo = Math.min(dietro, davanti) + 8, hi = Math.max(dietro, davanti) - 14;
+      L.sk.muri(Math.min(lo, hi), Math.max(lo, hi));
+    }
+  }
+
   // scala intera dei pixel: la piu' grande che entra nell'altezza dell'arena (che dipende solo dalla finestra)
   function adatta() {
     const s = Math.max(1, Math.min(4, Math.floor((arenaEl.clientHeight - 44) / man.canvas[1])));
     arenaEl.style.setProperty("--s", s);
+    muri();
   }
 
   function update(S) {
@@ -133,9 +155,10 @@ const Arena = (() => {
       ultimoT = performance.now();
       requestAnimationFrame(ciclo);
     }
+    let nomi = false;
     for (const lato of ["p", "c"]) {
       const pg = lato === "p" ? S.player : S.cpu, L = lati[lato];
-      L.nome.textContent = pg.nome;
+      if (L.nome.textContent !== pg.nome) { L.nome.textContent = pg.nome; nomi = true; }
       for (const [nome, p] of Object.entries(parti)) {
         const h = pg.hp[p.loc];
         // le protesi non sanguinano
@@ -153,10 +176,15 @@ const Arena = (() => {
         L.ko = true;
         const u = L.ultimo || {loc: "busto", dmg: 30};
         // duello gia' finito al caricamento: subito a terra; altrimenti il colpo di grazia fa in tempo ad arrivare
-        if (primo) L.sk.muori(u.dmg, u.loc);
-        else setTimeout(() => L.sk.muori(u.dmg, u.loc), 350);
+        if (primo) L.sk.muori(u.dmg);
+        else setTimeout(() => L.sk.muori(u.dmg), 350);
       }
-      if (primo) L.sk.assesta(morto ? 320 : 160);   // la posa iniziale e' gia' quella giusta (arti storpi, a terra...)
+    }
+    // i nomi allargano gli slot e spostano i combattenti: i muri vanno ricalcolati PRIMA di far assestare i corpi
+    if (nomi) muri();
+    if (primo) for (const lato of ["p", "c"]) {
+      const pg = lato === "p" ? S.player : S.cpu;
+      lati[lato].sk.assesta(pg.hp.testa.val <= 0 || pg.hp.busto.val <= 0 ? 320 : 160);   // la posa iniziale e' gia' quella giusta (arti storpi, a terra...)
     }
   }
 
@@ -165,7 +193,9 @@ const Arena = (() => {
   function colpo(ev) {
     if (!lati.p) return;
     const att = lati[ev.chi === "p" ? "p" : "c"], dif = lati[ev.chi === "p" ? "c" : "p"];
-    att.sk.affonda();
+    // a distanza si punta e si sente il rinculo; in mischia si fa un passo avanti (meno a ogni colpo di una raffica)
+    if ((ev.info && ev.info.tags || []).some(t => /distanza/i.test(t))) att.sk.spara();
+    else att.sk.affonda(1 / Math.sqrt(Math.max(1, ev.colpi || 1)));
     if (ev.esito === "colpito" && ev.hp_persi > 0) {
       dif.sk.colpisci(ev.loc, ev.hp_persi, !!ev.split);
       dif.ultimo = {loc: ev.loc, dmg: ev.hp_persi};

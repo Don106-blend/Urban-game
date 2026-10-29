@@ -157,23 +157,42 @@ Le locazioni con protesi non sanguinano.
 
 ## 10. Fisica: come si muove lo scheletro (`static/fisica.js`)
 
-Lo scheletro e' la stessa lista di **giunti** del manifest, trattata come particelle (verlet): ogni pezzo e' un
+Lo scheletro e' la stessa lista di **giunti** del manifest, trattata come particelle (verlet con masse): ogni pezzo e' un
 osso `da -> a`, quindi **qualunque sprite o overlay appeso a un osso segue la fisica senza altro lavoro**.
 
-- Ossa rigide; bacino (`vita, anca, anca_dx, anca_sx`) e parte alta del busto (`vita, collo_alto, spalle`) sono
-  corpi rigidi incernierati in vita. Cerniere: ginocchio piega in avanti, gomito indietro.
-- **Muscoli**: molle PD verso una posa bersaglio (bacino e piedi piantati, busto e testa sopra la vita vera,
-  braccia penzoloni, ginocchia/gomiti da IK). Sono *molli* di proposito (periodo ~0,5-1,5 s): un colpo si vede.
-- **Colpo** = impulso di velocita' sulla locazione colpita, proporzionale al danno (`0,15 + 0,02 * hp`, max 3 px/passo):
-  la testa scatta, il busto si piega, la gamba si solleva. Poi i muscoli riportano in piedi. Mai a terra da vivi.
-- **Locazione storpiata** (`crippled`): i muscoli di *quella* locazione si spengono e fa il ragdoll da sola. Una
-  gamba sola: sta in piedi sull'altra. Due gambe: il bacino scende a terra e le braccia sane si puntellano
-  (`seduto`). Senza arti: a terra.
-- **Morte** (testa o busto a 0): tutti i muscoli spenti, spinta all'indietro; resta distesa. Una resa non uccide.
-- Convenzioni: `-x` = indietro (la CPU e' specchiata dal CSS, quindi vale per entrambi); pavimento a y = 111;
-  raggi di contatto in `RAGGIO` (la caviglia ha il piede sotto); passo fisso 1/60 s.
-- Un nuovo corpo con gli stessi nomi di giunti/ossa funziona senza toccare la fisica; se cambiano le lunghezze delle
-  ossa, ricontrollare `ARTI`/`MUSCOLO` in `fisica.js` e rifare girare `node test_fisica.js`.
+- **Ossa e masse**: ossa rigide; bacino (`vita, anca, anca_dx, anca_sx`) e parte alta del busto (`vita, collo_alto,
+  spalle`) sono corpi rigidi incernierati in vita. Il bacino pesa, mani e testa sono leggere (nei vincoli chi pesa meno
+  si sposta di piu'). Cerniere: ginocchio piega in avanti, gomito indietro; la correzione e' ripartita tra le tre
+  particelle (una correzione "a senso unico" regala quantita' di moto e faceva scivolare via i corpi seduti).
+- **Muscoli**: molle PD verso una posa bersaglio (bacino sopra i piedi, busto e testa sopra la vita *vera*, braccia
+  penzoloni e un filo piegate, ginocchia/gomiti da IK). Sono *molli* di proposito: periodo ~0,5-1,5 s, un colpo si vede.
+  Il bacino e' morbido in orizzontale e saldo in verticale. A ogni colpo i muscoli cedono per un istante (`rilascio`).
+- **Posa di guardia**: il bacino sta 2 px sotto la posizione a gambe tese (ginocchia un po' piegate): una gamba tesa e'
+  una singolarita' dell'IK, il ginocchio amplifica ogni micro-spostamento e da' l'effetto "gambe che vanno su e giu'".
+  Respiro e dondolio sono solo **orizzontali** e non toccano mai la quota del bacino.
+- **Colpo** = impulso sulla locazione colpita, proporzionale al danno (`0,15 + 0,02 * hp`, max 3 px/passo: la testa
+  scatta, il busto si piega, la gamba si solleva) **piu'** una spinta a tutto il corpo (`1,4 *` quella velocita'): il
+  combattente *scivola indietro* (60 danni ~ 20 px, 100 danni ~ 35 px). Mai a terra da vivi.
+- **Passi** (`_passi`): ogni piede e' piantato in un punto o e' in volo verso uno nuovo. Si fa un passo (uno alla volta,
+  solo con due gambe sane) se il bacino e' uscito dall'appoggio dei piedi (si rincorre la spinta), e, dopo ~0,5 s senza
+  colpi, per **tornare a piedi al posto di partenza**. Su una gamba sola non si cammina; seduti nemmeno.
+- **Locazione storpiata** (`crippled`): i muscoli di *quella* locazione si spengono e fa il ragdoll da sola; la gamba che
+  cede scivola in avanti. Una gamba sola: sta in piedi sull'altra. Due gambe: ci si siede dove si era (il bacino ha un'ancora)
+  con le gambe davanti e le braccia sane si puntellano a terra. Senza arti: a terra.
+- **Morte** (testa o busto a 0): muscoli spenti, spinta all'indietro con quantita' di moto netta all'indietro (`_porta`), poi
+  il corpo **si addormenta** (`dorme`) quando e' fermo: niente piu' calcoli, niente tremolii. Una resa non uccide.
+- **Muri** (`muri(min, max)`): i limiti dell'arena, nelle coordinate dello sprite di ciascuno. `arena.js` li calcola dal DOM
+  (bordo dell'arena dietro, linea di mezzo davanti, con un margine per sprite e piedi) e li aggiorna a ogni resize e al cambio
+  dei nomi. Nessuna particella puo' uscirne, da vivi o da morti.
+- **Eventi**: `colpisci`, `affonda` (attacco in mischia: passo avanti), `spara` (a distanza: braccio su e rinculo),
+  `schiva` (salto all'indietro), `para`, `storpia`, `muori`.
+- **Resa a schermo**: posizioni intere e rotazioni *a scatti* (~3 gradi, con isteresi) in `posa()`: un pezzo fermo non
+  riscrive il DOM e non brilla di rotazioni a frazioni di pixel.
+- Convenzioni: `-x` = indietro (la CPU e' specchiata dal CSS, quindi vale per entrambi); pavimento a y = 111; raggi di
+  contatto in `RAGGIO` (la caviglia ha il piede sotto, 9 px); passo fisso 1/60 s.
+- Un nuovo corpo con gli stessi nomi di giunti/ossa funziona senza toccare la fisica; se cambiano le lunghezze delle ossa,
+  ricontrollare `ARTI`/`MUSCOLO` in `fisica.js` e rifare girare `node test_fisica.js` (controlla: a riposo nessun
+  su-e-giu', ritorno a casa dopo ogni colpo, muri, arti storpi, cadaveri immobili).
 
 ## 11. Errori gia' fatti (non ripetere)
 
