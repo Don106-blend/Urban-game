@@ -3,12 +3,24 @@
   "rivolto": "destra",
   "canvas": [48, 111],
   "colori": { "contorno": "#262626", "ombra": "#6a6a6a", "base": "#8e8e8e", "luce": "#b2b2b2", "riflesso": "#d8d8d8" },
+  "giunti": {
+    "cima": [21, 2], "collo_alto": [21, 19], "vita": [20, 37], "anca": [20, 55],
+    "spalla_dx": [19, 25], "gomito_dx": [19, 43], "polso_dx": [19, 68],
+    "spalla_sx": [15, 25], "gomito_sx": [15, 43], "polso_sx": [15, 68],
+    "anca_dx": [19, 57], "ginocchio_dx": [19, 77], "caviglia_dx": [19, 102],
+    "anca_sx": [23, 57], "ginocchio_sx": [23, 77], "caviglia_sx": [23, 102]
+  },
   "parti": {
-    "braccio_sx": { "file": "braccio_sx.png", "x": 12, "y": 21, "z": 0 },
-    "gamba_sx":   { "file": "gamba_sx.png",   "x": 19, "y": 53, "z": 0 },
-    "gamba_dx":   { "file": "gamba_dx.png",   "x": 15, "y": 53, "z": 1 },
-    "busto":      { "file": "busto.png",      "x": 14, "y": 18, "z": 2 },
-    "testa":      { "file": "testa.png",      "x": 14, "y": 0,  "z": 3 },
-    "braccio_dx": { "file": "braccio_dx.png", "x": 16, "y": 21, "z": 4 }
+    "braccio_sup_sx": { "file": "braccio_sup_sx.png", "loc": "braccio_sx", "z": 0,  "da": "spalla_sx",   "a": "gomito_sx",    "perno": [3, 4],  "y0": 0 },
+    "avambraccio_sx": { "file": "avambraccio_sx.png", "loc": "braccio_sx", "z": 1,  "da": "gomito_sx",   "a": "polso_sx",     "perno": [3, 0],  "y0": 22 },
+    "coscia_sx":      { "file": "coscia_sx.png",      "loc": "gamba_sx",   "z": 2,  "da": "anca_sx",     "a": "ginocchio_sx", "perno": [4, 4],  "y0": 0 },
+    "stinco_sx":      { "file": "stinco_sx.png",      "loc": "gamba_sx",   "z": 3,  "da": "ginocchio_sx", "a": "caviglia_sx", "perno": [4, 0],  "y0": 24 },
+    "coscia_dx":      { "file": "coscia_dx.png",      "loc": "gamba_dx",   "z": 4,  "da": "anca_dx",     "a": "ginocchio_dx", "perno": [4, 4],  "y0": 0 },
+    "stinco_dx":      { "file": "stinco_dx.png",      "loc": "gamba_dx",   "z": 5,  "da": "ginocchio_dx", "a": "caviglia_dx", "perno": [4, 0],  "y0": 24 },
+    "busto_sup":      { "file": "busto_sup.png",      "loc": "busto",      "z": 6,  "da": "vita",        "a": "collo_alto",   "perno": [6, 19], "y0": 0 },
+    "busto_inf":      { "file": "busto_inf.png",      "loc": "busto",      "z": 7,  "da": "vita",        "a": "anca",         "perno": [6, 0],  "y0": 19 },
+    "testa":          { "file": "testa.png",          "loc": "testa",      "z": 8,  "da": "collo_alto",  "a": "cima",         "perno": [7, 19], "y0": 0 },
+    "braccio_sup_dx": { "file": "braccio_sup_dx.png", "loc": "braccio_dx", "z": 9,  "da": "spalla_dx",   "a": "gomito_dx",    "perno": [3, 4],  "y0": 0 },
+    "avambraccio_dx": { "file": "avambraccio_dx.png", "loc": "braccio_dx", "z": 10, "da": "gomito_dx",   "a": "polso_dx",     "perno": [3, 0],  "y0": 22 }
   }
 }

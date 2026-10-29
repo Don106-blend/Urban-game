@@ -1622,6 +1622,19 @@ def overhaul(webapp):
         webapp.rientro_bias(rec_neg)
     assert rec_neg["bias"] == 0
 
+    # ---- matchmaking: la CPU rispecchia i poteri del giocatore (4 poteri, uno a rango 4) ----
+    random.seed(7)
+    g = eroe_base(db["attacchi"], db["poteri"], db["stances"])
+    g.livello = 8
+    for pw in [p for p in db["poteri"] if p["id"] != g.poteri[0]["def"]["id"]][:3]:
+        g.poteri.append({"def": pw, "rango": 1, "attivo": False})
+    g.stats["controllo"] = 4
+    g.poteri[0]["rango"], g.poteri[1]["rango"] = 4, 2
+    for _ in range(40):
+        cpu_m = webapp.cpu_bilanciata(g)
+        assert sorted(s["rango"] for s in cpu_m.poteri) == [1, 1, 2, 4]
+        assert len({s["def"]["id"] for s in cpu_m.poteri}) == 4
+
     # ---- overhaul fase 4C: il survey a tre stati non spinge piu' le manopole a vuoto ----
     salvato_prof = dict(webapp.PROFILO)
     webapp.salva_profilo = lambda: None            # niente file: il profilo reale non si tocca

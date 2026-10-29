@@ -1,5 +1,6 @@
-/* Urban — arena del duello: due combattenti fatti di sprite separati (static/sprites/maschio),
-   sangue per locazione che cresce col danno, animazioni di colpo. API: Arena.update(S), Arena.colpo(ev). */
+/* Urban — arena del duello: due combattenti fatti di sprite articolati (static/sprites/maschio/parti.json),
+   sangue per locazione che cresce col danno, animazioni di colpo e crollo a ragdoll.
+   API: Arena.update(S), Arena.colpo(ev). */
 const Arena = (() => {
   const BASE = "/static/sprites/maschio/";
   // i 5 grigi dello sprite base (canale R) -> chiave; la skin e il sangue sono mappe sulle stesse chiavi
@@ -10,9 +11,9 @@ const Arena = (() => {
   };
   const SANGUE = {a: [107, 13, 24], b: [163, 17, 31], c: [201, 32, 44], d: [232, 64, 74]};
 
-  let parti = null;                 // loc -> {x, y, z, w, h, px}
-  let tela = [48, 111];
-  const lati = {};                  // "p" | "c" -> {slot, fx, cv: {loc: canvas}, danno: {loc: n}}
+  let man = null;                   // parti.json
+  let parti = null;                 // nome -> {...manifest, w, h, px}
+  const lati = {};                  // "p" | "c" -> {fighter, fx, cv, el, danno, ko}
   let arenaEl = null;
 
   const hash = (x, y, s) => {
@@ -28,27 +29,27 @@ const Arena = (() => {
   };
 
   async function carica() {
-    const man = await (await fetch(BASE + "parti.json")).json();
-    tela = man.canvas;
-    const lista = await Promise.all(Object.entries(man.parti).map(([loc, p]) => new Promise(res => {
+    man = await (await fetch(BASE + "parti.json")).json();
+    const lista = await Promise.all(Object.entries(man.parti).map(([nome, p]) => new Promise(res => {
       const img = new Image();
       img.onload = () => {
         const c = document.createElement("canvas");
         c.width = img.width; c.height = img.height;
         const ctx = c.getContext("2d");
         ctx.drawImage(img, 0, 0);
-        res([loc, {...p, w: img.width, h: img.height, px: ctx.getImageData(0, 0, img.width, img.height).data}]);
+        res([nome, {...p, w: img.width, h: img.height, px: ctx.getImageData(0, 0, img.width, img.height).data}]);
       };
       img.src = BASE + p.file;
     })));
     parti = Object.fromEntries(lista);
   }
 
-  /* skin + sangue: una macchia di rumore decide quali pixel sono sporchi, `danno` (0..1) alza la soglia */
-  function disegna(lato, loc, danno) {
-    const p = parti[loc], cv = lati[lato].cv[loc], ctx = cv.getContext("2d");
+  /* skin + sangue: una macchia di rumore decide quali pixel sono sporchi, `danno` (0..1) alza la soglia.
+     Il rumore e' calcolato sulle coordinate dello sprite intero (y0), cosi' le due meta' di un arto sono continue. */
+  function disegna(lato, nome, danno) {
+    const p = parti[nome], cv = lati[lato].cv[nome], ctx = cv.getContext("2d");
     const out = ctx.createImageData(p.w, p.h);
-    const seed = loc.length * 31 + loc.charCodeAt(loc.length - 1) + (lato === "p" ? 0 : 97);
+    const seed = p.loc.length * 31 + p.loc.charCodeAt(p.loc.length - 1) + (lato === "p" ? 0 : 97);
     const soglia = danno > 0 ? 0.1 + 0.9 * danno : 0;
     for (let y = 0; y < p.h; y++) for (let x = 0; x < p.w; x++) {
       const i = (y * p.w + x) * 4;
@@ -56,7 +57,7 @@ const Arena = (() => {
       const g = GRIGI[p.px[i]] || "b";
       let col = PELLI[lato][g];
       if (g !== "k" && soglia) {
-        const v = 0.7 * vn(x / 3, y / 3, seed) + 0.3 * hash(x, y, seed + 7);
+        const v = 0.7 * vn(x / 3, (y + p.y0) / 3, seed) + 0.3 * hash(x, y + p.y0, seed + 7);
         if (v < soglia) col = SANGUE[soglia - v > 0.35 ? "a" : g];
       }
       out.data.set([col[0], col[1], col[2], 255], i);
@@ -64,34 +65,98 @@ const Arena = (() => {
     ctx.putImageData(out, 0, 0);
   }
 
+  /* ogni pezzo va dal giunto `da` al giunto `a`: lo sprite viene ruotato di quanto ruota quell'osso rispetto
+     alla posa a riposo e appeso al giunto `da` per il suo perno. A riposo la rotazione e' 0. */
+  const RIPOSO = () => Object.fromEntries(Object.entries(man.giunti).map(([k, [x, y]]) => [k, {x, y}]));
+  function posa(L, pt) {
+    for (const [nome, p] of Object.entries(man.parti)) {
+      const A = pt[p.da], B = pt[p.a], A0 = man.giunti[p.da], B0 = man.giunti[p.a];
+      const th = Math.atan2(B.y - A.y, B.x - A.x) - Math.atan2(B0[1] - A0[1], B0[0] - A0[0]);
+      L.el[nome].style.transform =
+        `translate(${A.x}px,${A.y}px) rotate(${th}rad) translate(${-p.perno[0]}px,${-p.perno[1]}px)`;
+    }
+  }
+
+  /* ---------- ragdoll: scheletro a particelle (verlet) con ossa rigide, limiti di piegatura e pavimento ---------- */
+  const GRAVITA = 0.3, PAVIMENTO = 111;
+  const RAGGIO = {cima: 8, collo_alto: 4, vita: 6, anca: 6, anca_dx: 6, anca_sx: 6, spalla_dx: 4, spalla_sx: 4,
+                  gomito_dx: 3, gomito_sx: 3, polso_dx: 3, polso_sx: 3, ginocchio_dx: 4, ginocchio_sx: 4,
+                  caviglia_dx: 8, caviglia_sx: 8};
+  const GRUPPI_RIGIDI = [["vita", "anca", "anca_dx", "anca_sx"], ["vita", "collo_alto", "spalla_dx", "spalla_sx"]];
+  const LIMITI = [["cima", "vita", 0.75], ["collo_alto", "anca", 0.7], ["spalla_dx", "polso_dx", 0.3],
+                  ["spalla_sx", "polso_sx", 0.3], ["anca_dx", "caviglia_dx", 0.5], ["anca_sx", "caviglia_sx", 0.5]];
+
+  function ragdoll(L, istantaneo) {
+    const P = {};
+    for (const [k, [x, y]] of Object.entries(man.giunti)) P[k] = {x, y, px: x, py: y, r: RAGGIO[k] || 3};
+    const dist = (a, b) => Math.hypot(P[a].x - P[b].x, P[a].y - P[b].y);
+    const vinc = [];                                    // [a, b, lunghezza, minimo?]
+    const rigido = (a, b) => vinc.push([a, b, dist(a, b), false]);
+    Object.values(man.parti).forEach(p => rigido(p.da, p.a));
+    GRUPPI_RIGIDI.forEach(g => g.forEach((a, i) => g.slice(i + 1).forEach(b => rigido(a, b))));
+    LIMITI.forEach(([a, b, f]) => vinc.push([a, b, dist(a, b) * f, true]));
+
+    // il colpo di grazia spinge la parte alta indietro (-x: gli sprite guardano a destra), le ginocchia cedono in avanti
+    for (const k of ["cima", "collo_alto", "spalla_dx", "spalla_sx", "polso_dx", "polso_sx"]) P[k].px += 3;
+    P.cima.px += 1.2; P.vita.px += 1.5; P.anca.px += 0.8;
+    P.ginocchio_dx.px -= 1.2; P.ginocchio_sx.px -= 1; P.caviglia_dx.px -= 3; P.caviglia_sx.px -= 2.6;   // i piedi scivolano avanti
+
+    const passo = () => {
+      for (const p of Object.values(P)) {
+        const vx = (p.x - p.px) * 0.995, vy = (p.y - p.py) * 0.995;
+        p.px = p.x; p.py = p.y; p.x += vx; p.y += vy + GRAVITA;
+      }
+      for (let it = 0; it < 12; it++) {
+        for (const [a, b, len, min] of vinc) {
+          const A = P[a], B = P[b];
+          const dx = B.x - A.x, dy = B.y - A.y, d = Math.hypot(dx, dy) || 1e-6;
+          if (min && d >= len) continue;
+          const f = (d - len) / d * 0.5;
+          A.x += dx * f; A.y += dy * f; B.x -= dx * f; B.y -= dy * f;
+        }
+        for (const p of Object.values(P)) {
+          if (p.y > PAVIMENTO - p.r) { p.y = PAVIMENTO - p.r; p.x += (p.px - p.x) * 0.03; }
+        }
+      }
+    };
+    const fermo = () => Object.values(P).every(p => Math.hypot(p.x - p.px, p.y - p.py) < 0.03);
+
+    if (istantaneo) {
+      for (let i = 0; i < 400 && !(i > 60 && fermo()); i++) passo();
+      posa(L, P);
+      return;
+    }
+    let ultimo = performance.now(), acc = 0, quieto = 0, n = 0;
+    const frame = (t) => {
+      acc += Math.min(100, t - ultimo); ultimo = t;
+      while (acc >= 1000 / 60) { passo(); acc -= 1000 / 60; n++; quieto = fermo() ? quieto + 1 : 0; }
+      posa(L, P);
+      if (quieto < 20 && n < 420) requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  }
+
   function costruisci(lato) {
     const slot = document.createElement("div");
     slot.className = "f-slot";
     slot.innerHTML = `<div class="f-nome b-${lato}"></div>
-      <div class="fighter f-${lato}"><div class="idle"><div class="fx"></div></div></div>`;
+      <div class="fighter f-${lato}"><div class="scala"><div class="idle"><div class="fx"></div></div></div></div>`;
     const fx = slot.querySelector(".fx");
-    const cv = {};
-    for (const [loc, p] of Object.entries(parti).sort((a, b) => a[1].z - b[1].z)) {
+    const cv = {}, el = {};
+    for (const [nome, p] of Object.entries(parti).sort((a, b) => a[1].z - b[1].z)) {
       const d = document.createElement("div");
       d.className = "parte";
-      d.dataset.loc = loc;
-      d.style.cssText = `left:calc(var(--s) * ${p.x}px);top:calc(var(--s) * ${p.y}px);` +
-        `width:calc(var(--s) * ${p.w}px);height:calc(var(--s) * ${p.h}px);z-index:${p.z}`;
+      d.dataset.loc = p.loc;
+      d.style.cssText = `width:${p.w}px;height:${p.h}px;z-index:${p.z}`;
       const c = document.createElement("canvas");
       c.width = p.w; c.height = p.h;
       d.appendChild(c);
       fx.appendChild(d);
-      cv[loc] = c;
+      cv[nome] = c; el[nome] = d;
     }
-    lati[lato] = {slot, fx, cv, danno: {}};
+    lati[lato] = {fighter: slot.querySelector(".fighter"), fx, cv, el, danno: {}, ko: false, nome: slot.querySelector(".f-nome")};
     arenaEl.appendChild(slot);
-  }
-
-  // scala intera dei pixel: la piu' grande che entra nell'altezza disponibile
-  function adatta() {
-    if (!arenaEl) return;
-    const s = Math.max(1, Math.min(5, Math.floor((arenaEl.clientHeight - 40) / tela[1])));
-    arenaEl.style.setProperty("--s", s);
+    posa(lati[lato], RIPOSO());
   }
 
   function update(S) {
@@ -101,23 +166,27 @@ const Arena = (() => {
       if (!update.carico) update.carico = carica().then(() => { update.carico = null; update(S); });
       return;
     }
-    if (!lati.p) {
+    const primo = !lati.p;
+    if (primo) {
       arenaEl.innerHTML = "";
       costruisci("p"); costruisci("c");
-      new ResizeObserver(adatta).observe(arenaEl);
-      adatta();
     }
     for (const lato of ["p", "c"]) {
       const pg = lato === "p" ? S.player : S.cpu, L = lati[lato];
-      L.slot.querySelector(".f-nome").textContent = pg.nome;
-      for (const loc of Object.keys(parti)) {
-        const h = pg.hp[loc];
+      L.nome.textContent = pg.nome;
+      for (const [nome, p] of Object.entries(parti)) {
+        const h = pg.hp[p.loc];
         // le protesi non sanguinano
         const danno = !h || h.protesi ? 0 : Math.min(1, Math.max(0, 1 - h.val / h.max));
-        if (L.danno[loc] !== danno) { L.danno[loc] = danno; disegna(lato, loc, danno); }
+        if (L.danno[nome] !== danno) { L.danno[nome] = danno; disegna(lato, nome, danno); }
       }
       const perso = S.finito && (lato === "p") === !S.vinto_dal_player;
-      L.fx.classList.toggle("ko", !!perso);
+      if (perso && !L.ko) {
+        L.ko = true;
+        // duello gia' finito al caricamento: subito a terra; altrimenti il colpo di grazia fa in tempo a finire
+        if (primo) { L.fighter.classList.add("ko"); ragdoll(L, true); }
+        else setTimeout(() => { L.fighter.classList.add("ko"); ragdoll(L, false); }, 450);
+      }
     }
   }
 

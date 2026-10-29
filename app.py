@@ -435,19 +435,19 @@ def rientro_bias(rec):
         rec["bias"] += -1 if rec["bias"] > 0 else 1
 
 
-def _spendi_token_cpu(c, token):
-    """Spende token in upgrade casuali validi (stesse regole del giocatore)."""
+def _spendi_token_cpu(c, token, categorie=("stat", "skill", "potere")):
+    """Spende token in upgrade casuali validi (stesse regole del giocatore), solo nelle `categorie`."""
     while True:
         opzioni = []
         for s in STATS:
-            if c.stats[s] < 4 and token >= costo_upgrade(c.stats[s]):
+            if "stat" in categorie and c.stats[s] < 4 and token >= costo_upgrade(c.stats[s]):
                 opzioni.append(("stat", s, costo_upgrade(c.stats[s])))
         for s in SKILLS:
-            if c.skills[s] < 4 and token >= costo_upgrade(c.skills[s]):
+            if "skill" in categorie and c.skills[s] < 4 and token >= costo_upgrade(c.skills[s]):
                 opzioni.append(("skill", s, costo_upgrade(c.skills[s])))
         for slot in c.poteri:
             # il rango di un potere non può superare il rango del dado controllo
-            if (slot["rango"] < 4 and slot["rango"] < c.stats["controllo"]
+            if ("potere" in categorie and slot["rango"] < 4 and slot["rango"] < c.stats["controllo"]
                     and token >= costo_upgrade(slot["rango"])):
                 opzioni.append(("potere", slot, costo_upgrade(slot["rango"])))
         if not opzioni:
@@ -557,13 +557,51 @@ def eroe_livello(livello, nomi_usati=()):
     return c
 
 
+def costo_rango(rango):
+    """Token per portare una voce da rango 1 a `rango`."""
+    return sum(costo_upgrade(r) for r in range(1, rango))
+
+
+def token_spesi(c):
+    """Token che il giocatore ha davvero investito, divisi in (statistiche + skill, poteri). La
+    statistica che parte a rango 2 e' gratis."""
+    ss = sum(costo_rango(v) for v in (*c.stats.values(), *c.skills.values())) - costo_rango(2)
+    return max(0, ss), sum(costo_rango(s["rango"]) for s in c.poteri)
+
+
+def eroe_speculare(giocatore, extra, nomi_usati=()):
+    """Eroe che rispecchia la costruzione del giocatore: stesso numero di poteri (scelti a caso) con
+    gli stessi ranghi, e gli stessi Token (+-`extra`) in statistiche e skill, spesi a caso. Il
+    livello da solo non dice quanto e' forte un eroe: chi ha 4 poteri e uno a rango 4 finiva contro
+    una CPU con un solo potere a rango 1, perche' i poteri della CPU erano solo una lotteria."""
+    c = eroe_base(DB["attacchi"], DB["poteri"], DB["stances"], set(nomi_usati))
+    ranghi = sorted((s["rango"] for s in giocatore.poteri), reverse=True)[:MAX_POTERI]
+    noti = {s["def"]["id"] for s in c.poteri}
+    altri = [pw for pw in DB["poteri"] if pw["id"] not in noti]
+    random.shuffle(altri)
+    for pw in altri[:max(0, len(ranghi) - len(c.poteri))]:
+        c.poteri.append({"def": pw, "rango": 1, "attivo": False})
+    random.shuffle(ranghi)
+    for slot, r in zip(c.poteri, ranghi):
+        slot["rango"] = r
+    token = token_spesi(giocatore)[0] + extra
+    # il rango di un potere non supera il Controllo: lo si alza prima, a carico dello stesso budget
+    while c.stats["controllo"] < max(ranghi, default=1):
+        token -= costo_upgrade(c.stats["controllo"])
+        c.stats["controllo"] += 1
+    _spendi_token_cpu(c, max(0, token), ("stat", "skill"))
+    return c
+
+
 def cpu_bilanciata(giocatore, bias=0):
-    """Matchmaking: la CPU e' un eroe di livello pari a quello del giocatore, piu' il bias
-    DEL PERSONAGGIO (limitato a +-BIAS_MAX livelli, v. aggiorna_profilo) e un po' di
-    variabilita', con equipaggiamento a budget."""
+    """Matchmaking: la CPU rispecchia la build del giocatore (poteri e Token spesi, v.
+    eroe_speculare), scostata del bias DEL PERSONAGGIO (limitato a +-BIAS_MAX, v. aggiorna_profilo)
+    e di un po' di variabilita' (un Token = un livello); equipaggiamento a budget di livello."""
     bias = max(-BIAS_MAX, min(BIAS_MAX, bias))
-    livello = max(1, getattr(giocatore, "livello", 1) + bias + random.choice((-1, 0, 0, 1)))
-    c = eroe_livello(livello, {giocatore.nome})
+    extra = bias + random.choice((-1, 0, 0, 1))
+    livello = max(1, getattr(giocatore, "livello", 1) + extra)
+    c = eroe_speculare(giocatore, extra, {giocatore.nome})
+    c.livello = livello
     _equipaggia_cpu(c, livello)
     return c
 

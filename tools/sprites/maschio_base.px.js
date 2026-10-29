@@ -50,23 +50,35 @@ part("testa", headSpans, { lt: 2, dk: 2, hl: [[3, 5]] })
 
 // ---- BUSTO: spalle/torace, vita, bacino con i glutei dietro. 11 di profondita' massima
 const torsoSpans = lerp([[0,3,8],[2,1,9],[5,0,10],[12,0,10],[16,1,9],[24,2,9],[29,1,9],[33,0,10],[37,1,9]])
-part("busto", torsoSpans, { lt: 2, dk: 2, hl: [[7, 10]] })
+// Ogni pezzo e' tagliato a meta' (forme invariate, ma contorno e luce rifatti per ciascuna meta') per avere
+// l'articolazione: busto in vita, braccio al gomito, gamba al ginocchio. La meta' bassa va posata con la riga
+// di contorno alta sulla riga `taglio` della meta' alta (vedi parti.json), cosi' la sagoma resta quella intera.
+const TAGLIO = { busto: 19, braccio: 22, gamba: 24 }
+part("busto_sup", torsoSpans.slice(0, TAGLIO.busto), { lt: 2, dk: 2, hl: [[7, 10]] })
+part("busto_inf", torsoSpans.slice(TAGLIO.busto), { lt: 2, dk: 2 })
 
 // ---- BRACCIO: spalla tonda, gomito, avambraccio, mano. Il destro e' il piu' vicino alla camera.
 const armSpans = [[1,3],...rep(21,[0,4]),...rep(12,[1,4]),...rep(2,[1,3]),...rep(10,[1,4]),[2,3]]
-part("braccio_dx", armSpans, { hl: [[4, 9]] })
-part("braccio_sx", armSpans, { hl: [[4, 9]], far: true })
+for (const [lato, far] of [["dx", false], ["sx", true]]) {
+  part("braccio_sup_" + lato, armSpans.slice(0, TAGLIO.braccio), { hl: [[4, 9]], far })
+  part("avambraccio_" + lato, armSpans.slice(TAGLIO.braccio), { hl: [[3, 9]], far })
+}
 
 // ---- GAMBA: coscia, ginocchio, polpaccio che sporge dietro, caviglia, piede lungo 15 verso davanti
 const legSpans = [...rep(7,[0,6]),...rep(13,[0,5]),...rep(3,[1,5]),...rep(10,[0,5]),...rep(12,[1,5]),...rep(6,[1,4]),
   [1,5],[0,8],[0,12],[0,14],[0,14]]
-part("gamba_dx", legSpans, { hl: [[6, 14]] })
-part("gamba_sx", legSpans, { hl: [[6, 14]], far: true })
+for (const [lato, far] of [["dx", false], ["sx", true]]) {
+  part("coscia_" + lato, legSpans.slice(0, TAGLIO.gamba), { hl: [[6, 14]], far })
+  part("stinco_" + lato, legSpans.slice(TAGLIO.gamba), { hl: [[8, 18]], far })
+}
 
-// ---- Anteprima assemblata (non e' uno dei 6 pezzi). Ordine: braccio lontano, gamba lontana, gamba vicina,
-// busto, testa, braccio vicino. Stesse coordinate di parti.json.
+// ---- Anteprima assemblata (non e' uno dei pezzi). Ordine: braccio e gamba lontani, gamba vicina, busto,
+// testa, braccio vicino; ogni meta' bassa sopra la sua meta' alta. Stesse coordinate di parti.json.
 scene("assemblato", { w: 48, h: 111, bg: "_" },
-  stamp("braccio_sx", 12, 21), stamp("gamba_sx", 19, 53), stamp("gamba_dx", 15, 53),
-  stamp("busto", 14, 18), stamp("testa", 14, 0), stamp("braccio_dx", 16, 21))
+  stamp("braccio_sup_sx", 12, 21), stamp("avambraccio_sx", 12, 43),
+  stamp("coscia_sx", 19, 53), stamp("stinco_sx", 19, 77),
+  stamp("coscia_dx", 15, 53), stamp("stinco_dx", 15, 77),
+  stamp("busto_sup", 14, 18), stamp("busto_inf", 14, 37), stamp("testa", 14, 0),
+  stamp("braccio_sup_dx", 16, 21), stamp("avambraccio_dx", 16, 43))
 
-sheet("parti", ["testa", "busto", "braccio_sx", "braccio_dx", "gamba_sx", "gamba_dx"], { cols: 6, pad: 2 })
+sheet("parti", ["testa", "busto_*", "braccio_*", "avambraccio_*", "coscia_*", "stinco_*"], { cols: 11, pad: 2 })
