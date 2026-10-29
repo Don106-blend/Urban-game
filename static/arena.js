@@ -1,6 +1,6 @@
 /* Urban — arena del duello: due combattenti fatti di sprite articolati (static/sprites/maschio/parti.json),
-   sangue per locazione che cresce col danno, animazioni di colpo e crollo a ragdoll.
-   API: Arena.update(S), Arena.colpo(ev). */
+   sangue per locazione che cresce col danno e fisica dei corpi (static/fisica.js): i colpi sono impulsi,
+   le locazioni storpiate fanno il ragdoll, da morti si crolla. API: Arena.update(S), Arena.colpo(ev). */
 const Arena = (() => {
   const BASE = "/static/sprites/maschio/";
   // i 5 grigi dello sprite base (canale R) -> chiave; la skin e il sangue sono mappe sulle stesse chiavi
@@ -13,7 +13,7 @@ const Arena = (() => {
 
   let man = null;                   // parti.json
   let parti = null;                 // nome -> {...manifest, w, h, px}
-  const lati = {};                  // "p" | "c" -> {fighter, fx, cv, el, danno, ko}
+  const lati = {};                  // "p" | "c" -> {fx, cv, el, danno, ko, ultimo, sk}
   let arenaEl = null;
 
   const hash = (x, y, s) => {
@@ -67,80 +67,21 @@ const Arena = (() => {
 
   /* ogni pezzo va dal giunto `da` al giunto `a`: lo sprite viene ruotato di quanto ruota quell'osso rispetto
      alla posa a riposo e appeso al giunto `da` per il suo perno. A riposo la rotazione e' 0. */
-  const RIPOSO = () => Object.fromEntries(Object.entries(man.giunti).map(([k, [x, y]]) => [k, {x, y}]));
   function posa(L, pt) {
     for (const [nome, p] of Object.entries(man.parti)) {
       const A = pt[p.da], B = pt[p.a], A0 = man.giunti[p.da], B0 = man.giunti[p.a];
       const th = Math.atan2(B.y - A.y, B.x - A.x) - Math.atan2(B0[1] - A0[1], B0[0] - A0[0]);
+      // posizioni intere e rotazione nulla quando e' trascurabile: i pixel restano nitidi a riposo
       L.el[nome].style.transform =
-        `translate(${A.x}px,${A.y}px) rotate(${th}rad) translate(${-p.perno[0]}px,${-p.perno[1]}px)`;
+        `translate(${Math.round(A.x)}px,${Math.round(A.y)}px) rotate(${Math.abs(th) < 0.03 ? 0 : th}rad) translate(${-p.perno[0]}px,${-p.perno[1]}px)`;
     }
-  }
-
-  /* ---------- ragdoll: scheletro a particelle (verlet) con ossa rigide, limiti di piegatura e pavimento ---------- */
-  const GRAVITA = 0.3, PAVIMENTO = 111;
-  const RAGGIO = {cima: 8, collo_alto: 4, vita: 6, anca: 6, anca_dx: 6, anca_sx: 6, spalla_dx: 4, spalla_sx: 4,
-                  gomito_dx: 3, gomito_sx: 3, polso_dx: 3, polso_sx: 3, ginocchio_dx: 4, ginocchio_sx: 4,
-                  caviglia_dx: 8, caviglia_sx: 8};
-  const GRUPPI_RIGIDI = [["vita", "anca", "anca_dx", "anca_sx"], ["vita", "collo_alto", "spalla_dx", "spalla_sx"]];
-  const LIMITI = [["cima", "vita", 0.75], ["collo_alto", "anca", 0.7], ["spalla_dx", "polso_dx", 0.3],
-                  ["spalla_sx", "polso_sx", 0.3], ["anca_dx", "caviglia_dx", 0.5], ["anca_sx", "caviglia_sx", 0.5]];
-
-  function ragdoll(L, istantaneo) {
-    const P = {};
-    for (const [k, [x, y]] of Object.entries(man.giunti)) P[k] = {x, y, px: x, py: y, r: RAGGIO[k] || 3};
-    const dist = (a, b) => Math.hypot(P[a].x - P[b].x, P[a].y - P[b].y);
-    const vinc = [];                                    // [a, b, lunghezza, minimo?]
-    const rigido = (a, b) => vinc.push([a, b, dist(a, b), false]);
-    Object.values(man.parti).forEach(p => rigido(p.da, p.a));
-    GRUPPI_RIGIDI.forEach(g => g.forEach((a, i) => g.slice(i + 1).forEach(b => rigido(a, b))));
-    LIMITI.forEach(([a, b, f]) => vinc.push([a, b, dist(a, b) * f, true]));
-
-    // il colpo di grazia spinge la parte alta indietro (-x: gli sprite guardano a destra), le ginocchia cedono in avanti
-    for (const k of ["cima", "collo_alto", "spalla_dx", "spalla_sx", "polso_dx", "polso_sx"]) P[k].px += 3;
-    P.cima.px += 1.2; P.vita.px += 1.5; P.anca.px += 0.8;
-    P.ginocchio_dx.px -= 1.2; P.ginocchio_sx.px -= 1; P.caviglia_dx.px -= 3; P.caviglia_sx.px -= 2.6;   // i piedi scivolano avanti
-
-    const passo = () => {
-      for (const p of Object.values(P)) {
-        const vx = (p.x - p.px) * 0.995, vy = (p.y - p.py) * 0.995;
-        p.px = p.x; p.py = p.y; p.x += vx; p.y += vy + GRAVITA;
-      }
-      for (let it = 0; it < 12; it++) {
-        for (const [a, b, len, min] of vinc) {
-          const A = P[a], B = P[b];
-          const dx = B.x - A.x, dy = B.y - A.y, d = Math.hypot(dx, dy) || 1e-6;
-          if (min && d >= len) continue;
-          const f = (d - len) / d * 0.5;
-          A.x += dx * f; A.y += dy * f; B.x -= dx * f; B.y -= dy * f;
-        }
-        for (const p of Object.values(P)) {
-          if (p.y > PAVIMENTO - p.r) { p.y = PAVIMENTO - p.r; p.x += (p.px - p.x) * 0.03; }
-        }
-      }
-    };
-    const fermo = () => Object.values(P).every(p => Math.hypot(p.x - p.px, p.y - p.py) < 0.03);
-
-    if (istantaneo) {
-      for (let i = 0; i < 400 && !(i > 60 && fermo()); i++) passo();
-      posa(L, P);
-      return;
-    }
-    let ultimo = performance.now(), acc = 0, quieto = 0, n = 0;
-    const frame = (t) => {
-      acc += Math.min(100, t - ultimo); ultimo = t;
-      while (acc >= 1000 / 60) { passo(); acc -= 1000 / 60; n++; quieto = fermo() ? quieto + 1 : 0; }
-      posa(L, P);
-      if (quieto < 20 && n < 420) requestAnimationFrame(frame);
-    };
-    requestAnimationFrame(frame);
   }
 
   function costruisci(lato) {
     const slot = document.createElement("div");
     slot.className = "f-slot";
     slot.innerHTML = `<div class="f-nome b-${lato}"></div>
-      <div class="fighter f-${lato}"><div class="scala"><div class="idle"><div class="fx"></div></div></div></div>`;
+      <div class="fighter f-${lato}"><div class="scala"><div class="fx"></div></div></div>`;
     const fx = slot.querySelector(".fx");
     const cv = {}, el = {};
     for (const [nome, p] of Object.entries(parti).sort((a, b) => a[1].z - b[1].z)) {
@@ -154,9 +95,20 @@ const Arena = (() => {
       fx.appendChild(d);
       cv[nome] = c; el[nome] = d;
     }
-    lati[lato] = {fighter: slot.querySelector(".fighter"), fx, cv, el, danno: {}, ko: false, nome: slot.querySelector(".f-nome")};
+    const ossa = Object.values(man.parti).map(p => [p.da, p.a]);
+    lati[lato] = {fx, cv, el, danno: {}, ko: false, ultimo: null, nome: slot.querySelector(".f-nome"),
+                  sk: new Fisica.Scheletro(man.giunti, ossa)};
     arenaEl.appendChild(slot);
-    posa(lati[lato], RIPOSO());
+    posa(lati[lato], lati[lato].sk.P);
+  }
+
+  /* un solo ciclo per entrambi: passi di fisica a 60 Hz fissi, poi si posano gli sprite */
+  let ultimoT = 0, acc = 0;
+  function ciclo(t) {
+    acc += Math.min(100, t - ultimoT); ultimoT = t;
+    while (acc >= 1000 / 60) { Object.values(lati).forEach(L => L.sk.passo()); acc -= 1000 / 60; }
+    Object.values(lati).forEach(L => posa(L, L.sk.P));
+    requestAnimationFrame(ciclo);
   }
 
   // scala intera dei pixel: la piu' grande che entra nell'altezza dell'arena (che dipende solo dalla finestra)
@@ -178,6 +130,8 @@ const Arena = (() => {
       costruisci("p"); costruisci("c");
       new ResizeObserver(adatta).observe(arenaEl);
       adatta();
+      ultimoT = performance.now();
+      requestAnimationFrame(ciclo);
     }
     for (const lato of ["p", "c"]) {
       const pg = lato === "p" ? S.player : S.cpu, L = lati[lato];
@@ -188,37 +142,49 @@ const Arena = (() => {
         const danno = !h || h.protesi ? 0 : Math.min(1, Math.max(0, 1 - h.val / h.max));
         if (L.danno[nome] !== danno) { L.danno[nome] = danno; disegna(lato, nome, danno); }
       }
-      const perso = S.finito && (lato === "p") === !S.vinto_dal_player;
-      if (perso && !L.ko) {
-        L.ko = true;
-        // duello gia' finito al caricamento: subito a terra; altrimenti il colpo di grazia fa in tempo a finire
-        if (primo) { L.fighter.classList.add("ko"); ragdoll(L, true); }
-        else setTimeout(() => { L.fighter.classList.add("ko"); ragdoll(L, false); }, 450);
+      // una locazione storpiata perde i muscoli e fa il ragdoll da sola; il resto del corpo resta in piedi
+      for (const loc of Object.keys(Fisica.LOC)) {
+        const h = pg.hp[loc];
+        L.sk.storpia(loc, !!(h && h.crippled), primo);
       }
+      // si cade a terra solo da morti (testa o busto a zero): una resa lascia in piedi
+      const morto = pg.hp.testa.val <= 0 || pg.hp.busto.val <= 0;
+      if (morto && !L.ko) {
+        L.ko = true;
+        const u = L.ultimo || {loc: "busto", dmg: 30};
+        // duello gia' finito al caricamento: subito a terra; altrimenti il colpo di grazia fa in tempo ad arrivare
+        if (primo) L.sk.muori(u.dmg, u.loc);
+        else setTimeout(() => L.sk.muori(u.dmg, u.loc), 350);
+      }
+      if (primo) L.sk.assesta(morto ? 320 : 160);   // la posa iniziale e' gia' quella giusta (arti storpi, a terra...)
     }
   }
 
-  const anima = (el, cl) => {
-    el.classList.remove("attacca", "colpito", "schiva");
-    void el.offsetWidth;
-    el.classList.add(cl);
-  };
-
-  /* un colpo nuovo: chi attacca scatta in avanti, chi difende incassa (e la parte colpita lampeggia) o scarta */
+  /* un colpo nuovo, in fisica: chi attacca si sporge, chi difende riceve un impulso proporzionale al danno
+     sulla locazione colpita (e la parte lampeggia), oppure schiva con un saltello o para */
   function colpo(ev) {
     if (!lati.p) return;
     const att = lati[ev.chi === "p" ? "p" : "c"], dif = lati[ev.chi === "p" ? "c" : "p"];
-    anima(att.fx, "attacca");
+    att.sk.affonda();
     if (ev.esito === "colpito" && ev.hp_persi > 0) {
-      anima(dif.fx, "colpito");
+      dif.sk.colpisci(ev.loc, ev.hp_persi, !!ev.split);
+      dif.ultimo = {loc: ev.loc, dmg: ev.hp_persi};
       const bersagli = ev.split ? dif.fx.querySelectorAll(".parte") : dif.fx.querySelectorAll(`.parte[data-loc="${ev.loc}"]`);
       bersagli.forEach(b => {
         b.classList.remove("lampeggia"); void b.offsetWidth; b.classList.add("lampeggia");
       });
+    } else if (ev.esito === "schivato") {
+      dif.sk.schiva();
     } else {
-      anima(dif.fx, "schiva");
+      dif.sk.para();
     }
   }
 
-  return {update, colpo};
+  /* avanza la fisica a mano di n passi (un browser che non ridisegna, come quello dei test, non fa girare il ciclo) */
+  function passi(n) {
+    for (let i = 0; i < n; i++) Object.values(lati).forEach(L => L.sk.passo());
+    Object.values(lati).forEach(L => posa(L, L.sk.P));
+  }
+
+  return {update, colpo, passi};
 })();

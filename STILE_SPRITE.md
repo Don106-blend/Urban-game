@@ -14,7 +14,8 @@ qualsiasi cosa**: serve a restare coerenti con il corpo base maschile (`maschio`
 | Sorgente degli sprite (codice pxl, skill `pxl-pixel-art`) | `tools/sprites/maschio_base.px.js` |
 | PNG finali dei pezzi + manifest | `static/sprites/maschio/*.png`, `static/sprites/maschio/parti.json` |
 | Anteprima (grigio + due ricolorazioni) | `tools/sprites/anteprima_maschio.png` |
-| Disegno nel duello, sangue, ricolorazione, ragdoll | `static/arena.js` |
+| Disegno nel duello, sangue, ricolorazione | `static/arena.js` |
+| Fisica dei corpi (scheletro, muscoli, ragdoll) | `static/fisica.js`, test: `node test_fisica.js` |
 | Stili dell'arena | fondo di `static/style.css` (blocchi "arena" e "colonna centrale") |
 
 Rigenerare i PNG (da `tools/sprites/`, `PXL` = `node <skill pxl>/bin/pxl.js`):
@@ -154,11 +155,32 @@ sprite **intero** (`y0`), cosi' le due meta' di un arto sono continue. Soglia `0
 dove la soglia e' superata di 0.35 diventa il tono piu' scuro (coaguli). Il contorno `k` non si sporca.
 Le locazioni con protesi non sanguinano.
 
-## 10. Errori gia' fatti (non ripetere)
+## 10. Fisica: come si muove lo scheletro (`static/fisica.js`)
+
+Lo scheletro e' la stessa lista di **giunti** del manifest, trattata come particelle (verlet): ogni pezzo e' un
+osso `da -> a`, quindi **qualunque sprite o overlay appeso a un osso segue la fisica senza altro lavoro**.
+
+- Ossa rigide; bacino (`vita, anca, anca_dx, anca_sx`) e parte alta del busto (`vita, collo_alto, spalle`) sono
+  corpi rigidi incernierati in vita. Cerniere: ginocchio piega in avanti, gomito indietro.
+- **Muscoli**: molle PD verso una posa bersaglio (bacino e piedi piantati, busto e testa sopra la vita vera,
+  braccia penzoloni, ginocchia/gomiti da IK). Sono *molli* di proposito (periodo ~0,5-1,5 s): un colpo si vede.
+- **Colpo** = impulso di velocita' sulla locazione colpita, proporzionale al danno (`0,15 + 0,02 * hp`, max 3 px/passo):
+  la testa scatta, il busto si piega, la gamba si solleva. Poi i muscoli riportano in piedi. Mai a terra da vivi.
+- **Locazione storpiata** (`crippled`): i muscoli di *quella* locazione si spengono e fa il ragdoll da sola. Una
+  gamba sola: sta in piedi sull'altra. Due gambe: il bacino scende a terra e le braccia sane si puntellano
+  (`seduto`). Senza arti: a terra.
+- **Morte** (testa o busto a 0): tutti i muscoli spenti, spinta all'indietro; resta distesa. Una resa non uccide.
+- Convenzioni: `-x` = indietro (la CPU e' specchiata dal CSS, quindi vale per entrambi); pavimento a y = 111;
+  raggi di contatto in `RAGGIO` (la caviglia ha il piede sotto); passo fisso 1/60 s.
+- Un nuovo corpo con gli stessi nomi di giunti/ossa funziona senza toccare la fisica; se cambiano le lunghezze delle
+  ossa, ricontrollare `ARTI`/`MUSCOLO` in `fisica.js` e rifare girare `node test_fisica.js`.
+
+## 11. Errori gia' fatti (non ripetere)
 
 - Corpo frontale e tozzo: richiesto di profilo e sottile.
 - Nome di classe CSS `.flash`: gia' usato dai messaggi di sistema (bordo giallo sui pezzi). I pezzi usano `.lampeggia`.
 - Giudicare dalla `_preview` con griglia di pxl: ingrandire con Nearest, senza griglia, su fondo grigio chiaro.
 - Cambiare l'altezza dell'arena in base ai menu: la zona dei combattenti e' **statica** (vedi `style.css`).
-- Il browser di prova non ridisegna le animazioni quando il pannello e' nascosto: per verificare la fisica leggere
-  le trasformazioni o fare avanzare la simulazione a mano, non fidarsi di un solo screenshot.
+- Il browser di prova non esegue `requestAnimationFrame` (il ciclo della fisica non gira) e lo screenshot puo'
+  mostrare un fotogramma vecchio: far avanzare la simulazione con `Arena.passi(n)`, poi fare **due** screenshot
+  (o leggere le `transform` dei pezzi). La taratura vera si fa in Node con `test_fisica.js`.
