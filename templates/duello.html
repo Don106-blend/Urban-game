@@ -13,6 +13,7 @@
   </div>
 
   <div class="ring">
+    <div id="d-arena" class="arena"></div>
     <div id="d-scena" class="scena"></div>
     <div id="d-azioni" class="azioni"></div>
     <details class="storico">
@@ -26,5 +27,6 @@
   </div>
 </div>
 
+<script src="{{ url_for('static', filename='arena.js') }}"></script>
 <script src="{{ url_for('static', filename='duello.js') }}"></script>
 {% endblock %}

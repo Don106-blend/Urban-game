@@ -53,6 +53,7 @@ function render() {
   // la mira dell'uno evidenzia la locazione bersaglio sulla scheda dell'altro
   renderPannello("pan-player", S.player, S.cpu.mira);
   renderPannello("pan-cpu", S.cpu, S.player.mira);
+  Arena.update(S);
   renderScena();
   renderLog();
   renderAzioni();
@@ -342,6 +343,7 @@ function effettiNuoviEventi() {
   if (ultimoEffetto === null) { ultimoEffetto = maxN; return; }  // primo disegno: niente replay
   for (const ev of evs) {
     if (ev.n <= ultimoEffetto || ev.tipo !== "colpo") continue;
+    Arena.colpo(ev);
     const corner = document.querySelector(ev.chi === "p" ? ".corner-cpu" : ".corner-player");
     if (!corner) continue;
     const esito = ev.esito === "colpito" ? ["−" + ev.hp_persi, "fl-hit"] : [ESITI[ev.esito][0], "fl-miss"];

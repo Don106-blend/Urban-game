@@ -1,0 +1,14 @@
+{
+  "vista": "profilo",
+  "rivolto": "destra",
+  "canvas": [48, 111],
+  "colori": { "contorno": "#262626", "ombra": "#6a6a6a", "base": "#8e8e8e", "luce": "#b2b2b2", "riflesso": "#d8d8d8" },
+  "parti": {
+    "braccio_sx": { "file": "braccio_sx.png", "x": 12, "y": 21, "z": 0 },
+    "gamba_sx":   { "file": "gamba_sx.png",   "x": 19, "y": 53, "z": 0 },
+    "gamba_dx":   { "file": "gamba_dx.png",   "x": 15, "y": 53, "z": 1 },
+    "busto":      { "file": "busto.png",      "x": 14, "y": 18, "z": 2 },
+    "testa":      { "file": "testa.png",      "x": 14, "y": 0,  "z": 3 },
+    "braccio_dx": { "file": "braccio_dx.png", "x": 16, "y": 21, "z": 4 }
+  }
+}
