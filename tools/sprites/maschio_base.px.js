@@ -2,7 +2,8 @@
 // 5 grigi fissi (k contorno, a ombra, b base, c luce, d riflesso): la skin si cambia con una mappa
 // indice -> colore, quindi NON aggiungere altri grigi. La luce arriva da davanti-alto, cosi' resta
 // dal lato dell'avversario anche quando lo sprite viene specchiato.
-// Proporzioni: ~7.4 teste (testa 14px, altezza totale 105px), arto sottile come nel reference.
+// Proporzioni: cranio 14px interno, altezza totale 111px (~7 teste), arti sottili come nel reference.
+// Regole complete (palette, luce, tagli, giunti, overlay): STILE_SPRITE.md nella radice del progetto.
 pal({ k: "#262626", a: "#6a6a6a", b: "#8e8e8e", c: "#b2b2b2", d: "#d8d8d8" })
 ramps("abcd")
 
