@@ -159,6 +159,12 @@ const Arena = (() => {
     posa(lati[lato], RIPOSO());
   }
 
+  // scala intera dei pixel: la piu' grande che entra nell'altezza dell'arena (che dipende solo dalla finestra)
+  function adatta() {
+    const s = Math.max(1, Math.min(4, Math.floor((arenaEl.clientHeight - 44) / man.canvas[1])));
+    arenaEl.style.setProperty("--s", s);
+  }
+
   function update(S) {
     arenaEl = arenaEl || document.getElementById("d-arena");
     if (!arenaEl) return;
@@ -170,6 +176,8 @@ const Arena = (() => {
     if (primo) {
       arenaEl.innerHTML = "";
       costruisci("p"); costruisci("c");
+      new ResizeObserver(adatta).observe(arenaEl);
+      adatta();
     }
     for (const lato of ["p", "c"]) {
       const pg = lato === "p" ? S.player : S.cpu, L = lati[lato];

@@ -686,3 +686,61 @@ a.fighter-card:hover { transform: translateY(-3px); border-color: var(--volt); }
   body.duello-mode .danno-grande { font-size: 18px; }
   body.duello-mode .azioni { flex: 1 1 0; max-height: none; min-height: 90px; overflow-y: auto; }
 }
+
+/* ---------- colonna centrale del duello: 50% combattenti, 15% tiri, 35% mosse; niente scroll ---------- */
+/* le percentuali valgono sullo spazio che resta dopo la riga dello storico; tutto e' in flex con base 0, quindi
+   le proporzioni non dipendono mai dal contenuto (menu, mosse, tiri): cambia solo la finestra. */
+@media (min-width: 981px) {
+  body.duello-mode .ring { position: relative; gap: 8px; overflow: hidden; }
+  body.duello-mode .arena { flex: 50 1 0; height: auto; min-height: 0; }
+  body.duello-mode .scena { flex: 15 1 0; min-height: 0; overflow: hidden; display: flex; }
+  body.duello-mode .scena-carta { flex: 1 1 auto; min-height: 0; overflow: hidden; padding: 0 12px; gap: 0 18px;
+                                  align-content: center; }
+  body.duello-mode .scena-carta.entra { animation: none; }
+  body.duello-mode .scena-intesta { font-size: clamp(11px, 1.5vh, 14px); }
+  body.duello-mode .scena-azione b { font-size: clamp(12px, 1.8vh, 16px); }
+  body.duello-mode .dado { padding: 1px 10px; border-width: 1px; }
+  body.duello-mode .dado-titolo, body.duello-mode .dado-sotto { font-size: clamp(8px, 1.1vh, 10px); min-height: 0; }
+  body.duello-mode .dado-valore { font-size: clamp(16px, 3vh, 26px); line-height: 1.05; }
+  body.duello-mode .esito-colpo { font-size: clamp(12px, 2vh, 17px); letter-spacing: 1px; }
+  body.duello-mode .danno-grande { font-size: clamp(12px, 2vh, 17px); }
+  body.duello-mode .danno-grande .muted { display: none; }
+  body.duello-mode .scena-ko { font-size: clamp(12px, 2vh, 17px); letter-spacing: 2px; }
+
+  /* mosse: una griglia a righe uguali che riempie il 35%, bottoni compatti che non scorrono mai */
+  body.duello-mode .azioni { flex: 35 1 0; min-height: 0; max-height: none; overflow: hidden; padding: 6px;
+                             gap: 5px; grid-template-rows: auto; grid-auto-rows: minmax(0, 1fr); align-content: stretch; }
+  body.duello-mode .azioni > .titolo-menu { grid-row: auto; min-height: 0; font-size: 10.5px; letter-spacing: 1.5px;
+                                            align-self: center; }
+  body.duello-mode .azioni .btn { padding: 4px 9px; min-height: 0; overflow: hidden; font-size: clamp(11px, 1.6vh, 13.5px); }
+  body.duello-mode .btn-opz { gap: 1px; justify-content: center; }
+  body.duello-mode .btn-opz .scena-tags, body.duello-mode .btn-opz .scena-effetto { display: none; }
+  body.duello-mode .btn-opz .opz-meta { font-size: clamp(9px, 1.3vh, 11px); }
+  body.duello-mode .btn-opz .opz-desc { font-size: clamp(9px, 1.3vh, 11px); line-height: 1.25; -webkit-line-clamp: 1; }
+  body.duello-mode .azioni .attesa, body.duello-mode .azioni .esito { align-self: center; }
+  /* il questionario di fine duello non e' combattimento: li' si scorre */
+  body.duello-mode .azioni:has(.survey) { overflow-y: auto; display: block; }
+
+  /* lo storico e' un cassetto che si apre SOPRA la colonna: non toglie spazio a nessuna zona */
+  body.duello-mode .storico { flex: 0 0 auto; padding: 3px 12px; }
+  body.duello-mode .storico[open] .log { position: absolute; left: 0; right: 0; bottom: 30px; height: 220px;
+                                         z-index: 30; margin: 0; box-shadow: 0 -8px 24px rgba(0, 0, 0, .6); }
+}
+@media (min-width: 981px) {
+  body.duello-mode .scena-intesta { flex-wrap: nowrap; white-space: nowrap; overflow: hidden; line-height: 1.2; }
+  body.duello-mode .scena-intesta > * { overflow: hidden; text-overflow: ellipsis; }
+  body.duello-mode .scena-carta { row-gap: 2px; }
+}
+@media (min-width: 981px) {
+  body.duello-mode .arena { gap: calc(var(--s) * 40px); }
+  body.duello-mode .azioni .btn { width: 100%; box-sizing: border-box; }
+}
+@media (min-width: 981px) {
+  /* colonne fisse: i bottoni riempiono sempre la larghezza, qualunque sia il menu */
+  body.duello-mode .azioni { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  body.duello-mode .azioni:has(.btn-risposta) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (min-width: 981px) {
+  body.duello-mode .dado { min-width: 120px; }
+  body.duello-mode .dado-titolo, body.duello-mode .dado-sotto { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}
