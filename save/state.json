@@ -1,5 +1,5 @@
 {
- "crediti": 991560,
+ "crediti": 991710,
  "personaggi": [
   {
    "id": 7,
@@ -42,9 +42,9 @@
     1
    ],
    "vittorie": 3,
-   "sconfitte": 10,
+   "sconfitte": 11,
    "morto": false,
-   "last_heal": 1793222847.2261586,
+   "last_heal": 1793274028.2962768,
    "armi": [
     2
    ],
@@ -98,7 +98,7 @@
    "vittorie": 2,
    "sconfitte": 11,
    "morto": false,
-   "last_heal": 1793222847.2261586,
+   "last_heal": 1793274028.2962768,
    "armatura_equip": 2,
    "protesi": [
     1
@@ -145,7 +145,7 @@
    "vittorie": 0,
    "sconfitte": 2,
    "morto": false,
-   "last_heal": 1793222847.2261586
+   "last_heal": 1793274028.2962768
   },
   {
    "id": 21,
@@ -188,7 +188,7 @@
    "vittorie": 0,
    "sconfitte": 1,
    "morto": false,
-   "last_heal": 1793222847.2261586
+   "last_heal": 1793274028.2962768
   },
   {
    "id": 34,
@@ -216,7 +216,7 @@
    ],
    "hp": {
     "testa": 80,
-    "busto": 120,
+    "busto": -50,
     "braccio_sx": 100,
     "braccio_dx": 100,
     "gamba_sx": 100,
@@ -224,17 +224,17 @@
    },
    "crippled": [],
    "livello": 1,
-   "xp": 100,
+   "xp": 225,
    "token": 0,
-   "toughness": 1,
+   "toughness": 3,
    "armi": [],
    "armatura_equip": null,
    "protesi": [],
    "augments": [],
    "vittorie": 0,
-   "sconfitte": 1,
+   "sconfitte": 2,
    "morto": false,
-   "last_heal": 1793222847.2261586,
+   "last_heal": 1793274028.2962768,
    "bias_duelli": 0
   },
   {
@@ -298,7 +298,7 @@
    "vittorie": 2,
    "sconfitte": 1,
    "morto": false,
-   "last_heal": 1793222847.2261586
+   "last_heal": 1793274028.2962768
   },
   {
    "id": 36,
@@ -337,18 +337,18 @@
     }
    ],
    "hp": {
-    "testa": 80,
-    "busto": 120,
+    "testa": 95,
+    "busto": -53,
     "braccio_sx": 100,
     "braccio_dx": 100,
     "gamba_sx": 100,
-    "gamba_dx": 100
+    "gamba_dx": 9
    },
    "crippled": [],
    "livello": 5,
-   "xp": 525,
+   "xp": 650,
    "token": 0,
-   "toughness": 1,
+   "toughness": 3,
    "armi": [],
    "armatura_equip": 2,
    "protesi": [
@@ -359,9 +359,10 @@
     3
    ],
    "vittorie": 1,
-   "sconfitte": 0,
+   "sconfitte": 1,
    "morto": false,
-   "last_heal": 1793222847.2261586
+   "last_heal": 1793274300.8950143,
+   "bias_duelli": 0
   },
   {
    "id": 37,
@@ -401,7 +402,7 @@
    ],
    "hp": {
     "testa": 80,
-    "busto": 54,
+    "busto": 120,
     "braccio_sx": 100,
     "braccio_dx": 100,
     "gamba_sx": 100,
@@ -409,9 +410,9 @@
    },
    "crippled": [],
    "livello": 5,
-   "xp": 600,
+   "xp": 975,
    "token": 0,
-   "toughness": 2,
+   "toughness": 5,
    "armi": [
     1
    ],
@@ -420,11 +421,12 @@
    "augments": [
     6
    ],
-   "vittorie": 2,
-   "sconfitte": 0,
+   "vittorie": 3,
+   "sconfitte": 1,
    "morto": false,
-   "last_heal": 1793222799.1754577,
-   "bias_duelli": 0
+   "last_heal": 1793274028.2962768,
+   "bias_duelli": 1,
+   "bias": 1
   }
  ],
  "prossimo_id": 38,
