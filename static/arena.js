@@ -1,5 +1,5 @@
 /* Urban — arena del duello: due combattenti fisici (static/pupazzo.js) disegnati su un canvas, con sangue per locazione
-   che cresce col danno, ombre, schizzi, polvere e scosse dello schermo. Tutto in coordinate dello sprite (48x111,
+   che cresce col danno (e, in negativo, pelle strappata su carne e ossa), ombre, schizzi, polvere e scosse dello schermo. Tutto in coordinate dello sprite (48x111,
    static/sprites/maschio/parti.json) ingrandite di una scala intera; i pezzi si disegnano alla posa interpolata tra
    due passi di fisica (60 Hz fissi), a posizione e angolo *reali* (niente scatti a pixel interi). API:
    Arena.update(S) (stato del duello), Arena.colpo(ev) (uno scambio), Arena.passi(n) (avanza a mano, per i test). */
@@ -19,6 +19,7 @@ const Arena = (() => {
   const BORDO = 14;                 // fascia del pavimento in fondo all'arena (px schermo)
 
   let man = null, parti = null;     // parti.json e i pezzi caricati
+  const locEstesa = {};             // locazione -> {y0, y1}: righe dello sprite intero che occupa
   const lati = {};                  // "p" | "c" -> combattente
   let tela = null, ctx = null, arenaEl = null;
   let W = 0, H = 0, S = 2, dpr = 1; // dimensioni (px schermo), scala dei pixel sprite, densita'
@@ -46,39 +47,105 @@ const Arena = (() => {
   };
   const lim = (x, a, b) => Math.min(b, Math.max(a, x));
 
+  const leggi = (file) => new Promise(res => {
+    if (!file) return res(null);
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement("canvas");
+      c.width = img.width; c.height = img.height;
+      const cx = c.getContext("2d");
+      cx.drawImage(img, 0, 0);
+      res({tela: c, px: cx.getImageData(0, 0, img.width, img.height).data});
+    };
+    img.onerror = () => res(null);                  // l'interno e' facoltativo: senza, il corpo resta pelle e sangue
+    img.src = BASE + file;
+  });
+
   async function carica() {
     man = await (await fetch(BASE + "parti.json")).json();
-    const lista = await Promise.all(Object.entries(man.parti).map(([nome, p]) => new Promise(res => {
-      const img = new Image();
-      img.onload = () => {
-        const c = document.createElement("canvas");
-        c.width = img.width; c.height = img.height;
-        const cx = c.getContext("2d");
-        cx.drawImage(img, 0, 0);
-        res([nome, {...p, w: img.width, h: img.height, px: cx.getImageData(0, 0, img.width, img.height).data}]);
-      };
-      img.src = BASE + p.file;
-    })));
+    const lista = await Promise.all(Object.entries(man.parti).map(async ([nome, p]) => {
+      const [pelle, sk, ca] = await Promise.all([leggi(p.file), leggi(p.scheletro), leggi(p.carne)]);
+      return [nome, {...p, w: pelle.tela.width, h: pelle.tela.height, px: pelle.px, sk: sk && sk.tela, ca: ca && ca.px}];
+    }));
     parti = Object.fromEntries(lista);
+    // per ogni locazione, quanto e' lunga (in righe dello sprite intero): serve a centrare la ferita
+    for (const p of Object.values(parti)) {
+      const l = locEstesa[p.loc] = locEstesa[p.loc] || {y0: 1e9, y1: 0};
+      l.y0 = Math.min(l.y0, p.y0); l.y1 = Math.max(l.y1, p.y0 + p.h);
+    }
   }
 
-  /* skin + sangue: una macchia di rumore decide quali pixel sono sporchi, `danno` (0..1) alza la soglia.
-     Il rumore e' calcolato sulle coordinate dello sprite intero (y0), cosi' le due meta' di un arto sono continue. */
-  function disegnaPelle(lato, nome, danno) {
+  /* Sotto la pelle c'e' l'interno (scheletro e viscere, poi la carne): quando una locazione va in NEGATIVO la pelle si strappa
+     a macchie (alpha mask) e si intravede la carne, poi, piu' giu', l'osso. `prof` = -hp/hp_max in 0..1 (0 = non si vede niente,
+     1 = a -hp_max: del corpo restano ossa e brandelli). Le maschere sono *ranghi* per pixel (percentili di rumore a macchie piu'
+     la distanza da un centro-ferita fisso per locazione): cosi' la quota di pelle strappata e' esattamente quella voluta, e cresce
+     sempre a partire dagli stessi punti. */
+  const quotaPelle = (d) => d <= 0 ? 0 : Math.min(0.985, Math.max(0.08, 1 - Math.pow(1 - d, 1.4)));     // pelle strappata
+  const quotaCarne = (d) => d <= 0.1 ? 0 : Math.min(0.97, Math.pow((d - 0.1) / 0.9, 0.9));             // carne strappata (dopo la pelle)
+  const BORDO_FERITA = [92, 14, 26];
+
+  function rango(lato, nome, tipo) {
+    const L = lati[lato], k = nome + tipo;
+    if (L.rk[k]) return L.rk[k];
+    const p = parti[nome], ext = locEstesa[p.loc], len = Math.max(1, ext.y1 - ext.y0);
+    const sem = p.loc.length * 31 + p.loc.charCodeAt(p.loc.length - 1) + (lato === "p" ? 0 : 97) + tipo * 53;
+    const cx = 2 + 8 * hash(sem, 1, 5), cy = ext.y0 + len * (0.2 + 0.6 * hash(sem, 2, 5));      // il centro della ferita
+    const v = new Float32Array(p.w * p.h), idx = [];
+    for (let y = 0; y < p.h; y++) for (let x = 0; x < p.w; x++) {
+      const i = y * p.w + x;
+      if (!p.px[i * 4 + 3]) continue;
+      const dd = Math.hypot((x - cx) * 1.3, p.y0 + y - cy) / (len * 0.8 + 6);
+      v[i] = 0.5 * vn(x / 2.2, (y + p.y0) / 2.2, sem) + 0.15 * hash(x, y + p.y0, sem + 3) + 0.35 * Math.min(1, dd);
+      idx.push(i);
+    }
+    idx.sort((a, b) => v[a] - v[b]);
+    const r = new Float32Array(p.w * p.h).fill(-1);
+    idx.forEach((i, n) => { r[i] = n / idx.length; });
+    return L.rk[k] = r;
+  }
+
+  /* skin + sangue: una macchia di rumore decide quali pixel sono sporchi, `danno` (0..1) alza la soglia. Il rumore e' calcolato
+     sulle coordinate dello sprite intero (y0), cosi' le due meta' di un arto sono continue. Con `prof` > 0 i pixel strappati
+     spariscono e il bordo di quelli che restano e' un orlo di ferita. */
+  function disegnaPelle(lato, nome, danno, prof) {
     const p = parti[nome], cv = lati[lato].tele[nome], cx = cv.getContext("2d");
     const out = cx.createImageData(p.w, p.h);
     const seed = p.loc.length * 31 + p.loc.charCodeAt(p.loc.length - 1) + (lato === "p" ? 0 : 97);
-    const soglia = danno > 0 ? 0.1 + 0.9 * danno : 0;
+    const soglia = prof > 0 ? 1 - 0.5 * Math.sqrt(prof) : danno > 0 ? 0.1 + 0.9 * danno : 0;   // (continua con il caso sotto: a 0 hp e' 1)
+    const r = prof > 0 ? rango(lato, nome, 0) : null, q = quotaPelle(prof);
+    const resta = (x, y) => x >= 0 && y >= 0 && x < p.w && y < p.h && r[y * p.w + x] >= q;
     for (let y = 0; y < p.h; y++) for (let x = 0; x < p.w; x++) {
       const i = (y * p.w + x) * 4;
       if (!p.px[i + 3]) continue;
+      if (r && r[y * p.w + x] < q) continue;                                   // strappata: si vede quello che sta sotto
       const g = GRIGI[p.px[i]] || "b";
       let col = PELLI[lato][g];
       if (g !== "k" && soglia) {
         const v = 0.7 * vn(x / 3, (y + p.y0) / 3, seed) + 0.3 * hash(x, y + p.y0, seed + 7);
         if (v < soglia) col = SANGUE[soglia - v > 0.35 ? "a" : g];
       }
+      if (r && ((x > 0 && p.px[i - 4 + 3] && !resta(x - 1, y)) || (x < p.w - 1 && p.px[i + 4 + 3] && !resta(x + 1, y)) ||
+                (y > 0 && p.px[i - p.w * 4 + 3] && !resta(x, y - 1)) || (y < p.h - 1 && p.px[i + p.w * 4 + 3] && !resta(x, y + 1))))
+        col = BORDO_FERITA;
       out.data.set([col[0], col[1], col[2], 255], i);
+    }
+    cx.putImageData(out, 0, 0);
+  }
+
+  /* la carne: i pixel del suo sprite, strappati dopo la pelle (stessa idea, altra maschera); i bordi si scuriscono */
+  function disegnaCarne(lato, nome, prof) {
+    const p = parti[nome], cx = lati[lato].carne[nome].getContext("2d");
+    cx.clearRect(0, 0, p.w, p.h);
+    if (!(prof > 0) || !p.ca) return;
+    const out = cx.createImageData(p.w, p.h), r = rango(lato, nome, 1), q = quotaCarne(prof);
+    const resta = (x, y) => x >= 0 && y >= 0 && x < p.w && y < p.h && r[y * p.w + x] >= q;
+    for (let y = 0; y < p.h; y++) for (let x = 0; x < p.w; x++) {
+      const i = (y * p.w + x) * 4;
+      if (!p.ca[i + 3] || r[y * p.w + x] < q) continue;
+      const bordo = (x > 0 && p.ca[i - 4 + 3] && !resta(x - 1, y)) || (x < p.w - 1 && p.ca[i + 4 + 3] && !resta(x + 1, y)) ||
+                    (y > 0 && p.ca[i - p.w * 4 + 3] && !resta(x, y - 1)) || (y < p.h - 1 && p.ca[i + p.w * 4 + 3] && !resta(x, y + 1));
+      const f = bordo ? 0.62 : 1;
+      out.data.set([p.ca[i] * f, p.ca[i + 1] * f, p.ca[i + 2] * f, 255], i);
     }
     cx.putImageData(out, 0, 0);
   }
@@ -95,11 +162,12 @@ const Arena = (() => {
 
   function costruisci(lato) {
     const pup = new Pupazzo.Pupazzo(man);
-    const L = {lato, f: lato === "p" ? 1 : -1, O: 0, pup, tele: {}, sag: {}, danno: {}, lamp: {}, voci: [], nome: "",
+    const L = {lato, f: lato === "p" ? 1 : -1, O: 0, pup, tele: {}, carne: {}, rk: {}, sag: {}, chiave: {}, prof: {}, lamp: {}, voci: [], nome: "",
                ko: false, ultimo: null, xNome: 0};
     for (const [nome, p] of Object.entries(parti)) {
       const c = document.createElement("canvas"); c.width = p.w; c.height = p.h;
       L.tele[nome] = c; L.sag[nome] = sagoma(nome);
+      L.carne[nome] = c.cloneNode();
     }
     // l'elenco dei pezzi da disegnare: ognuno appeso a un corpo, con lo scarto del suo angolo in alto a sinistra dal
     // centro di massa (a riposo). Il piede e' ritagliato dallo stinco, con qualche riga in comune che nasconde la giuntura.
@@ -119,7 +187,7 @@ const Arena = (() => {
     }
     L.voci.sort((a, b) => a.z - b.z);
     lati[lato] = L;
-    for (const nome of Object.keys(parti)) disegnaPelle(lato, nome, 0);
+    for (const nome of Object.keys(parti)) disegnaPelle(lato, nome, 0, 0);
   }
 
   /* origine di ogni combattente nel mondo: i due bacini a `DIST` px l'uno dall'altro, al centro dell'arena */
@@ -184,9 +252,13 @@ const Arena = (() => {
       const b = C[v.corpo], [x, y, a] = posaCorpo(b);
       ctx.save();
       ctx.translate(x, y); ctx.rotate(a);
-      const tela_ = L.tele[v.nome];
+      const tela_ = L.tele[v.nome], pz = parti[v.nome];
+      if (L.prof[pz.loc] > 0) {                                                 // locazione in negativo: l'interno sotto la pelle
+        if (pz.sk) ctx.drawImage(pz.sk, 0, v.y0, tela_.width, v.h, v.ox, v.oy, tela_.width, v.h);
+        ctx.drawImage(L.carne[v.nome], 0, v.y0, tela_.width, v.h, v.ox, v.oy, tela_.width, v.h);
+      }
       ctx.drawImage(tela_, 0, v.y0, tela_.width, v.h, v.ox, v.oy, tela_.width, v.h);
-      const lamp = L.lamp[parti[v.nome].loc];
+      const lamp = L.lamp[pz.loc];
       if (lamp > 0) {
         ctx.globalAlpha = Math.min(1, lamp * 2.2);
         ctx.drawImage(L.sag[v.nome], 0, v.y0, tela_.width, v.h, v.ox, v.oy, tela_.width, v.h);
@@ -463,7 +535,12 @@ const Arena = (() => {
       for (const [nome, p] of Object.entries(parti)) {
         const h = pg.hp[p.loc];
         const danno = !h || h.protesi ? 0 : Math.min(1, Math.max(0, 1 - h.val / h.max));   // le protesi non sanguinano
-        if (L.danno[nome] !== danno) { L.danno[nome] = danno; disegnaPelle(lato, nome, danno); }
+        const prof = !h || h.protesi ? 0 : Math.min(1, Math.max(0, -h.val / h.max));        // ...e non si strappano
+        const chiave = danno + "|" + prof;
+        if (L.chiave[nome] !== chiave) {
+          L.chiave[nome] = chiave; L.prof[p.loc] = prof;
+          disegnaPelle(lato, nome, danno, prof); disegnaCarne(lato, nome, prof);
+        }
       }
       for (const loc of Object.keys(Pupazzo.LOC)) {
         const h = pg.hp[loc];

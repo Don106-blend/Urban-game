@@ -13,6 +13,7 @@ qualsiasi cosa**: serve a restare coerenti con il corpo base maschile (`maschio`
 |---|---|
 | Sorgente degli sprite (codice pxl, skill `pxl-pixel-art`) | `tools/sprites/maschio_base.px.js` |
 | PNG finali dei pezzi + manifest | `static/sprites/maschio/*.png`, `static/sprites/maschio/parti.json` |
+| Interno (scheletro, viscere, muscolo) sotto la pelle | `static/sprites/maschio/scheletro_*.png`, `carne_*.png` (sorgente: fondo di `maschio_base.px.js`, v. sez. 11) |
 | Anteprima (grigio + due ricolorazioni) | `tools/sprites/anteprima_maschio.png` |
 | Disegno nel duello (canvas), sangue, ricolorazione, scambi, effetti | `static/arena.js` |
 | Motore fisico a corpi rigidi | `static/fisica.js` |
@@ -26,7 +27,7 @@ Rigenerare i PNG (da `tools/sprites/`, `PXL` = `node <skill pxl>/bin/pxl.js`):
 PXL build tools/sprites/maschio_base.px.js --out <cartella temporanea>
 ```
 
-poi copiare `<out>/sprites/*.png` in `static/sprites/maschio/`. La scena `assemblato` (48x111) e lo sheet
+poi copiare `<out>/sprites/*.png` in `static/sprites/maschio/` (ci sono anche `scheletro_*` e `carne_*`). La scena `assemblato` (48x111) e lo sheet
 `parti` servono a controllare a occhio: ingrandirli senza griglia (Pillow, `Image.NEAREST`, x4-x6) prima di
 giudicare. Non usare lo `_preview` di pxl per giudicare le proporzioni: la griglia inganna.
 
@@ -122,6 +123,7 @@ l'alta (z maggiore).
 - `parti[nome]`: `file`, `loc` (locazione di gioco: testa, busto, braccio_sx/dx, gamba_sx/dx), `z` (ordine di
   disegno), `da`/`a` (i due giunti dell'osso), `perno` (punto dello sprite appeso al giunto `da`, in pixel locali),
   `y0` (riga di partenza nello sprite intero: serve a rendere continuo il sangue tra le due meta').
+- `scheletro`, `carne` (per pezzo, opzionali): i PNG dell'interno di quel pezzo (sez. 11). Stessa dimensione e stesso `perno` della pelle.
 - `piedi` (opzionale): `{parte: "stinco", riga: 26, sovrapposizione: 3}` = da quale riga dello sprite dello stinco si
   stacca il piede (corpo a se', con la caviglia), e quante righe condivide con lo stinco per nascondere la giuntura.
 - **Regola di posa**: ogni pezzo e' appeso al suo corpo rigido (`pupazzo.js`); il disegno e'
@@ -239,7 +241,43 @@ Tre strati, dal basso:
   `lab.scena({chi: "c", esito: "colpito", hp_persi: 70, loc: "busto", info: {tags: ["mischia"]}, tipo_danno: "taglio"}, {n: 12, ogni: 6})`.
   Per giudicare il movimento guardare i fogli e, soprattutto, le misure di `test_fisica.js`: un fotogramma non dice se e' fluido.
 
-## 11. Errori gia' fatti (non ripetere)
+## 11. Interno: scheletro, viscere, carne (`scheletro_*`, `carne_*`)
+
+Sotto la pelle di ogni pezzo ci sono due livelli, **stesso canvas, stessa sagoma, stessi perni** (il test `node test_fisica.js`, blocco 3,
+controlla dimensioni e sagome). Ordine di disegno per pezzo, dal basso: `scheletro` -> `carne` -> `pelle` (con il sangue).
+
+- `scheletro_<pezzo>`: ossa (4 toni: `s` contorno scuro, `t` ombra, `o` base, `p` luce, `q` riflesso) piu', nel busto, **organi**: polmoni
+  (`v u w`), cuore (`H h`), intestino (`j i g`). Testa: cranio con orbita, naso e denti, mascella, vertebre cervicali e trachea. Busto alto:
+  gabbia toracica (costole, sterno, clavicola, colonna). Busto basso: lombari, sacro, bacino, anse intestinali. Arti: omero, ulna e radio,
+  mano; femore e rotula; tibia, perone, piede. L'arto lontano (`_sx`) ha le stesse ossa un gradino piu' scure (`swap` p->o->t->s).
+- `carne_<pezzo>`: la sagoma della pelle riletta in rossi (`M n m l L`: contorno, ombra, base, luce, riflesso; **piu' spenti del sangue**
+  `SANGUE` di `arena.js`, che e' piu' vivo) con fibre muscolari (strisce lungo l'osso negli arti, oblique sul busto).
+- **Colori veri**, non indici: l'interno non si ricolora (non dipende dalla pelle del combattente). Stile come il resto: luce da
+  davanti-in-alto, niente antialiasing, 2-3 toni per materiale. Ossa e organi stanno **dentro la sagoma** (si ritagliano da soli nel
+  sorgente: `dentro()`), quindi non escono mai dalla pelle.
+- Nel sorgente: forme riempite (`rc` rettangolo, `el` ellisse, `ln` linea), `forma()` le ombreggia, `interno()` le registra. Per ritoccare
+  un osso si cambia la funzione del pezzo (`armSup`, `thigh`, `shin`...), non il PNG.
+
+**Quando si vede** (`arena.js`: `disegnaPelle`, `disegnaCarne`, `rango`): solo quando la locazione e' **in negativo**. `prof = -hp / hp_max`
+(0..1; le protesi restano a 0). Con `prof > 0` la pelle viene strappata a macchie (alpha mask) e sotto si intravede la carne; piu'
+si scende, piu' si strappa anche la carne e restano le ossa:
+
+| hp (busto, max 120) | `prof` | pelle strappata | carne strappata | effetto |
+|---|---|---|---|---|
+| -20 | 0,17 | ~23% | ~10% | danneggiato, si intravede l'interno |
+| -60 | 0,50 | ~62% | ~48% | mezzo corpo e' aperto |
+| -100 | 0,83 | ~92% | ~83% | quasi sparito: ossa, organi e brandelli |
+| -120 (= -max; un arto e' storpiato) | 1 | 98,5% | 97% | restano ossa e scampoli |
+
+- La maschera e' un **rango per pixel** (percentile di rumore a macchie + distanza da un centro-ferita fisso per locazione e per
+  combattente), quindi la quota strappata e' esattamente `quotaPelle(prof)` / `quotaCarne(prof)` e cresce sempre dagli stessi punti. La pelle
+  strappata ha l'orlo di ferita (`BORDO_FERITA`), la carne ai bordi scurisce. Il sangue della pelle e' continuo a 0 hp (soglia 1) e cala piano.
+- Testa e busto in negativo significano morte: si vedono sul cadavere. Gli arti in negativo si vedono da in piedi.
+- Se un pezzo non ha `scheletro`/`carne` nel manifest il gioco funziona lo stesso (resta pelle + sangue).
+- Provare nel laboratorio (`tools/lab/arena.html`): `lab.scena(null, {stato: {player: pg("A", {braccio_dx: -20, gamba_sx: -60}), cpu: pg("B", {busto: -100, testa: -80})}, n: 1, cols: 1, cella: 780, x0: 0.3, x1: 0.7})`.
+  Dopo una scena con un morto **ricaricare la pagina** (`reset` non lo fa rialzare).
+
+## 12. Errori gia' fatti (non ripetere)
 
 - Corpo frontale e tozzo: richiesto di profilo e sottile.
 - Nome di classe CSS `.flash`: gia' usato dai messaggi di sistema (bordo giallo sui pezzi). I pezzi usano `.lampeggia`.
@@ -251,4 +289,5 @@ Tre strati, dal basso:
 - Mettere una coppia di "raddrizzamento" sul bacino mentre i piedi sono a terra: litiga con le anche (limit cycle).
 - Far reggere tutto il peso alle gambe con un appoggio di 12 px: oscilla da un piede all'altro. Serve la molla di sostegno.
 - Aspettarsi che un piede poco carico regga una spinta orizzontale forte: scivola. La spinta e' limitata dall'attrito.
+- Interno: ritoccare i PNG a mano invece del sorgente; disegnare ossa che escono dalla sagoma della pelle (nel sorgente si ritagliano da sole).
 - Dare agli arti storpi solo "muscoli spenti": un avambraccio in equilibrio instabile ci mette secondi a cadere.

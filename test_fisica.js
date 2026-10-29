@@ -355,4 +355,58 @@ for (const forza of [0.1, 0.7, 1.6]) {
   ok(aCasa(p, x0, 2.5), "dopo la raffica torna a casa");
 }
 
+/* ====================================================================================================================
+   3. L'INTERNO DEGLI SPRITE (scheletro e carne sotto la pelle: static/sprites/maschio/{scheletro,carne}_*.png)
+   ==================================================================================================================== */
+{
+  // PNG a 8 bit senza interlaccio, a palette o RGBA (come li scrive pxl): decodifica minima, solo per confrontare le sagome.
+  // Restituisce `alfa[i]` per pixel.
+  const zlib = require("zlib");
+  const png = (file) => {
+    const b = fs.readFileSync(path.join(__dirname, "static/sprites/maschio", file));
+    ok(b.readUInt32BE(0) === 0x89504e47, `${file}: e' un PNG`);
+    const w = b.readUInt32BE(16), h = b.readUInt32BE(20), tipo = b[25], bpp = tipo === 6 ? 4 : 1;
+    ok(b[24] === 8 && (tipo === 6 || tipo === 3) && b[28] === 0, `${file}: 8 bit, a palette o RGBA, senza interlaccio`);
+    const idat = []; let trns = null;
+    for (let o = 8; o < b.length;) {
+      const len = b.readUInt32BE(o), t = b.toString("latin1", o + 4, o + 8);
+      if (t === "IDAT") idat.push(b.subarray(o + 8, o + 8 + len));
+      if (t === "tRNS") trns = b.subarray(o + 8, o + 8 + len);
+      o += 12 + len;
+    }
+    const raw = zlib.inflateSync(Buffer.concat(idat)), px = Buffer.alloc(w * h * bpp), riga = w * bpp;
+    for (let y = 0; y < h; y++) {
+      const f = raw[y * (riga + 1)], src = y * (riga + 1) + 1;
+      for (let x = 0; x < riga; x++) {
+        const a = x >= bpp ? px[y * riga + x - bpp] : 0, up = y ? px[(y - 1) * riga + x] : 0, ul = x >= bpp && y ? px[(y - 1) * riga + x - bpp] : 0;
+        const pr = a + up - ul, pa = Math.abs(pr - a), pb = Math.abs(pr - up), pc = Math.abs(pr - ul);
+        const paeth = pa <= pb && pa <= pc ? a : pb <= pc ? up : ul;
+        px[y * riga + x] = (raw[src + x] + (f === 1 ? a : f === 2 ? up : f === 3 ? (a + up) >> 1 : f === 4 ? paeth : 0)) & 255;
+      }
+    }
+    const alfa = new Uint8Array(w * h);
+    for (let i = 0; i < w * h; i++) alfa[i] = tipo === 6 ? px[i * 4 + 3] : (trns && px[i] < trns.length ? trns[px[i]] : 255);
+    return {w, h, alfa};
+  };
+  let pezzi = 0;
+  for (const [nome, p] of Object.entries(man.parti)) {
+    if (!p.scheletro && !p.carne) continue;
+    pezzi++;
+    ok(p.scheletro && p.carne, `${nome}: scheletro e carne vanno in coppia`);
+    const pelle = png(p.file), sk = png(p.scheletro), ca = png(p.carne);
+    ok(sk.w === pelle.w && sk.h === pelle.h && ca.w === pelle.w && ca.h === pelle.h, `${nome}: scheletro e carne hanno le dimensioni della pelle`);
+    let carneFuori = 0, carneBuchi = 0, ossa = 0, ossaFuori = 0;
+    for (let i = 0; i < pelle.w * pelle.h; i++) {
+      const sagoma = pelle.alfa[i] > 0, c = ca.alfa[i] > 0, o = sk.alfa[i] > 0;
+      if (c && !sagoma) carneFuori++;
+      if (sagoma && !c) carneBuchi++;
+      if (o) { ossa++; if (!sagoma) ossaFuori++; }
+    }
+    ok(carneFuori === 0 && carneBuchi === 0, `${nome}: la carne ha la stessa sagoma della pelle`);
+    ok(ossa > 20 && ossaFuori === 0, `${nome}: lo scheletro c'e' e sta dentro la sagoma (${ossa} px, ${ossaFuori} fuori)`);
+  }
+  ok(pezzi === Object.keys(man.parti).length, "ogni pezzo ha il suo interno");
+  log("interno: ", pezzi, "pezzi con scheletro e carne");
+}
+
 console.log(`OK - ${n} check passati`);

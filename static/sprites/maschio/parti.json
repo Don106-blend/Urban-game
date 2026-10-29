@@ -12,16 +12,16 @@
     "anca_sx": [23, 57], "ginocchio_sx": [23, 77], "caviglia_sx": [23, 102]
   },
   "parti": {
-    "braccio_sup_sx": { "file": "braccio_sup_sx.png", "loc": "braccio_sx", "z": 0,  "da": "spalla_sx",   "a": "gomito_sx",    "perno": [3, 4],  "y0": 0 },
-    "avambraccio_sx": { "file": "avambraccio_sx.png", "loc": "braccio_sx", "z": 1,  "da": "gomito_sx",   "a": "polso_sx",     "perno": [3, 0],  "y0": 22 },
-    "coscia_sx":      { "file": "coscia_sx.png",      "loc": "gamba_sx",   "z": 2,  "da": "anca_sx",     "a": "ginocchio_sx", "perno": [4, 4],  "y0": 0 },
-    "stinco_sx":      { "file": "stinco_sx.png",      "loc": "gamba_sx",   "z": 3,  "da": "ginocchio_sx", "a": "caviglia_sx", "perno": [4, 0],  "y0": 24 },
-    "coscia_dx":      { "file": "coscia_dx.png",      "loc": "gamba_dx",   "z": 4,  "da": "anca_dx",     "a": "ginocchio_dx", "perno": [4, 4],  "y0": 0 },
-    "stinco_dx":      { "file": "stinco_dx.png",      "loc": "gamba_dx",   "z": 5,  "da": "ginocchio_dx", "a": "caviglia_dx", "perno": [4, 0],  "y0": 24 },
-    "busto_sup":      { "file": "busto_sup.png",      "loc": "busto",      "z": 6,  "da": "vita",        "a": "collo_alto",   "perno": [6, 19], "y0": 0 },
-    "busto_inf":      { "file": "busto_inf.png",      "loc": "busto",      "z": 7,  "da": "vita",        "a": "anca",         "perno": [6, 0],  "y0": 19 },
-    "testa":          { "file": "testa.png",          "loc": "testa",      "z": 8,  "da": "collo_alto",  "a": "cima",         "perno": [7, 19], "y0": 0 },
-    "braccio_sup_dx": { "file": "braccio_sup_dx.png", "loc": "braccio_dx", "z": 9,  "da": "spalla_dx",   "a": "gomito_dx",    "perno": [3, 4],  "y0": 0 },
-    "avambraccio_dx": { "file": "avambraccio_dx.png", "loc": "braccio_dx", "z": 10, "da": "gomito_dx",   "a": "polso_dx",     "perno": [3, 0],  "y0": 22 }
+    "braccio_sup_sx": { "file": "braccio_sup_sx.png", "loc": "braccio_sx", "z": 0,  "da": "spalla_sx",   "a": "gomito_sx",    "perno": [3, 4],  "y0": 0, "scheletro": "scheletro_braccio_sup_sx.png", "carne": "carne_braccio_sup_sx.png" },
+    "avambraccio_sx": { "file": "avambraccio_sx.png", "loc": "braccio_sx", "z": 1,  "da": "gomito_sx",   "a": "polso_sx",     "perno": [3, 0],  "y0": 22, "scheletro": "scheletro_avambraccio_sx.png", "carne": "carne_avambraccio_sx.png" },
+    "coscia_sx":      { "file": "coscia_sx.png",      "loc": "gamba_sx",   "z": 2,  "da": "anca_sx",     "a": "ginocchio_sx", "perno": [4, 4],  "y0": 0, "scheletro": "scheletro_coscia_sx.png", "carne": "carne_coscia_sx.png" },
+    "stinco_sx":      { "file": "stinco_sx.png",      "loc": "gamba_sx",   "z": 3,  "da": "ginocchio_sx", "a": "caviglia_sx", "perno": [4, 0],  "y0": 24, "scheletro": "scheletro_stinco_sx.png", "carne": "carne_stinco_sx.png" },
+    "coscia_dx":      { "file": "coscia_dx.png",      "loc": "gamba_dx",   "z": 4,  "da": "anca_dx",     "a": "ginocchio_dx", "perno": [4, 4],  "y0": 0, "scheletro": "scheletro_coscia_dx.png", "carne": "carne_coscia_dx.png" },
+    "stinco_dx":      { "file": "stinco_dx.png",      "loc": "gamba_dx",   "z": 5,  "da": "ginocchio_dx", "a": "caviglia_dx", "perno": [4, 0],  "y0": 24, "scheletro": "scheletro_stinco_dx.png", "carne": "carne_stinco_dx.png" },
+    "busto_sup":      { "file": "busto_sup.png",      "loc": "busto",      "z": 6,  "da": "vita",        "a": "collo_alto",   "perno": [6, 19], "y0": 0, "scheletro": "scheletro_busto_sup.png", "carne": "carne_busto_sup.png" },
+    "busto_inf":      { "file": "busto_inf.png",      "loc": "busto",      "z": 7,  "da": "vita",        "a": "anca",         "perno": [6, 0],  "y0": 19, "scheletro": "scheletro_busto_inf.png", "carne": "carne_busto_inf.png" },
+    "testa":          { "file": "testa.png",          "loc": "testa",      "z": 8,  "da": "collo_alto",  "a": "cima",         "perno": [7, 19], "y0": 0, "scheletro": "scheletro_testa.png", "carne": "carne_testa.png" },
+    "braccio_sup_dx": { "file": "braccio_sup_dx.png", "loc": "braccio_dx", "z": 9,  "da": "spalla_dx",   "a": "gomito_dx",    "perno": [3, 4],  "y0": 0, "scheletro": "scheletro_braccio_sup_dx.png", "carne": "carne_braccio_sup_dx.png" },
+    "avambraccio_dx": { "file": "avambraccio_dx.png", "loc": "braccio_dx", "z": 10, "da": "gomito_dx",   "a": "polso_dx",     "perno": [3, 0],  "y0": 22, "scheletro": "scheletro_avambraccio_dx.png", "carne": "carne_avambraccio_dx.png" }
   }
 }
