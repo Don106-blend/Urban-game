@@ -20,6 +20,9 @@ qualsiasi cosa**: serve a restare coerenti con il corpo base maschile (`maschio`
 | Motore fisico a corpi rigidi | `static/fisica.js` |
 | Il combattente come ragdoll attivo (muscoli, passi, colpi, attacchi) | `static/pupazzo.js`, test: `node test_fisica.js` |
 | Banco di prova della fisica nel browser | `tools/lab/arena.html` (v. sez. 10) |
+| Fasciature (la garza al posto del sangue, in palestra) | `fascia_*.png` (sorgente: fondo di `maschio_aspetto.px.js`), manifest `aspetto.json` -> `fasciature` (v. sez. 16) |
+| Oggetti della palestra (sacco, rack, lavagna...): sorgente, PNG, manifest | `tools/sprites/palestra.px.js`, `static/sprites/palestra/*.png` + `oggetti.json` (v. sez. 15) |
+| La scena della palestra | `static/scena_palestra.js` (usa `Arena.kit` di `arena.js`) |
 | Stili dell'arena | fondo di `static/style.css` (blocchi "arena" e "colonna centrale") |
 
 Rigenerare i PNG (da `tools/sprites/`, `PXL` = `node <skill pxl>/bin/pxl.js`):
@@ -302,7 +305,7 @@ si scende, piu' si strappa anche la carne e restano le ossa:
 
 ## 13. Aspetto: capelli, vestiti e colori (`maschio_aspetto.px.js`, `aspetto.json`, `aspetto.py`)
 
-Ogni personaggio ha un **aspetto**: `{"sesso", "capelli", "maglia", "pantaloni", "seed"}`. Capelli, maglia e pantaloni sono overlay
+Ogni personaggio ha un **aspetto**: `{"sesso", "capelli", "maglia", "pantaloni", "copricapo", "seed"}` (`copricapo` puo' essere `null`). Capelli, maglia e pantaloni sono overlay
 (sez. 8) **a indici** come il corpo (k contorno, a ombra, b base, c luce, d riflesso): il colore non e' nei PNG ma si ricava a runtime
 dal `seed`, campionando due texture. Tutto e' dichiarato in `static/sprites/maschio/aspetto.json` (letto sia da `arena.js` sia dal
 server, `aspetto.py`): per aggiungere una capigliatura o un indumento si disegna, si dichiara nel manifest e basta.
@@ -342,7 +345,7 @@ Gli indumenti stanno sopra il corpo e le ferite; il braccio vicino resta sopra i
 - I capelli lunghi tengono x <= 4 all'altezza del collo (righe 15+), altrimenti coprono il collo.
 - A testa in negativo (cranio spaccato) i capelli si strappano come la pelle.
 
-### Maglie e pantaloni (3 + 3)
+### Maglie e pantaloni (33 maglie e 23 pantaloni: 3 + 3 base, poi 10 + 10, poi altri 10 + 10, poi 10 maglie cyberpunk)
 - Un overlay **per pezzo base** (`busto_sup`, `busto_inf`, `braccio_sup`, `avambraccio`, `coscia`, `stinco`): **stesso canvas e stessa sagoma** del pezzo di
   pelle (il test lo controlla: i pixel dell'indumento sono un sottoinsieme della pelle). Si ricavano dal pezzo (stessa luce, stessi toni),
   tagliati all'orlo (`fino(riga)`: taglia, contorno `k` sul bordo nuovo, ombra `a` sopra) e con i dettagli del tessuto. Il lato lontano (`_sx`)
@@ -357,12 +360,78 @@ Gli indumenti stanno sopra il corpo e le ferite; il braccio vicino resta sopra i
 | pantaloni **tre quarti** | + stinco | orlo alla riga 12 dello stinco | tasca sulla coscia |
 | pantaloni **lunghi** | + stinco | orlo alla riga 24 dello stinco (piede scoperto) | cucitura a punti |
 
+**Gli altri 10 + 10** (`maschio_aspetto.px.js`, secondo blocco): stesse regole; dove un pezzo e' uguale a quello di un altro indumento (manica
+lunga liscia, busto dei pantaloni lunghi...) il manifest punta allo stesso PNG, e si disegna solo cio' che cambia. Le operazioni (`taglia`, `bordo`,
+`riga`, `punti`, `fino`) toccano solo pixel gia' presenti nella pelle: un indumento non puo' uscire dalla sagoma.
+
+| maglie | com'e' | pantaloni | com'e' |
+|---|---|---|---|
+| polo | colletto e bottoni, manica corta | bermuda | al ginocchio |
+| felpa | cappuccio, tasca a marsupio, polsini | cargo | tasche sulla coscia e sullo stinco |
+| giacca di pelle | cerniera, bavero | jogger | banda laterale, polsino alla caviglia |
+| gilet | senza maniche, cerniera, taschino | leggings | fino alla caviglia, riflessi |
+| maglia a righe | righe orizzontali, manica corta | eleganti | piega centrale, cintura |
+| dolcevita | collo alto, maniche lunghe | pantaloncini sportivi | cortissimi, banda laterale |
+| camicia | colletto a V, bottoni | pinocchietto | sotto il ginocchio |
+| maniche a tre quarti | polsino a meta' avambraccio | a zampa | fascia chiara sul fondo |
+| top corto | finisce sotto il petto | gonna | pieghe, senza stinco |
+| cappotto | lungo, cintura, doppiopetto | jeans con toppe | toppe e strappi (la pelle si vede) |
+
+**Il terzo giro (altri 10 + 10)**, stesso metodo (`pixel(fn)` ritocca ogni pixel con una funzione `(x, y) -> tono`: fantasie a fiori, mimetico, quadri,
+gessato, righe imbottite). Un capo puo' avere un `colore` fisso nel manifest al posto di quello preso dalla texture (gli stivali di cuoio).
+
+| maglie | com'e' | pantaloni | com'e' |
+|---|---|---|---|
+| scollo a V | apertura a V sul petto | pelle | riflessi lucidi, cuciture |
+| raglan | cuciture oblique spalla-ascella | mimetici | macchie mimetiche a due toni |
+| camicia hawaiana | fantasia a fiori, scollo, bottoni | a quadri | righe orizzontali e verticali |
+| bomber | corto in vita con elastico, cerniera, maniche lunghe | gessato | righe verticali sottili |
+| tunica | lunga, cintura, maniche a tre quarti | kilt | gonna a quadri sopra il ginocchio |
+| corsetto | senza maniche, allacciatura a incrocio | imbottiti | righe orizzontali trapuntate, polsino |
+| parka | lungo, cappuccio, cerniera, tasche | harem | larghi, polsino alla caviglia |
+| t-shirt strappata | buchi e orlo sfrangiato | cuoio e stivali | **colore fisso marrone**, gli stivali coprono il piede |
+| maglia sportiva | senza maniche, bande laterali | con ginocchiere | rinforzi sulle ginocchia |
+| cardigan | aperto, bottoni, tasche | strappati | buchi alle ginocchia, orlo sfrangiato |
+
+**Cyberpunk (10 maglie, nessun pantalone)**, in fondo al terzo blocco del sorgente: il neon e' il tono `d` su fondo scuro, le scanalature sono `k` e `a`; il
+disegno continua da un pezzo all'altro (`pixel((x, y) => FN(x, y + 19))`). Alcuni hanno un `colore` fisso nel manifest, perche' con un colore a caso perderebbero
+cio' che li fa quelli che sono. Anteprima a colori: scene `cyber_anteprima_1` e `_2`.
+
+| maglia | com'e' | colore |
+|---|---|---|
+| giacca a LED (`led`) | colletto alto, cerniera, due strisce di neon lungo il fianco e sulle maniche | fisso blu notte |
+| corpetto tattico (`tattico`) | senza maniche, bretella a tracolla, tasche, cintura | dalla texture |
+| impermeabile riflettente (`impermeabile`) | lungo, colletto alto, cintura, bande catarifrangenti sul busto e sulle maniche | dalla texture |
+| tuta a circuiti (`circuiti`) | aderente, piste incise con un nodo a ogni capo | fisso ciano |
+| corazza con spallacci (`spallacci`) | piastra sul petto, addome a placche, spalline e bracciali (il resto delle braccia e' pelle) | fisso grigio acciaio |
+| piumino cromato (`cromato`) | cuciture orizzontali con il riflesso sotto, maniche lunghe | fisso argento |
+| maglia a rete (`rete`) | solo i fili in un reticolo a rombi (la pelle si vede in mezzo), colletto e polsini pieni | dalla texture |
+| tuta a pannelli (`tuta`) | nera, cuciture dei pannelli, rombo sul petto | fisso nero |
+| giubbotto a borchie (`borchie`) | cerniera obliqua, risvolto, borchie sulle spalle e lungo l'orlo | fisso cuoio nero |
+| camicia olografica (`olo`) | bande oblique dal buio al lampo, maniche corte | fisso viola |
+
 ### Strappi con i danni
 `arena.js: disegnaVestiti`. Per un pezzo, `f = (1 - hp/hp_max) / 0.85` limitato a 0..1 (hp della sua **locazione**, come per il sangue):
 **a 15% degli hp l'indumento di quella locazione e' tutto strappato** (f = 1). I pixel strappati sono quelli con rango minore (stessa
 maschera a ranghi della sez. 11, `rango(lato, nome, 2)`: la quota strappata e' esattamente `f`, e cresce dai punti di ferita); sotto
 si vede quello che c'e': pelle con il sangue, poi (in negativo) carne e ossa. I pixel che restano sul bordo di uno strappo scendono di un
 gradino di tono (`SCURO`), e sugli stracci compare sangue (soglia `0.85 f`). Le protesi non si strappano.
+
+### Copricapo (5 cappelli e 10 maschere)
+- `copricapo_<id>.png`, **stessa tela e stesso offset dei capelli** (32 x 50, `[-10, -10]`), a indici, **sopra i capelli** (ultimo livello della testa).
+  Contorno scuro pieno (sono oggetti sopra la testa, non capelli). Nel manifest: `tipo` (`cappello`/`maschera`), `non_con` (capigliature con cui non si
+  abbinano: volumi che escono dal cappello, cioe' ciuffo, mohicano, ricci, chignon alto), `nascondi_capelli`, `colore` fisso opzionale.
+- Cappelli: cappellino (visiera), berretto di lana (pompon), cappello a tesa larga, elmetto, bandana. Maschere: antigas (filtro), hockey (bianca),
+  mascherina chirurgica (azzurra), passamontagna (copre tutta la testa, **nasconde i capelli**, fessura per gli occhi), maschera da ballo.
+- **Maschere cyberpunk (5)**: visore cibernetico (fascia sugli occhi con la lente accesa e un'antenna dietro), respiratore a filtri (mascherina con filtro
+  tondo sulla guancia, cinghia e tubo che scende sul collo), occhio cibernetico (fascia con una lente grande sull'occhio e un'antenna), casco integrale
+  (copre tutta la testa e **nasconde i capelli**, visiera scura), placca cyborg (meta' del viso in metallo con lente e viti). Anteprima: scena `copricapo_cyber_anteprima`.
+- Colori: `colore` fisso dove ha senso (antigas, hockey, chirurgica, visore, respiratore, placca cyborg), altrimenti preso dalla texture dei vestiti (tag 9 del seed).
+- Assegnazione (`aspetto.py`): il 40% dei personaggi ne porta uno (`PROB_COPRICAPO`), scelto tra quelli compatibili con i capelli; la combinazione
+  (capelli, maglia, pantaloni, copricapo) resta unica. I salvataggi di prima ricevono la chiave `copricapo` una volta sola (`completa`, anche `null`).
+- Non si strappano, ma **cadono**: quando gli hp della testa scendono sotto il 50% (protesi escluse) il copricapo si stacca e fa il ragdoll (`staccaCopricapo` in
+  `arena.js`: parte dalla posa della testa con uno scatto all'indietro e in su, gravita', rimbalzi smorzati, attrito a terra) e resta sul pavimento. Se copriva i capelli
+  (passamontagna, casco) i capelli ricompaiono. Se gli hp risalgono (cura) torna in testa. Duello gia' finito: e' gia' a terra.
 
 ### Texture dei colori (il seed sceglie i colori)
 - `colori_vestiti.png` (151 x 4): **20 sezioni di colore di larghezza irregolare**. Piu' larga = piu' comune (jeans 22, nero 16, grigio 14 ...); la
@@ -385,4 +454,123 @@ gradino di tono (`SCURO`), e sugli stracci compare sangue (soglia `0.85 f`). Le 
   (tutti diversi; il campione se lo porta nel box). Il client lo riceve in `pannello()` -> `player.aspetto` / `cpu.aspetto`.
 - Il corpo e' ancora solo il maschile: i capelli F stanno sulla stessa testa. Un futuro corpo femminile cambiera' le forme ma i capelli
   restano compatibili se tengono la stessa testa (nomi dei pezzi, giunti, riga di taglio).
+- **Anteprima** nelle pagine Box, Contratti e Duelli: ogni carta ha sopra il nome un `<canvas class="anteprima" data-aspetto='{json}'>` che `static/anteprima.js` riempie con `Arena.anteprima(canvas, aspetto)` (`arena.js`, incluso nella pagina): corpo a riposo a scala 2, con pelle, maglia, pantaloni e capelli, stessi sprite e colori del duello; senza fisica. Nuovi pezzi del corpo o nuovi livelli vanno aggiunti anche li'.
 - Prova nel laboratorio (`tools/lab/arena.html`): `pg("A", {busto: 40}, [], {capelli: "f2", maglia: "lunga", pantaloni: "corti", seed: 7})`.
+
+## 14. Texture delle ferite, ali, braccia extra, volo e vittoria (`arena.js`, `pupazzo.js`)
+
+### Ferite per tipo di danno
+L'engine ricorda quanto danno di ogni tipo ha subito una locazione (`Personaggio.danni_tipo`, solo nel duello; `pannello()` lo manda nel campo
+`hp[loc].tipi`). `arena.js: disegnaPelle` disegna uno strato per tipo, **uno sopra l'altro** (si sovrappongono), sopra il sangue:
+
+| tipo | aspetto | note |
+|---|---|---|
+| contundente, taglio, ... (tutto il resto) | sangue rosso come prima | e' quello che resta: `danno - fuoco - acido - elettrico` (frazioni degli hp massimi) |
+| **fuoco** | macchie **nere** (`FUOCO`) | soglia a macchie come il sangue |
+| **acido** | verde giallastro con bolle scure (`ACIDO`) | **si applica lentamente: in 3 secondi** (`ACIDO_SECONDI`; `acidoVis` insegue `acidoObj` in `passo()`) |
+| **elettrico** | **cicatrice da fulmine** ramificata (`FULMINE`) | rami a zig-zag con sotto-rami da un punto (`fulmine()`), ogni cella ha un ordine: piu' danno = il disegno si allunga dalla radice |
+
+I numeri sono frazioni di `hp_max` (x1,7 per fuoco e acido: una botta da 30 su 100 si vede). Ogni tipo ha la sua maschera di rumore con un seme
+diverso, quindi due tipi sullo stesso punto si mescolano. Il contorno `k` non si sporca. Le texture stanno sulla **pelle** (non sui vestiti, che si
+strappano per conto loro, sez. 13). A duello gia' avviato, senza ricostruire lo stato, l'acido compare gia' del tutto (niente animazione).
+
+### Ali (potere "Ali")
+- `ali_ala.png` (46 x 50, indici, un'ala sola); `aspetto.json` -> `ali`: `perno` (il punto che sta sulla schiena) e `attacco` (pezzo `busto_sup`, punto
+  (3, 7) nel pezzo). Si disegna due volte, lontana (piu' scura, `far`) e vicina; il colore e' una tinta naturale schiarita dalla texture dei capelli
+  (`U(seed, 7)`): ogni personaggio ha ali diverse.
+- Sono dietro al busto (la lontana dietro a tutto) e ruotano attorno al perno: **a riposo rialzate dietro le spalle** (`ALI.riposo`, -1,0 rad: prima erano
+  ripiegate in basso e sembravano strane; leggero respiro), **in volo battono** (~1,9 Hz, `voloK` dosa il passaggio). Esistono solo se il potere e' attivo (`pannello().extra.ali`).
+- Prova: `pg("A", {}, [], undefined, {ali: true, volo: true})` nel laboratorio; anteprima: scena `ali_anteprima` del sorgente.
+
+### Volo (stance "Volo")
+`Pupazzo.volo(true)`: il bacino sale di `T.quotaVolo` (15 px), i piedi si raccolgono (`T.piediVolo`), la molla regge **tutto** il peso e una coppia tiene
+dritto il bacino (senza piedi a terra non lo fa nessuno: prima il corpo si piegava in avanti), con un dondolio lento. **In volo non si cammina**: la macchina dei passi non parte
+(prima, spinto o in attacco, i piedi continuavano ad alternarsi come camminando) e i piedi penzolano appena dietro le anche. L'ombra si rimpicciolisce da sola.
+Un colpo in volo scivola e rientra come a terra; `volo(false)` rimette a terra. Test: `node test_fisica.js`, blocco 2.9.
+
+### Braccia extra (potere "2x2")
+`disegnaBraccioExtra`: una **copia di ogni braccio** (stessa fisica, quindi segue il braccio vero), attaccata piu' in basso sul busto e ruotata attorno alla
+spalla; pelle, maglia e ferite sono quelle del braccio. Sparisce con il potere (`pannello().extra.braccia`).
+
+### Supervelocita' e Super Forza (effetti visivi legati al rango del potere ATTIVO)
+`pannello().extra` porta `velocita` e `forza` = il rango del potere se e' attivo, 0 se no (`Personaggio.rango_potere_attivo`); `arena.js` li legge in `L.extra`.
+- **Supervelocita'**: le animazioni del personaggio vanno **+25% per rango** (r1 1,25x, r2 1,5x, r3 1,75x, r4 2x), e tornano normali a potere spento. `avanzaL` fa piu' passi
+  di fisica per ogni passo di scena (`VEL_RANGO`) e il disegno interpola sull'intero tratto; gli scambi (attacchi, schivate) partono dal pupazzo, quindi durano di meno da soli
+  (un colpo: 55, 44, 37, 31, 28 passi per r0-r4).
+- **Super Forza**: **braccia e busto piu' grandi del 18,75% per rango** (r4 = +75%, `FORZA_RANGO`), crescendo e calando con dolcezza. E' solo visivo: tutto cio' che e' di sopra
+  al bacino (busto, braccia, ali, braccia extra) si ingrandisce attorno al bacino, che resta fermo, la testa sale col collo senza crescere, le gambe non cambiano. Per non far
+  sbagliare i colpi, la mira passa da `forzaPunto`: la mano fisica va dove, ingrandita, tocca la locazione (e l'impatto, le scintille e l'impulso usano il punto che si vede).
+
+### Vittoria (`Pupazzo.esulta`, `arena.js`)
+A duello finito, quando gli scambi in corso sono finiti e il perdente e' caduto (o si e' arreso), dopo circa 0,9 s **chi ha vinto esulta** e non smette piu'
+(la scena resta li'). Due animazioni, che `arena.js` sceglie su `St.vinto_dal_player` e sugli hp **totali** del vincitore (somma dei `val` / somma dei `max`):
+- **`salti`**: braccia al cielo (un po' in avanti: la spalla non le porta dietro la verticale) e saltelli. Sempre, se ha almeno meta' degli hp totali; sotto, a sorte
+  (50%) tra questa e l'altra. Un saltello: ci si accovaccia (0,12 s), una spinta sola (`T.saltoV`, circa 11 px di quota), in aria la molla non regge e i piedi
+  si raccolgono, poi l'atterraggio (la molla riprende subito e il bacino parte basso, cosi' non rimbalza). Un saltello ogni `T.saltoPer` (0,6 s).
+- **`braccio`**: **solo sotto meta' degli hp totali** (e a sorte). Un braccio solo al cielo (il destro, o il sinistro se e' storpio), l'altro che pende lungo il fianco,
+  poi la testa si china (circa 40 gradi) e le spalle cedono. Niente saltelli.
+- Casi limite: un braccio storpio non si alza; con una gamba storpia, da seduto o in volo alza le braccia ma non salta; senza braccia sane la testa si china
+  comunque; la morte (`muori`) cancella la festa; se cadono in due non vince nessuno. Dal laboratorio: `Arena.festeggia("p", "salti" | "braccio")`.
+- Prova: `node test_fisica.js`, blocco 2.10.
+
+### Regola generale
+Ali, braccia extra e volo dipendono **solo dallo stato attivo** (`extra`): a potere spento le texture extra non vengono piu' disegnate.
+
+## 15. La palestra: oggetti, scena e i nuovi movimenti del pupazzo
+
+La pagina della palestra (`static/palestra.js`) ha in cima una scena (`static/scena_palestra.js`) con gli allievi che fanno quello che hanno in
+programma. Riusa i combattenti del ring senza copiarli: `Arena.kit` (in fondo ad `arena.js`) espone quel che serve a una scena con un numero qualunque
+di allievi e una tela sua (`apriTela`, `crea`, `applica` = stato di un combattente da un oggetto-personaggio, `avanza` = un passo di fisica, `disegnaCombattente`...).
+Il duello continua a funzionare come prima: `applicaPg` e `avanzaL` sono le due funzioni estratte da `update()` e `passo()`, e i semi del rumore
+(`semeLato`) restano quelli di "p" e "c". Un combattente puo' stare piu' in alto (`L.dy`, la fila di dietro: chi riposa, studia, guarda).
+
+**Pupazzo, cose nuove** (`pupazzo.js`, prova: `node test_fisica.js` blocco 2.11):
+`rilassa(true|false)` = posa di chi non combatte (braccia lungo i fianchi, spalle e testa che cedono, respiro lento); `ciclo("pesi" | "corda", {fase, periodo})` =
+un gesto che si ripete finche' non lo ferma `fermaCicli()` (pesi: dal petto sopra la testa con le ginocchia che lavorano; corda: un saltello per giro, atterra
+morbido); `inCiclo()`. Le camminate lunghe non ci sono: il passo del pupazzo e' fatto per rientrare di pochi px, quindi in scena chi cambia postazione si dissolve e
+rientra (0,2 + 0,3 s).
+
+**Oggetti** (`tools/sprites/palestra.px.js`, 16 sprite). A differenza dei combattenti NON sono a 5 grigi-indice ricolorati dal gioco: hanno i colori veri (palette sobria e
+fredda), contorno `k`, luce da davanti-in alto come il resto. Un pixel = una scala intera (2 px schermo). Rigenerarli:
+
+```
+PXL build tools/sprites/palestra.px.js --out <cartella temporanea>
+python tools/sprites/palestra_manifest.py <cartella temporanea>
+```
+
+`palestra_manifest.py` copia i PNG in `static/sprites/palestra/` e scrive `oggetti.json` (dimensioni e **perno**: `fondo` = il centro del bordo basso, per cio' che sta per
+terra; `alto` = per cio' che e' appeso, cioe' sacco, lampada, targhe; `centro` = il bilanciere in mano). Se uno sprite manca la scena disegna un segnaposto. Per aggiungere un
+oggetto: disegnarlo in `palestra.px.js`, aggiungerlo a `PERNO` in `palestra_manifest.py`, e piazzarlo in `scena_palestra.js` (`oggettiMuro` / `oggettiPavimento`).
+
+**Come si prova.** `python tools/demo_palestra.py` apre una palestra piena su una cartella temporanea (porta 5057). Nel browser di prova `requestAnimationFrame` non gira: dalla
+console `ScenaPalestra.galleria()[0].passi(300)` fa avanzare e ridisegna la scena.
+
+
+## 16. Fasciature (la palestra non mostra sangue: mostra la garza)
+
+In palestra chi e' ferito non ha sangue, pelle strappata ne' carne in vista: ha una **fasciatura**. E' un overlay per pezzo come i vestiti (sez. 8 e 13), nel `static/sprites/maschio/`:
+`fascia_testa`, `fascia_busto_sup`, `fascia_busto_inf`, `fascia_braccio_sup`, `fascia_avambraccio` (braccio e pugno: come le bende da boxe, il polso resta scoperto), `fascia_coscia`,
+`fascia_stinco` (il piede no). Sorgente: il blocco in fondo a `tools/sprites/maschio_aspetto.px.js` (`fascia()`, `garza()`: giri diagonali, il lato in ombra e quello in luce del corpo si leggono
+ancora); dichiarate in `aspetto.json` -> `fasciature` (`colore` crema, `pezzi`). A 5 grigi-indice come il resto: arena.js li ricolora col crema (`rampa`), `far` per l'arto lontano.
+
+**Come si vedono** (`arena.js`: `applicaPg(lato, pg, primo, inPalestra)`, `disegnaFascia`): `g` = gravita' della locazione (`1 - hp/max`, 1 se storpia o in negativo, 0 per le protesi).
+Sotto `FASCIA_MIN` (10%) niente; sopra, la garza copre **una fetta della locazione, piu' larga quanto piu' grave** (30% del suo sviluppo a 0, tutto a 1; continua tra i due pezzi di un
+arto: coordinate dello sprite intero) e dal 40% in giu' di hp compaiono **macchie di sangue** sulla garza. Gli arti storpi restano storpi (la posa) ma fasciati. In palestra i vestiti restano
+interi e il cappello al suo posto. Il duello non cambia (`inPalestra` e' falso).
+Prova: `node test_fisica.js` (sagome); a occhio: demo della palestra (`python tools/demo_palestra.py`) e `ScenaPalestra.galleria()[0].passi(200)`.
+Ricostruire: `PXL build tools/sprites/maschio_aspetto.px.js --out <tmp>` e copiare `fascia_*.png` in `static/sprites/maschio/`.
+
+
+## 17. Cappotti con la falda staccata (trench e dieci cyberpunk)
+
+Un cappotto ha il busto e le maniche come ogni maglia (overlay per pezzo, `pezzi` in `aspetto.json`) **piu' una falda**: un pezzo staccato del modello che scende sul
+bacino e sulle cosce fino a dove vuole il cappotto, senza far parte delle gambe. Nel manifest e' la chiave `falda` della maglia: `{file, pezzo: "busto_inf", offset, perno}` (`offset` =
+angolo alto-sinistra della falda nel sistema del busto basso, sempre riga 13; `perno` = dove si appende, in cima). Sprite a indici come il resto; il disegno e' `arena.js: disegnaFalda`.
+- **Movimento.** E' un pendolo smorzato appeso al busto basso (`avanzaL`): se il corpo avanza si scosta all'indietro, poi ondeggia e si assesta; in volo si alza un poco. Sta sopra le gambe e sotto le braccia.
+- **Danni.** Si strappa con i danni del **busto**, come il resto del cappotto ma **dall'orlo in su** (`rangoFalda`, `disegnaVestiti`), con il sangue sugli stracci.
+- **I cappotti** (`maschio_aspetto.px.js`, blocchi "TRENCH" e "DIECI CAPPOTTI CYBERPUNK"; `falda(id, {w, h, riga, hem, forato, dett})`: `riga(y)` = estremi della riga, `hem(x)` = dove finisce la colonna, `forato(x, y)` = i buchi):
+  `trench` (base, al ginocchio), `trench_neon` (dritto, al polpaccio, bordi al neon), `trench_asimm` (orlo in diagonale), `trench_corto` (giubbotto lungo), `trench_coda` (coda di rondine),
+  `trench_manto` (mantello a campana, pieghe a raggiera), `trench_frange` (strisce di lunghezze diverse), `trench_piastre` (gonna di tre piastre coi cavi in mezzo),
+  `trench_strascico` (spolverino che dietro trascina), `trench_aderente` (a matita fino alla caviglia, con spacco), `trench_zigzag` (orlo a dente di sega, piste di circuito).
+  Colori fissi nel manifest per i piu' (`colore`). Per un cappotto nuovo: una `falda(...)`, i due overlay del busto, e la voce in `aspetto.json` (con `falda`).
+- Test: `node test_fisica.js` (la falda sta nella tela, a indici, appesa al busto basso). Anteprima: scena `trench_cyber_anteprima`.

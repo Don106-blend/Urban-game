@@ -3,9 +3,57 @@
 {% block content %}
 <div class="page-head">
   <h1>NEGOZIO</h1>
-  <p class="muted">Oggetti ed equipaggiamenti. L'inventario crescerà.</p>
+  <p class="muted">Attrezzi per la palestra, equipaggiamento per i combattenti. Quello che togli a un combattente finisce in magazzino:
+     non si butta, si rimonta.</p>
 </div>
 
+<h2 class="neg-sub" id="attrezzi">Attrezzi della palestra <span class="muted">· posti: {{ occupati }}/{{ capienza }}</span></h2>
+<div class="card-grid">
+  {% for aid, a in attrezzi.items() if not a.iniziale %}
+  <div class="fighter-card shop-item {{ 'posseduto' if aid in posseduti }}">
+    <div class="fc-top">
+      <span class="fc-nome">🏋 {{ a.nome }}</span>
+      {% if aid in posseduti %}<span class="badge badge-pronto">IN PALESTRA</span>{% else %}<span class="costo">¤ {{ a.prezzo }}</span>{% endif %}
+    </div>
+    <p class="muted">{{ a.descrizione }}</p>
+    <p class="attrezzo-effetto">{{ a.effetto }}</p>
+    {% if aid not in posseduti %}
+    <form method="post" action="{{ url_for('negozio_attrezzo') }}">
+      <input type="hidden" name="id" value="{{ aid }}">
+      <button class="btn btn-volt full" {{ 'disabled' if crediti < a.prezzo }}>
+        {{ 'Monta in palestra' if crediti >= a.prezzo else 'Crediti insufficienti' }}
+      </button>
+    </form>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+{% if magazzino %}
+<h2 class="neg-sub" id="magazzino">Magazzino <span class="muted">· gratis da rimontare</span></h2>
+<div class="card-grid">
+  {% for m in magazzino %}
+  <div class="fighter-card shop-item">
+    <div class="fc-top">
+      <span class="fc-nome">{{ {'arma': '🗡', 'armatura': '🛡', 'protesi': '⚙', 'augment': '🔩'}[m.cat] }} {{ m.item.nome }}</span>
+      <span class="badge badge-rango">{{ m.cat|upper }}</span>
+    </div>
+    <p class="muted">{{ m.item.descrizione }}</p>
+    {% if vivi %}
+    <form method="post" action="{{ url_for('negozio_magazzino_equip') }}">
+      <input type="hidden" name="indice" value="{{ m.indice }}">
+      <select name="pid" class="select">
+        {% for c in vivi %}<option value="{{ c.id }}">{{ c.nome }}</option>{% endfor %}
+      </select>
+      <button class="btn btn-ghost full">Consegna</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<h2 class="neg-sub">Equipaggiamento</h2>
 <div class="card-grid">
   <div class="fighter-card shop-item">
     <div class="fc-top">
@@ -50,7 +98,7 @@
       </button>
     </form>
     {% else %}
-    <p class="muted">Nessun eroe nel box.</p>
+    <p class="muted">Nessun allievo in palestra.</p>
     {% endif %}
   </div>
   {% endfor %}
@@ -77,7 +125,7 @@
       </button>
     </form>
     {% else %}
-    <p class="muted">Nessun eroe nel box.</p>
+    <p class="muted">Nessun allievo in palestra.</p>
     {% endif %}
   </div>
   {% endfor %}
@@ -105,7 +153,7 @@
       </button>
     </form>
     {% else %}
-    <p class="muted">Nessun eroe nel box.</p>
+    <p class="muted">Nessun allievo in palestra.</p>
     {% endif %}
   </div>
   {% endfor %}
@@ -133,7 +181,7 @@
       </button>
     </form>
     {% else %}
-    <p class="muted">Nessun eroe nel box.</p>
+    <p class="muted">Nessun allievo in palestra.</p>
     {% endif %}
   </div>
   {% endfor %}

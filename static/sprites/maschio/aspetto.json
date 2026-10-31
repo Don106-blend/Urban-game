@@ -1,5 +1,5 @@
 {
- "descrizione": "Aspetto del corpo maschile: capigliature, maglie, pantaloni e texture dei colori. Vedi STILE_SPRITE.md sez. 13.",
+ "descrizione": "Aspetto del corpo maschile: capigliature, maglie, pantaloni, ali, fasciature e texture dei colori. Vedi STILE_SPRITE.md sez. 13, 14 e 16.",
  "texture": {
   "vestiti": "colori_vestiti.png",
   "capelli": "colori_capelli.png"
@@ -193,6 +193,601 @@
     "braccio_sup": "maglia_lunga_braccio_sup.png",
     "avambraccio": "maglia_lunga_avambraccio.png"
    }
+  },
+  {
+   "id": "polo",
+   "nome": "Polo",
+   "pezzi": {
+    "busto_sup": "maglia_polo_busto_sup.png",
+    "busto_inf": "maglia_polo_busto_inf.png",
+    "braccio_sup": "maglia_tshirt_braccio_sup.png"
+   }
+  },
+  {
+   "id": "felpa",
+   "nome": "Felpa",
+   "pezzi": {
+    "busto_sup": "maglia_felpa_busto_sup.png",
+    "busto_inf": "maglia_felpa_busto_inf.png",
+    "braccio_sup": "maglia_lunga_braccio_sup.png",
+    "avambraccio": "maglia_lunga_avambraccio.png"
+   }
+  },
+  {
+   "id": "giacca",
+   "nome": "Giacca di pelle",
+   "pezzi": {
+    "busto_sup": "maglia_giacca_busto_sup.png",
+    "busto_inf": "maglia_giacca_busto_inf.png",
+    "braccio_sup": "maglia_lunga_braccio_sup.png",
+    "avambraccio": "maglia_lunga_avambraccio.png"
+   }
+  },
+  {
+   "id": "gilet",
+   "nome": "Gilet",
+   "pezzi": {
+    "busto_sup": "maglia_gilet_busto_sup.png",
+    "busto_inf": "maglia_gilet_busto_inf.png"
+   }
+  },
+  {
+   "id": "righe",
+   "nome": "Maglia a righe",
+   "pezzi": {
+    "busto_sup": "maglia_righe_busto_sup.png",
+    "busto_inf": "maglia_righe_busto_inf.png",
+    "braccio_sup": "maglia_righe_braccio_sup.png"
+   }
+  },
+  {
+   "id": "dolcevita",
+   "nome": "Dolcevita",
+   "pezzi": {
+    "busto_sup": "maglia_dolcevita_busto_sup.png",
+    "busto_inf": "maglia_dolcevita_busto_inf.png",
+    "braccio_sup": "maglia_lunga_braccio_sup.png",
+    "avambraccio": "maglia_lunga_avambraccio.png"
+   }
+  },
+  {
+   "id": "camicia",
+   "nome": "Camicia",
+   "pezzi": {
+    "busto_sup": "maglia_camicia_busto_sup.png",
+    "busto_inf": "maglia_camicia_busto_inf.png",
+    "braccio_sup": "maglia_lunga_braccio_sup.png",
+    "avambraccio": "maglia_lunga_avambraccio.png"
+   }
+  },
+  {
+   "id": "manica34",
+   "nome": "Maniche a tre quarti",
+   "pezzi": {
+    "busto_sup": "maglia_manica34_busto_sup.png",
+    "busto_inf": "maglia_manica34_busto_inf.png",
+    "braccio_sup": "maglia_lunga_braccio_sup.png",
+    "avambraccio": "maglia_manica34_avambraccio.png"
+   }
+  },
+  {
+   "id": "crop",
+   "nome": "Top corto",
+   "pezzi": {
+    "busto_sup": "maglia_crop_busto_sup.png",
+    "braccio_sup": "maglia_tshirt_braccio_sup.png"
+   }
+  },
+  {
+   "id": "cappotto",
+   "nome": "Cappotto",
+   "pezzi": {
+    "busto_sup": "maglia_cappotto_busto_sup.png",
+    "busto_inf": "maglia_cappotto_busto_inf.png",
+    "braccio_sup": "maglia_lunga_braccio_sup.png",
+    "avambraccio": "maglia_lunga_avambraccio.png"
+   }
+  },
+  {
+   "id": "vscollo",
+   "nome": "Scollo a V",
+   "pezzi": {
+    "busto_sup": "maglia_vscollo_busto_sup.png",
+    "busto_inf": "maglia_tshirt_busto_inf.png",
+    "braccio_sup": "maglia_tshirt_braccio_sup.png"
+   }
+  },
+  {
+   "id": "raglan",
+   "nome": "Raglan",
+   "pezzi": {
+    "busto_sup": "maglia_raglan_busto_sup.png",
+    "busto_inf": "maglia_tshirt_busto_inf.png",
+    "braccio_sup": "maglia_tshirt_braccio_sup.png"
+   }
+  },
+  {
+   "id": "hawaiana",
+   "nome": "Camicia hawaiana",
+   "pezzi": {
+    "busto_sup": "maglia_hawaiana_busto_sup.png",
+    "busto_inf": "maglia_hawaiana_busto_inf.png",
+    "braccio_sup": "maglia_hawaiana_braccio_sup.png"
+   }
+  },
+  {
+   "id": "bomber",
+   "nome": "Bomber",
+   "pezzi": {
+    "busto_sup": "maglia_bomber_busto_sup.png",
+    "busto_inf": "maglia_bomber_busto_inf.png",
+    "braccio_sup": "maglia_lunga_braccio_sup.png",
+    "avambraccio": "maglia_lunga_avambraccio.png"
+   }
+  },
+  {
+   "id": "tunica",
+   "nome": "Tunica",
+   "pezzi": {
+    "busto_sup": "maglia_tunica_busto_sup.png",
+    "busto_inf": "maglia_tunica_busto_inf.png",
+    "braccio_sup": "maglia_lunga_braccio_sup.png",
+    "avambraccio": "maglia_manica34_avambraccio.png"
+   }
+  },
+  {
+   "id": "corsetto",
+   "nome": "Corsetto",
+   "pezzi": {
+    "busto_sup": "maglia_corsetto_busto_sup.png",
+    "busto_inf": "maglia_corsetto_busto_inf.png"
+   }
+  },
+  {
+   "id": "parka",
+   "nome": "Parka",
+   "pezzi": {
+    "busto_sup": "maglia_parka_busto_sup.png",
+    "busto_inf": "maglia_parka_busto_inf.png",
+    "braccio_sup": "maglia_lunga_braccio_sup.png",
+    "avambraccio": "maglia_lunga_avambraccio.png"
+   }
+  },
+  {
+   "id": "strappata",
+   "nome": "T-shirt strappata",
+   "pezzi": {
+    "busto_sup": "maglia_strappata_busto_sup.png",
+    "busto_inf": "maglia_strappata_busto_inf.png",
+    "braccio_sup": "maglia_strappata_braccio_sup.png"
+   }
+  },
+  {
+   "id": "jersey",
+   "nome": "Maglia sportiva",
+   "pezzi": {
+    "busto_sup": "maglia_jersey_busto_sup.png",
+    "busto_inf": "maglia_jersey_busto_inf.png"
+   }
+  },
+  {
+   "id": "cardigan",
+   "nome": "Cardigan",
+   "pezzi": {
+    "busto_sup": "maglia_cardigan_busto_sup.png",
+    "busto_inf": "maglia_cardigan_busto_inf.png",
+    "braccio_sup": "maglia_lunga_braccio_sup.png",
+    "avambraccio": "maglia_lunga_avambraccio.png"
+   }
+  },
+  {
+   "id": "led",
+   "nome": "Giacca a LED",
+   "pezzi": {
+    "busto_sup": "maglia_led_busto_sup.png",
+    "busto_inf": "maglia_led_busto_inf.png",
+    "braccio_sup": "maglia_led_braccio_sup.png",
+    "avambraccio": "maglia_led_avambraccio.png"
+   },
+   "colore": [
+    34,
+    36,
+    56
+   ]
+  },
+  {
+   "id": "tattico",
+   "nome": "Corpetto tattico",
+   "pezzi": {
+    "busto_sup": "maglia_tattico_busto_sup.png",
+    "busto_inf": "maglia_tattico_busto_inf.png"
+   }
+  },
+  {
+   "id": "impermeabile",
+   "nome": "Impermeabile riflettente",
+   "pezzi": {
+    "busto_sup": "maglia_impermeabile_busto_sup.png",
+    "busto_inf": "maglia_impermeabile_busto_inf.png",
+    "braccio_sup": "maglia_impermeabile_braccio_sup.png",
+    "avambraccio": "maglia_impermeabile_avambraccio.png"
+   }
+  },
+  {
+   "id": "circuiti",
+   "nome": "Tuta a circuiti",
+   "pezzi": {
+    "busto_sup": "maglia_circuiti_busto_sup.png",
+    "busto_inf": "maglia_circuiti_busto_inf.png",
+    "braccio_sup": "maglia_circuiti_braccio_sup.png",
+    "avambraccio": "maglia_circuiti_avambraccio.png"
+   },
+   "colore": [
+    30,
+    170,
+    190
+   ]
+  },
+  {
+   "id": "spallacci",
+   "nome": "Corazza con spallacci",
+   "pezzi": {
+    "busto_sup": "maglia_spallacci_busto_sup.png",
+    "busto_inf": "maglia_spallacci_busto_inf.png",
+    "braccio_sup": "maglia_spallacci_braccio_sup.png",
+    "avambraccio": "maglia_spallacci_avambraccio.png"
+   },
+   "colore": [
+    96,
+    102,
+    116
+   ]
+  },
+  {
+   "id": "cromato",
+   "nome": "Piumino cromato",
+   "pezzi": {
+    "busto_sup": "maglia_cromato_busto_sup.png",
+    "busto_inf": "maglia_cromato_busto_inf.png",
+    "braccio_sup": "maglia_cromato_braccio_sup.png",
+    "avambraccio": "maglia_cromato_avambraccio.png"
+   },
+   "colore": [
+    150,
+    158,
+    172
+   ]
+  },
+  {
+   "id": "rete",
+   "nome": "Maglia a rete",
+   "pezzi": {
+    "busto_sup": "maglia_rete_busto_sup.png",
+    "busto_inf": "maglia_rete_busto_inf.png",
+    "braccio_sup": "maglia_rete_braccio_sup.png",
+    "avambraccio": "maglia_rete_avambraccio.png"
+   }
+  },
+  {
+   "id": "tuta",
+   "nome": "Tuta a pannelli",
+   "pezzi": {
+    "busto_sup": "maglia_tuta_busto_sup.png",
+    "busto_inf": "maglia_tuta_busto_inf.png",
+    "braccio_sup": "maglia_tuta_braccio_sup.png",
+    "avambraccio": "maglia_tuta_avambraccio.png"
+   },
+   "colore": [
+    36,
+    36,
+    44
+   ]
+  },
+  {
+   "id": "borchie",
+   "nome": "Giubbotto a borchie",
+   "pezzi": {
+    "busto_sup": "maglia_borchie_busto_sup.png",
+    "busto_inf": "maglia_borchie_busto_inf.png",
+    "braccio_sup": "maglia_borchie_braccio_sup.png",
+    "avambraccio": "maglia_borchie_avambraccio.png"
+   },
+   "colore": [
+    46,
+    40,
+    42
+   ]
+  },
+  {
+   "id": "olo",
+   "nome": "Camicia olografica",
+   "pezzi": {
+    "busto_sup": "maglia_olo_busto_sup.png",
+    "busto_inf": "maglia_olo_busto_inf.png",
+    "braccio_sup": "maglia_olo_braccio_sup.png"
+   },
+   "colore": [
+    120,
+    90,
+    210
+   ]
+  },
+  {
+   "id": "trench",
+   "nome": "Trench",
+   "pezzi": {
+    "busto_sup": "maglia_trench_busto_sup.png",
+    "busto_inf": "maglia_trench_busto_inf.png",
+    "braccio_sup": "maglia_lunga_braccio_sup.png",
+    "avambraccio": "maglia_lunga_avambraccio.png"
+   },
+   "falda": {
+    "file": "maglia_trench_falda.png",
+    "pezzo": "busto_inf",
+    "offset": [
+     -3,
+     13
+    ],
+    "perno": [
+     10,
+     0
+    ]
+   }
+  },
+  {
+   "id": "trench_neon",
+   "nome": "Trench neon",
+   "pezzi": {
+    "busto_sup": "maglia_trench_neon_busto_sup.png",
+    "busto_inf": "maglia_trench_neon_busto_inf.png",
+    "braccio_sup": "maglia_led_braccio_sup.png",
+    "avambraccio": "maglia_led_avambraccio.png"
+   },
+   "falda": {
+    "file": "maglia_trench_neon_falda.png",
+    "pezzo": "busto_inf",
+    "offset": [
+     -3,
+     13
+    ],
+    "perno": [
+     10,
+     0
+    ]
+   },
+   "colore": [
+    26,
+    28,
+    46
+   ]
+  },
+  {
+   "id": "trench_asimm",
+   "nome": "Trench asimmetrico",
+   "pezzi": {
+    "busto_sup": "maglia_trench_asimm_busto_sup.png",
+    "busto_inf": "maglia_trench_asimm_busto_inf.png",
+    "braccio_sup": "maglia_lunga_braccio_sup.png",
+    "avambraccio": "maglia_lunga_avambraccio.png"
+   },
+   "falda": {
+    "file": "maglia_trench_asimm_falda.png",
+    "pezzo": "busto_inf",
+    "offset": [
+     -4,
+     13
+    ],
+    "perno": [
+     11,
+     0
+    ]
+   }
+  },
+  {
+   "id": "trench_corto",
+   "nome": "Giubbotto lungo",
+   "pezzi": {
+    "busto_sup": "maglia_trench_corto_busto_sup.png",
+    "busto_inf": "maglia_trench_corto_busto_inf.png",
+    "braccio_sup": "maglia_lunga_braccio_sup.png",
+    "avambraccio": "maglia_lunga_avambraccio.png"
+   },
+   "falda": {
+    "file": "maglia_trench_corto_falda.png",
+    "pezzo": "busto_inf",
+    "offset": [
+     -3,
+     13
+    ],
+    "perno": [
+     10,
+     0
+    ]
+   }
+  },
+  {
+   "id": "trench_coda",
+   "nome": "Trench a coda di rondine",
+   "pezzi": {
+    "busto_sup": "maglia_trench_coda_busto_sup.png",
+    "busto_inf": "maglia_trench_coda_busto_inf.png",
+    "braccio_sup": "maglia_lunga_braccio_sup.png",
+    "avambraccio": "maglia_lunga_avambraccio.png"
+   },
+   "falda": {
+    "file": "maglia_trench_coda_falda.png",
+    "pezzo": "busto_inf",
+    "offset": [
+     -3,
+     13
+    ],
+    "perno": [
+     10,
+     0
+    ]
+   },
+   "colore": [
+    40,
+    26,
+    58
+   ]
+  },
+  {
+   "id": "trench_manto",
+   "nome": "Mantello a campana",
+   "pezzi": {
+    "busto_sup": "maglia_trench_manto_busto_sup.png",
+    "busto_inf": "maglia_trench_manto_busto_inf.png",
+    "braccio_sup": "maglia_lunga_braccio_sup.png",
+    "avambraccio": "maglia_lunga_avambraccio.png"
+   },
+   "falda": {
+    "file": "maglia_trench_manto_falda.png",
+    "pezzo": "busto_inf",
+    "offset": [
+     -7,
+     13
+    ],
+    "perno": [
+     14,
+     0
+    ]
+   },
+   "colore": [
+    70,
+    78,
+    94
+   ]
+  },
+  {
+   "id": "trench_frange",
+   "nome": "Trench a frange",
+   "pezzi": {
+    "busto_sup": "maglia_trench_frange_busto_sup.png",
+    "busto_inf": "maglia_trench_frange_busto_inf.png",
+    "braccio_sup": "maglia_lunga_braccio_sup.png",
+    "avambraccio": "maglia_lunga_avambraccio.png"
+   },
+   "falda": {
+    "file": "maglia_trench_frange_falda.png",
+    "pezzo": "busto_inf",
+    "offset": [
+     -3,
+     13
+    ],
+    "perno": [
+     10,
+     0
+    ]
+   },
+   "colore": [
+    96,
+    56,
+    34
+   ]
+  },
+  {
+   "id": "trench_piastre",
+   "nome": "Cappotto a piastre",
+   "pezzi": {
+    "busto_sup": "maglia_trench_piastre_busto_sup.png",
+    "busto_inf": "maglia_trench_piastre_busto_inf.png",
+    "braccio_sup": "maglia_lunga_braccio_sup.png",
+    "avambraccio": "maglia_lunga_avambraccio.png"
+   },
+   "falda": {
+    "file": "maglia_trench_piastre_falda.png",
+    "pezzo": "busto_inf",
+    "offset": [
+     -3,
+     13
+    ],
+    "perno": [
+     10,
+     0
+    ]
+   },
+   "colore": [
+    92,
+    100,
+    112
+   ]
+  },
+  {
+   "id": "trench_strascico",
+   "nome": "Spolverino a strascico",
+   "pezzi": {
+    "busto_sup": "maglia_trench_strascico_busto_sup.png",
+    "busto_inf": "maglia_trench_strascico_busto_inf.png",
+    "braccio_sup": "maglia_lunga_braccio_sup.png",
+    "avambraccio": "maglia_lunga_avambraccio.png"
+   },
+   "falda": {
+    "file": "maglia_trench_strascico_falda.png",
+    "pezzo": "busto_inf",
+    "offset": [
+     -14,
+     13
+    ],
+    "perno": [
+     21,
+     0
+    ]
+   },
+   "colore": [
+    30,
+    30,
+    36
+   ]
+  },
+  {
+   "id": "trench_aderente",
+   "nome": "Trench aderente",
+   "pezzi": {
+    "busto_sup": "maglia_trench_aderente_busto_sup.png",
+    "busto_inf": "maglia_trench_aderente_busto_inf.png",
+    "braccio_sup": "maglia_lunga_braccio_sup.png",
+    "avambraccio": "maglia_lunga_avambraccio.png"
+   },
+   "falda": {
+    "file": "maglia_trench_aderente_falda.png",
+    "pezzo": "busto_inf",
+    "offset": [
+     -3,
+     13
+    ],
+    "perno": [
+     10,
+     0
+    ]
+   },
+   "colore": [
+    18,
+    54,
+    62
+   ]
+  },
+  {
+   "id": "trench_zigzag",
+   "nome": "Trench a zig-zag",
+   "pezzi": {
+    "busto_sup": "maglia_trench_zigzag_busto_sup.png",
+    "busto_inf": "maglia_trench_zigzag_busto_inf.png",
+    "braccio_sup": "maglia_circuiti_braccio_sup.png",
+    "avambraccio": "maglia_circuiti_avambraccio.png"
+   },
+   "falda": {
+    "file": "maglia_trench_zigzag_falda.png",
+    "pezzo": "busto_inf",
+    "offset": [
+     -3,
+     13
+    ],
+    "perno": [
+     10,
+     0
+    ]
+   }
   }
  ],
  "pantaloni": [
@@ -221,6 +816,458 @@
     "coscia": "pantaloni_lunghi_coscia.png",
     "stinco": "pantaloni_lunghi_stinco.png"
    }
+  },
+  {
+   "id": "bermuda",
+   "nome": "Bermuda",
+   "pezzi": {
+    "busto_inf": "pantaloni_corti_busto_inf.png",
+    "coscia": "pantaloni_bermuda_coscia.png"
+   }
+  },
+  {
+   "id": "cargo",
+   "nome": "Cargo",
+   "pezzi": {
+    "busto_inf": "pantaloni_lunghi_busto_inf.png",
+    "coscia": "pantaloni_cargo_coscia.png",
+    "stinco": "pantaloni_cargo_stinco.png"
+   }
+  },
+  {
+   "id": "jogger",
+   "nome": "Jogger",
+   "pezzi": {
+    "busto_inf": "pantaloni_lunghi_busto_inf.png",
+    "coscia": "pantaloni_jogger_coscia.png",
+    "stinco": "pantaloni_jogger_stinco.png"
+   }
+  },
+  {
+   "id": "leggings",
+   "nome": "Leggings",
+   "pezzi": {
+    "busto_inf": "pantaloni_lunghi_busto_inf.png",
+    "coscia": "pantaloni_leggings_coscia.png",
+    "stinco": "pantaloni_leggings_stinco.png"
+   }
+  },
+  {
+   "id": "eleganti",
+   "nome": "Eleganti",
+   "pezzi": {
+    "busto_inf": "pantaloni_eleganti_busto_inf.png",
+    "coscia": "pantaloni_eleganti_coscia.png",
+    "stinco": "pantaloni_eleganti_stinco.png"
+   }
+  },
+  {
+   "id": "sportivi",
+   "nome": "Pantaloncini sportivi",
+   "pezzi": {
+    "busto_inf": "pantaloni_corti_busto_inf.png",
+    "coscia": "pantaloni_sportivi_coscia.png"
+   }
+  },
+  {
+   "id": "pinocchietto",
+   "nome": "Pinocchietto",
+   "pezzi": {
+    "busto_inf": "pantaloni_lunghi_busto_inf.png",
+    "coscia": "pantaloni_lunghi_coscia.png",
+    "stinco": "pantaloni_pinocchietto_stinco.png"
+   }
+  },
+  {
+   "id": "zampa",
+   "nome": "A zampa",
+   "pezzi": {
+    "busto_inf": "pantaloni_lunghi_busto_inf.png",
+    "coscia": "pantaloni_zampa_coscia.png",
+    "stinco": "pantaloni_zampa_stinco.png"
+   }
+  },
+  {
+   "id": "gonna",
+   "nome": "Gonna",
+   "pezzi": {
+    "busto_inf": "pantaloni_gonna_busto_inf.png",
+    "coscia": "pantaloni_gonna_coscia.png"
+   }
+  },
+  {
+   "id": "toppe",
+   "nome": "Jeans con toppe",
+   "pezzi": {
+    "busto_inf": "pantaloni_lunghi_busto_inf.png",
+    "coscia": "pantaloni_toppe_coscia.png",
+    "stinco": "pantaloni_toppe_stinco.png"
+   }
+  },
+  {
+   "id": "pelle",
+   "nome": "Pelle",
+   "pezzi": {
+    "busto_inf": "pantaloni_lunghi_busto_inf.png",
+    "coscia": "pantaloni_pelle_coscia.png",
+    "stinco": "pantaloni_pelle_stinco.png"
+   }
+  },
+  {
+   "id": "mimetici",
+   "nome": "Mimetici",
+   "pezzi": {
+    "busto_inf": "pantaloni_lunghi_busto_inf.png",
+    "coscia": "pantaloni_mimetici_coscia.png",
+    "stinco": "pantaloni_mimetici_stinco.png"
+   }
+  },
+  {
+   "id": "quadri",
+   "nome": "A quadri",
+   "pezzi": {
+    "busto_inf": "pantaloni_lunghi_busto_inf.png",
+    "coscia": "pantaloni_quadri_coscia.png",
+    "stinco": "pantaloni_quadri_stinco.png"
+   }
+  },
+  {
+   "id": "gessato",
+   "nome": "Gessato",
+   "pezzi": {
+    "busto_inf": "pantaloni_lunghi_busto_inf.png",
+    "coscia": "pantaloni_gessato_coscia.png",
+    "stinco": "pantaloni_gessato_stinco.png"
+   }
+  },
+  {
+   "id": "kilt",
+   "nome": "Kilt",
+   "pezzi": {
+    "busto_inf": "pantaloni_gonna_busto_inf.png",
+    "coscia": "pantaloni_kilt_coscia.png"
+   }
+  },
+  {
+   "id": "imbottiti",
+   "nome": "Imbottiti",
+   "pezzi": {
+    "busto_inf": "pantaloni_lunghi_busto_inf.png",
+    "coscia": "pantaloni_imbottiti_coscia.png",
+    "stinco": "pantaloni_imbottiti_stinco.png"
+   }
+  },
+  {
+   "id": "harem",
+   "nome": "Harem",
+   "pezzi": {
+    "busto_inf": "pantaloni_lunghi_busto_inf.png",
+    "coscia": "pantaloni_harem_coscia.png",
+    "stinco": "pantaloni_harem_stinco.png"
+   }
+  },
+  {
+   "id": "stivali",
+   "nome": "Cuoio e stivali",
+   "pezzi": {
+    "busto_inf": "pantaloni_lunghi_busto_inf.png",
+    "coscia": "pantaloni_lunghi_coscia.png",
+    "stinco": "pantaloni_stivali_stinco.png"
+   },
+   "colore": [
+    92,
+    58,
+    36
+   ]
+  },
+  {
+   "id": "ginocchiere",
+   "nome": "Con ginocchiere",
+   "pezzi": {
+    "busto_inf": "pantaloni_lunghi_busto_inf.png",
+    "coscia": "pantaloni_ginocchiere_coscia.png",
+    "stinco": "pantaloni_ginocchiere_stinco.png"
+   }
+  },
+  {
+   "id": "strappati",
+   "nome": "Strappati",
+   "pezzi": {
+    "busto_inf": "pantaloni_lunghi_busto_inf.png",
+    "coscia": "pantaloni_strappati_coscia.png",
+    "stinco": "pantaloni_strappati_stinco.png"
+   }
   }
- ]
+ ],
+ "copricapo": [
+  {
+   "id": "cappellino",
+   "nome": "Cappellino",
+   "tipo": "cappello",
+   "file": "copricapo_cappellino.png",
+   "offset": [
+    -10,
+    -10
+   ],
+   "non_con": [
+    "m4",
+    "m5",
+    "m7",
+    "m8",
+    "f7"
+   ],
+   "nascondi_capelli": false
+  },
+  {
+   "id": "berretto",
+   "nome": "Berretto di lana",
+   "tipo": "cappello",
+   "file": "copricapo_berretto.png",
+   "offset": [
+    -10,
+    -10
+   ],
+   "non_con": [
+    "m4",
+    "m5",
+    "m7",
+    "m8",
+    "f7"
+   ],
+   "nascondi_capelli": false
+  },
+  {
+   "id": "tesalarga",
+   "nome": "Cappello a tesa larga",
+   "tipo": "cappello",
+   "file": "copricapo_tesalarga.png",
+   "offset": [
+    -10,
+    -10
+   ],
+   "non_con": [
+    "m4",
+    "m5",
+    "m7",
+    "m8",
+    "f7"
+   ],
+   "nascondi_capelli": false
+  },
+  {
+   "id": "elmetto",
+   "nome": "Elmetto",
+   "tipo": "cappello",
+   "file": "copricapo_elmetto.png",
+   "offset": [
+    -10,
+    -10
+   ],
+   "non_con": [
+    "m4",
+    "m5",
+    "m7",
+    "m8",
+    "f7"
+   ],
+   "nascondi_capelli": false
+  },
+  {
+   "id": "bandana",
+   "nome": "Bandana",
+   "tipo": "cappello",
+   "file": "copricapo_bandana.png",
+   "offset": [
+    -10,
+    -10
+   ],
+   "non_con": [
+    "m5",
+    "m7",
+    "m8",
+    "f7"
+   ],
+   "nascondi_capelli": false
+  },
+  {
+   "id": "antigas",
+   "nome": "Maschera antigas",
+   "tipo": "maschera",
+   "file": "copricapo_antigas.png",
+   "offset": [
+    -10,
+    -10
+   ],
+   "non_con": [],
+   "nascondi_capelli": false,
+   "colore": [
+    58,
+    64,
+    52
+   ]
+  },
+  {
+   "id": "hockey",
+   "nome": "Maschera da hockey",
+   "tipo": "maschera",
+   "file": "copricapo_hockey.png",
+   "offset": [
+    -10,
+    -10
+   ],
+   "non_con": [],
+   "nascondi_capelli": false,
+   "colore": [
+    236,
+    236,
+    230
+   ]
+  },
+  {
+   "id": "chirurgica",
+   "nome": "Mascherina chirurgica",
+   "tipo": "maschera",
+   "file": "copricapo_chirurgica.png",
+   "offset": [
+    -10,
+    -10
+   ],
+   "non_con": [],
+   "nascondi_capelli": false,
+   "colore": [
+    150,
+    200,
+    225
+   ]
+  },
+  {
+   "id": "passamontagna",
+   "nome": "Passamontagna",
+   "tipo": "maschera",
+   "file": "copricapo_passamontagna.png",
+   "offset": [
+    -10,
+    -10
+   ],
+   "non_con": [],
+   "nascondi_capelli": true
+  },
+  {
+   "id": "domino",
+   "nome": "Maschera da ballo",
+   "tipo": "maschera",
+   "file": "copricapo_domino.png",
+   "offset": [
+    -10,
+    -10
+   ],
+   "non_con": [],
+   "nascondi_capelli": false
+  },
+  {
+   "id": "visore",
+   "nome": "Visore cibernetico",
+   "tipo": "maschera",
+   "file": "copricapo_visore.png",
+   "offset": [
+    -10,
+    -10
+   ],
+   "non_con": [],
+   "nascondi_capelli": false,
+   "colore": [
+    34,
+    38,
+    50
+   ]
+  },
+  {
+   "id": "respiratore",
+   "nome": "Respiratore a filtri",
+   "tipo": "maschera",
+   "file": "copricapo_respiratore.png",
+   "offset": [
+    -10,
+    -10
+   ],
+   "non_con": [],
+   "nascondi_capelli": false,
+   "colore": [
+    58,
+    64,
+    66
+   ]
+  },
+  {
+   "id": "oculare",
+   "nome": "Occhio cibernetico",
+   "tipo": "maschera",
+   "file": "copricapo_oculare.png",
+   "offset": [
+    -10,
+    -10
+   ],
+   "non_con": [],
+   "nascondi_capelli": false
+  },
+  {
+   "id": "casco",
+   "nome": "Casco integrale",
+   "tipo": "maschera",
+   "file": "copricapo_casco.png",
+   "offset": [
+    -10,
+    -10
+   ],
+   "non_con": [],
+   "nascondi_capelli": true
+  },
+  {
+   "id": "cyborg",
+   "nome": "Placca cyborg",
+   "tipo": "maschera",
+   "file": "copricapo_cyborg.png",
+   "offset": [
+    -10,
+    -10
+   ],
+   "non_con": [],
+   "nascondi_capelli": false,
+   "colore": [
+    150,
+    158,
+    170
+   ]
+  }
+ ],
+ "ali": {
+  "file": "ali_ala.png",
+  "perno": [
+   40,
+   44
+  ],
+  "attacco": {
+   "pezzo": "busto_sup",
+   "punto": [
+    3,
+    7
+   ]
+  }
+ },
+ "fasciature": {
+  "colore": [
+   228,
+   222,
+   206
+  ],
+  "pezzi": {
+   "testa": "fascia_testa.png",
+   "busto_sup": "fascia_busto_sup.png",
+   "busto_inf": "fascia_busto_inf.png",
+   "braccio_sup": "fascia_braccio_sup.png",
+   "avambraccio": "fascia_avambraccio.png",
+   "coscia": "fascia_coscia.png",
+   "stinco": "fascia_stinco.png"
+  }
+ }
 }

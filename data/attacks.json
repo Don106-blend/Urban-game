@@ -1322,10 +1322,10 @@
   {
     "id": 51,
     "nome": "Colpo pesante",
-    "descrizione": "Un colpo a tutta forza: costa 2 azioni ma colpisce molto più forte di un pugno. Si può schivare, ma non parare né mirare.\n\nDanno base: 70",
+    "descrizione": "Un colpo a tutta forza: costa 2 azioni ma colpisce molto più forte di un pugno. Non si può schivare né parare, né mirare: solo i riflessi lo fermano.\n\nDanno base: 70",
     "ranged": false,
     "can_aim": false,
-    "can_dodge": true,
+    "can_dodge": false,
     "attivo_default": true,
     "tipo_danno": "contundente",
     "danno": {

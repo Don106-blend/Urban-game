@@ -5,18 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Urban{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="{{ url_for('static', filename='nav.js') }}?v={{ asset_v }}" defer></script>
 </head>
-<body class="{% block body_class %}{% endblock %}">
+<body class="{% block body_class %}{% endblock %}" data-nav="{% block nav_mode %}{% endblock %}">
   <header class="topbar">
     <a class="wordmark" href="{{ url_for('index') }}">URBAN<span class="slash">/</span></a>
     <nav class="nav">
-      <a href="{{ url_for('box') }}" class="{{ 'on' if request.endpoint in ('box','personaggio') }}">Box</a>
-      <a href="{{ url_for('contratti') }}" class="{{ 'on' if request.endpoint == 'contratti' }}">Contratti</a>
+      <a href="{{ url_for('palestra_pagina') }}" class="{{ 'on' if request.endpoint in ('palestra_pagina','personaggio') }}">Palestra{% if eventi_attesa %}<span class="nav-badge" title="Eventi in attesa di una tua risposta">{{ eventi_attesa }}</span>{% endif %}</a>
+      <a href="{{ url_for('contratti') }}" class="{{ 'on' if request.endpoint == 'contratti' }}">Aspiranti</a>
       <a href="{{ url_for('negozio') }}" class="{{ 'on' if request.endpoint == 'negozio' }}">Negozio</a>
-      <a href="{{ url_for('duelli') }}" class="{{ 'on' if request.endpoint in ('duelli','duello') }}">Duelli</a>
-      <a href="{{ url_for('torneo') }}" class="{{ 'on' if request.endpoint == 'torneo' }}">Torneo</a>
+      <a href="{{ url_for('duelli') }}" class="{{ 'on' if request.endpoint in ('duelli','duello') }}">Serata</a>
+      <a href="{{ url_for('rivali') }}" class="{{ 'on' if request.endpoint == 'rivali' }}">Rivali</a>
+      <a href="{{ url_for('torneo') }}" class="nav-torneo {{ 'on' if request.endpoint == 'torneo' }}" title="Modalità a parte: non tocca la tua palestra">Torneo Evo</a>
       <a href="{{ url_for('debug') }}" class="nav-debug {{ 'on' if request.endpoint == 'debug' }}">Debug</a>
     </nav>
+    <div class="data-chip" title="Giorno {{ giorno_n }} della partita"><span class="c-icon">&#9679;</span> {{ data_breve }}</div>
     <div class="crediti-chip" title="Crediti">
       <span class="c-icon">¤</span> {{ crediti }}
     </div>

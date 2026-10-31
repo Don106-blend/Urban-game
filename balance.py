@@ -10,6 +10,7 @@ metriche M1-M10 di OVERHAUL_GAMEPLAY.md §3 con la fascia di accettazione e PASS
     python balance.py matchmaking # M9: eroe di livello L senza equip contro la CPU di pari livello
     python balance.py torneo      # tornei Evo interi con draft a caso: robustezza e % di vittoria
     python balance.py fuzz        # M10: duelli casuali, nessuna eccezione, nessun duello infinito
+    python balance.py azzardo     # Z1-Z7: il Banco (azzardi, folla, quote, clausole), v. AZZARDO.md
     python balance.py tutto       # tutto quanto sopra
 
 Opzioni: --n (duelli per cella), --seed, --jobs (processi), --root (albero da misurare),
@@ -113,16 +114,19 @@ def _per_nome(catalogo, nome):
 
 
 def spec(stat=1, skill=None, poteri=(), armi=(), armatura=None, protesi=(), augments=(),
-         mira=None, stats=None, profilo=None, solo=None):
+         mira=None, stats=None, profilo=None, solo=None, azzardo=None, forza=None, tifo0=None, nodifesa=False):
     """Descrizione picklable di un combattente. poteri = [(nome|id, rango)], armi/armatura/
     protesi/augments per nome o id. mira = None | "testa" | "busto": policy 'mira sempre'.
     profilo = override delle manopole dell'IA (es. {"mira": 0}) per tutta la durata del duello.
     solo = nome di un attacco da usare SEMPRE quando e' giocabile (policy per misurare se una
-    scelta e' dominata); se non e' giocabile decide la solita IA."""
+    scelta e' dominata); se non e' giocabile decide la solita IA.
+    azzardo = None (il duello e' quello di sempre) | "mai" | "saggio" | "folle": accende folla e azzardi (azzardo.py) per
+    TUTTI e due e dice come azzarda questo lato. forza = una giocata da fare SEMPRE appena si puo' ("ruota", "ruota1" una
+    volta sola, "r1@55" = Rilancio solo se il colpo va a segno con >= 55%...); tifo0 = tifo di partenza (>0 per questo lato)."""
     return {"stat": stat, "skill": stat if skill is None else skill, "stats": stats or {},
             "poteri": list(poteri), "armi": list(armi), "armatura": armatura,
             "protesi": list(protesi), "augments": list(augments), "mira": mira,
-            "profilo": profilo or {}, "solo": solo}
+            "profilo": profilo or {}, "solo": solo, "azzardo": azzardo, "forza": forza, "tifo0": tifo0, "nodifesa": nodifesa}
 
 
 def _id(catalogo, x):
@@ -206,11 +210,46 @@ def hp_crit(p):
     return max(0, p.hp["testa"]) + max(0, p.hp["busto"])
 
 
+def _step_forza(nome):
+    """Policy di prova del gambling: gioca SEMPRE quell'azzardo appena puo' (per misurare quanto vale la giocata, non l'IA che la
+    sceglie); per il resto decide la solita IA. "ruota" a ogni turno, "ruota1" una volta sola, "ultima", "r1@55" / "r2@65" =
+    Rilancio / Tutto o niente solo se il colpo che si rilancia va a segno con almeno quella percentuale."""
+    def step(d):
+        a, t = d.attivo, d.tavolo
+        if t.puo_azzardare(a)[0]:
+            if nome == "ruota" or (nome == "ruota1" and t.stat["ruota"] == 0):
+                t.azzarda(a, "ruota")
+                return
+            if nome == "ultima" and t.puo_ultima(a):
+                t.azzarda(a, "ultima")
+                return
+            if nome.startswith("r") and "@" in nome and a.azioni >= 1:
+                liv, soglia = nome[1:].split("@")
+                s = t._attacco_da_rilanciare(a)
+                if s is not None and s[1] * 100 >= int(soglia):
+                    t.piano[t.lato(a)] = s[0]["id"]
+                    t.azzarda(a, "rilancia", int(liv))
+                    return
+        d.cpu_step()
+    return step
+
+
 def gioca(sp_a, sp_b, cap=CAP_ROUND, costruiti=None):
     """Un duello A (lato 'player') contro B (lato 'cpu'). Ritorna un dict di misure."""
     pa, pb = costruiti or (costruisci(sp_a, "A"), costruisci(sp_b, "B"))
-    d = app.DuelloWeb(pg=pa, avversario=pb)
+    gambling = sp_a.get("azzardo") is not None or sp_b.get("azzardo") is not None
+    d = app.DuelloWeb(pg=pa, avversario=pb, azzardo_attivo=True if gambling else None)
+    if gambling:
+        pa.pol_azzardo = sp_a.get("azzardo") or "mai"
+        pb.pol_azzardo = sp_b.get("azzardo") or "mai"
+        if sp_a.get("tifo0") is not None:
+            d.tavolo.tifo = float(sp_a["tifo0"])
+        if sp_b.get("tifo0") is not None:
+            d.tavolo.tifo = -float(sp_b["tifo0"])
+
     def politica(sp):
+        if sp.get("forza"):
+            return _step_forza(sp["forza"])
         if sp.get("solo"):
             return _step_solo(sp["solo"], sp.get("mira"))   # mira (se c'e') poi sempre quell'attacco
         return _step_mira(sp["mira"]) if sp["mira"] else (lambda dd: dd.cpu_step())
@@ -220,15 +259,23 @@ def gioca(sp_a, sp_b, cap=CAP_ROUND, costruiti=None):
         if diff3 is None and d.round >= 3:
             diff3 = hp_crit(pa) - hp_crit(pb)  # inizio round 3: chi e' avanti dove conta?
         if d.fase == "risposta":
-            difendi(d)
+            if sp_a.get("nodifesa"):         # strategia di prova: chi subisce non si difende mai (si fa colpire apposta)
+                d.risolvi_risposta("nessuna risposta", None)
+            else:
+                difendi(d)
         elif d.fase in ("player", "cpu"):
             pol[id(d.attivo)](d)
         else:
             break
     perdente = None if d.vincitore is None else (pb if d.vincitore is pa else pa)
-    return {"a": d.vincitore is pa, "finito": d.finito, "round": d.round,
-            "testa": perdente is not None and perdente.hp["testa"] <= 0,
-            "diff3": diff3}
+    out = {"a": d.vincitore is pa, "finito": d.finito, "round": d.round,
+           "testa": perdente is not None and perdente.hp["testa"] <= 0,
+           "diff3": diff3}
+    if gambling:       # le statistiche del tavolo (azzardi giocati, ovazioni...) e le condizioni delle clausole
+        out["az"] = {k: v for k, v in d.tavolo.stat.items() if k != "esiti"}
+        out["az"]["esiti"] = dict(d.tavolo.stat["esiti"])
+        out["clausole"] = {c["id"]: d.tavolo.clausola_ok(c["id"]) for c in app.azzardo.CLAUSOLE}
+    return out
 
 
 def _lavoro_partite(args):
@@ -691,9 +738,236 @@ def m_torneo(es, a, rep):
         rep.info(f"{c}x {firma}")
 
 
+# ------------------------------------------------------------------ il Banco (AZZARDO.md)
+def _lavoro_quote(args):
+    """Duelli tra un eroe e la CPU "specchio" (di forza diversa), con gli azzardi accesi. Ritorna, per ogni inizio round, la
+    probabilita' stimata dal banco e l'esito; e quanto renderebbe a un giocatore CIECO una puntata di 100 tenuta fino alla fine o
+    incassata al round 3."""
+    n, seed = args
+    applica_what_if(WHAT_IF)
+    random.seed(seed)
+    profilo_neutro()
+    Z = app.azzardo
+    pts, ritorni = [], {"tieni_r1": [], "tieni_r3": [], "incassa_r1_r3": [], "clausole_vinte": []}
+    for _ in range(n):
+        h = _eroe_livello(random.choice((1, 3, 5, 8)))
+        h.nome = "Eroe"
+        c = app.cpu_bilanciata(h, random.choice((-2, -1, 0, 0, 1, 2)))
+        h.pol_azzardo = c.pol_azzardo = "saggio"
+        d = app.DuelloWeb(pg=h, avversario=c, azzardo_attivo=True)
+        vista = {}
+        while not d.finito and d.round < CAP_ROUND:
+            if d.round not in vista:
+                vista[d.round] = d.prob_vittoria()
+            if d.fase == "risposta":
+                difendi(d)
+            elif d.fase in ("player", "cpu"):
+                d.cpu_step()
+            else:
+                break
+        vinto = d.vincitore is h
+        pts += [(r, p, vinto) for r, p in vista.items()]
+        if vinto:        # le clausole si misurano sui duelli vinti, con gli eroi del gioco vero (poteri a caso, CPU specchio)
+            ritorni["clausole_vinte"].append({c["id"]: d.tavolo.clausola_ok(c["id"]) for c in Z.CLAUSOLE})
+        q1 = Z.quota(vista[1])
+        ritorni["tieni_r1"].append(100 * q1 if vinto else 0)
+        if 3 in vista:
+            ritorni["tieni_r3"].append(100 * Z.quota(vista[3]) if vinto else 0)
+            ritorni["incassa_r1_r3"].append(100 * q1 * vista[3] * (1 - Z.MARGINE_INCASSO))
+        else:
+            ritorni["incassa_r1_r3"].append(100 * q1 if vinto else 0)
+    return pts, ritorni
+
+
+def m_azzardo(es, a, rep):
+    print("\n[Z] il Banco: azzardi, folla, quote (AZZARDO.md)")
+    n = max(2000, a.n)
+    S = lambda **kw: spec(1, **kw)
+    mai = S(azzardo="mai")
+
+    # 1) il gambling non e' un'arma ne' una condanna: chi azzarda bene guadagna poco, chi azzarda a caso perde
+    ris = partite(es, [(mai, mai), (S(azzardo="saggio"), mai), (S(azzardo="folle"), mai),
+                       (S(azzardo="saggio"), S(azzardo="saggio"))], n, a.seed + 40)
+    ctrl, saggio, folle, ss = (pct(r) for r in ris)
+    rep.riga("Z1", "nessuno azzarda (controllo, deve stare a 50%)", f"{ctrl:.1f}%", "47-53%", _entro(ctrl, 47, 53))
+    rep.riga("Z1", "azzardare con giudizio, contro chi non azzarda", f"{saggio:.1f}% ({saggio - ctrl:+.1f})",
+             "non meno di -1,5; non oltre 58%", ctrl - 1.5 <= saggio <= 58)
+    rep.riga("Z1", "azzardare a caso, contro chi non azzarda", f"{folle:.1f}% ({folle - ctrl:+.1f})",
+             "almeno 2 punti sotto (si paga)", folle <= ctrl - 2)
+    rep.riga("Z1", "saggio contro saggio (simmetria)", f"{ss:.1f}%", "47-53%", _entro(ss, 47, 53))
+    lung = [statistics.mean(x["round"] for x in r) for r in ris]
+    rep.info(f"round medi: nessuno {lung[0]:.2f} | saggio {lung[1]:.2f} | folle {lung[2]:.2f} | saggio-saggio {lung[3]:.2f}")
+
+    # 2) quanto si azzarda e che cosa succede (saggio contro saggio)
+    r = ris[3]
+    tot = {k: sum(x["az"][k] for x in r) / len(r) for k in ("ruota", "rilancia", "ultima")}
+    ov = 100.0 * sum(1 for x in r if x["az"]["ovazioni"] > 0) / len(r)
+    ult = sum(x["az"]["ultima"] for x in r)
+    rep.riga("Z2", "giri di ruota per duello (entrambi i lati)", f"{tot['ruota']:.2f}", "0,3-2", _entro(tot["ruota"], 0.3, 2))
+    rep.riga("Z2", "rilanci per duello", f"{tot['rilancia']:.2f}", "0,2-2", _entro(tot["rilancia"], 0.2, 2))
+    rep.riga("Z2", "Ultime Puntate per duello", f"{tot['ultima']:.2f}", "0,03-0,3", _entro(tot["ultima"], 0.03, 0.3))
+    rep.riga("Z2", "duelli con almeno un'Ovazione", f"{ov:.0f}%", "20-40%", _entro(ov, 20, 40))
+    rok = sum(x["az"]["rilanci_ok"] for x in r)
+    rko = sum(x["az"]["rilanci_ko"] for x in r)
+    rep.info(f"rilanci a segno {rok} / mancati {rko}; Ultima Puntata riuscita {sum(x['az']['ultime_ok'] for x in r)} su {ult}")
+    esiti = Counter()
+    for x in r:
+        esiti.update(x["az"]["esiti"])
+    ruote = sum(esiti.values()) or 1
+    rep.info("esiti della ruota: " + ", ".join(f"{k} {100.0 * v / ruote:.0f}%" for k, v in esiti.most_common()))
+
+    # 3) la ruota vale quello che dice la tabella: a pari la casa vince, con la folla dalla tua si gioca in attivo
+    print("      -- un giro di ruota al primo turno (A) contro chi non azzarda, a diversi scarti della folla")
+    prove = [("scarto -1 (folla contro)", -30), ("scarto 0", 0), ("scarto +1", 30), ("scarto +2", 55)]
+    ris = partite(es, [(S(azzardo="mai", forza="ruota1", tifo0=t), mai) for _, t in prove], n, a.seed + 41)
+    v = [pct(x) for x in ris]
+    for (nome, t), x in zip(prove, v):
+        ev = app.azzardo.ruota_ev_sd(app.azzardo.scarto(t))[0]
+        rep.info(f"{nome:<26} vittoria di A {x:.1f}%   (EV della tabella {ev:+.0f} hp equivalenti)")
+    rep.riga("Z3", "ruota a pari: la casa non perde (non regala)", f"{v[1]:.1f}% ({v[1] - ctrl:+.1f})", "<= controllo +1,5", v[1] <= ctrl + 1.5)
+    rep.riga("Z3", "ruota con la folla +2 batte quella contraria", f"{v[3]:.1f}% vs {v[0]:.1f}%", "+2 > -1 di 3+ punti",
+             v[3] - v[0] >= 3)
+
+    # 4) rilanciare conviene solo quando il colpo e' probabile
+    print("      -- il Rilancio / Tutto o niente di A, fatto solo se il colpo va a segno con almeno X%")
+    prove = [("r1@30", "Rilancio se >= 30%"), ("r1@45", "Rilancio se >= 45%"), ("r1@60", "Rilancio se >= 60%"),
+             ("r2@45", "Tutto o niente se >= 45%"), ("r2@60", "Tutto o niente se >= 60%"), ("r2@75", "Tutto o niente se >= 75%")]
+    ris = partite(es, [(S(azzardo="mai", forza=f), mai) for f, _ in prove], n, a.seed + 42)
+    v = {f: pct(x) for (f, _), x in zip(prove, ris)}
+    for (f, nome), x in zip(prove, ris):
+        usati = sum(y["az"]["rilancia"] for y in x) / len(x)
+        ok = sum(y["az"]["rilanci_ok"] for y in x)
+        ko = sum(y["az"]["rilanci_ko"] for y in x)
+        rep.info(f"{nome:<28} vittoria di A {pct(x):.1f}%   ({usati:.2f} per duello, a segno {100.0 * ok / max(1, ok + ko):.0f}%)")
+    rep.riga("Z4", "rilanciare un colpo improbabile si paga", f"{v['r1@30']:.1f}% / {v['r2@45']:.1f}%",
+             f"sotto il controllo ({ctrl:.1f}%)", v["r1@30"] < ctrl and v["r2@45"] < ctrl)
+    # (il Rilancio semplice vale poco a ogni uso: la differenza tra soglie si perde nel rumore; Tutto o niente si vede bene)
+    rep.riga("Z4", "Tutto o niente: piu' il colpo e' probabile, meglio rende", f"{v['r2@45']:.1f}% -> {v['r2@60']:.1f}%",
+             "cresce con la soglia", v["r2@60"] > v["r2@45"])
+
+    # 5) l'Ultima Puntata (sempre, appena si e' in zona critica) e' un tiro di disperazione, non una scorciatoia
+    ris = partite(es, [(S(azzardo="mai", forza="ultima"), mai)], n, a.seed + 43)
+    u = ris[0]
+    nu = sum(x["az"]["ultima"] for x in u)
+    giocata = [x for x in u if x["az"]["ultima"]]
+    riuscita = [x for x in giocata if x["az"]["ultime_ok"]]
+    p_dopo = 100.0 * sum(1 for x in riuscita if x["a"]) / max(1, len(riuscita))
+    rep.info(f"Ultima Puntata giocata sempre a testa o busto < 30%: vittoria di A {pct(u):.1f}% (controllo {ctrl:.1f}%); "
+             f"giocata in {100.0 * len(giocata) / len(u):.0f}% dei duelli, riuscita nel "
+             f"{100.0 * sum(x['az']['ultime_ok'] for x in u) / max(1, nu):.0f}% dei casi; "
+             f"dopo il successo vince il {p_dopo:.0f}% (P_DOPO_ULTIMA nel codice: {int(100 * app.azzardo.P_DOPO_ULTIMA)}%)")
+
+    # 6) le quote: calibrazione, margine della casa, prezzo dell'incasso
+    blocchi = es.jobs * 2
+    per = max(60, n // blocchi // 2)
+    out = out_quote = es.mappa(_lavoro_quote, [(per, a.seed * 53 + i) for i in range(blocchi)])
+    pts = [p for o in out for p in o[0]]
+    print("      -- calibrazione delle quote: probabilita' stimata dal banco a inizio round contro la vittoria vera")
+    fasce = [(0.0, 0.15), (0.15, 0.3), (0.3, 0.45), (0.45, 0.55), (0.55, 0.7), (0.7, 0.85), (0.85, 1.01)]
+    scarto_max = 0.0
+    for lo, hi in fasce:
+        sel = [(p, v_) for _, p, v_ in pts if lo <= p < hi]
+        if len(sel) < 50:
+            continue
+        pm = sum(p for p, _ in sel) / len(sel)
+        vv = sum(1 for _, v_ in sel if v_) / len(sel)
+        if len(sel) >= 300:      # le fasce piccole (le code) ballano di 3-4 punti solo per il campione: si mostrano, non si contano
+            scarto_max = max(scarto_max, abs(pm - vv))
+        rep.info(f"p in [{lo:.2f}, {hi:.2f}): stimata {100 * pm:.0f}%  vera {100 * vv:.0f}%  (n={len(sel)})")
+    rep.riga("Z5", "scarto massimo tra stimata e vera (fasce con >= 300 casi)", f"{100 * scarto_max:.0f} punti",
+             "<= 8 punti", scarto_max <= 0.08)
+    # (puntata e incasso hanno ognuno il suo margine del 10%: andata e ritorno ~0,81, quindi la fascia dell'incasso e' piu' larga)
+    for k, nome, lo in (("tieni_r1", "puntata cieca al round 1, tenuta", 0.80), ("tieni_r3", "puntata cieca al round 3, tenuta", 0.80),
+                        ("incassa_r1_r3", "puntata al round 1, incassata al round 3", 0.76)):
+        xs = [x for o in out for x in o[1][k]]
+        m = statistics.mean(xs) / 100.0
+        rep.riga("Z5", f"ritorno per ¤: {nome}", f"{m:.2f}", f"{lo:.2f}-1,00 (la casa trattiene il suo)", _entro(m, lo, 1.00))
+
+    # 7) le clausole pagano k = 1 / P(condizione | vinci), misurato sugli eroi del gioco vero (poteri a caso contro la CPU specchio)
+    vinte = [x for o in out_quote for x in o[1]["clausole_vinte"]]
+    print(f"      -- clausole: probabilita' della condizione tra i {len(vinte)} duelli vinti dall'eroe, e k che ne segue")
+    for c in app.azzardo.CLAUSOLE:
+        if c.get("richiede_poteri"):
+            rep.info(f"clausola {c['nome']}: una scommessa sulla propria scelta (l'IA accende sempre i poteri, nulla da misurare); "
+                     f"k = {c['k']} e' il prezzo dell'handicap")
+            continue
+        pc = sum(1 for x in vinte if x[c["id"]]) / max(1, len(vinte))
+        k = 1 / pc if pc else float("inf")
+        rep.riga("Z6", f"clausola {c['nome']}: P(condizione | vinci) {100 * pc:.0f}%", f"k equo = {k:.2f}",
+                 f"k scritto {c['k']} <= equo", pc > 0 and c["k"] <= k * 1.05)
+
+    # 7b) le clausole sono scommesse su cose che si possono pilotare: nessuna strategia deve farne una macchina da soldi (EV per ¤ <= 1)
+    nm = {"mira": 0.0}
+    strat = [("IA di sempre", S(azzardo="mai")), ("mira sempre alla testa", S(azzardo="mai", mira="testa", profilo=nm)),
+             ("mira sempre al busto", S(azzardo="mai", mira="busto", profilo=nm)),
+             ("solo Colpo pesante", S(azzardo="mai", solo="Colpo pesante", profilo=nm)),
+             ("solo Pugno", S(azzardo="mai", solo="Pugno", profilo=nm)),
+             ("non si difende mai", S(azzardo="mai", nodifesa=True)),
+             ("mira testa, non si difende", S(azzardo="mai", mira="testa", profilo=nm, nodifesa=True))]
+    ris = partite(es, [(sp, mai) for _, sp in strat], n, a.seed + 45)
+    q0 = app.azzardo.quota(0.5)
+    peggiore = {}
+    for (nome, _), r in zip(strat, ris):
+        for c in app.azzardo.CLAUSOLE:
+            if c.get("richiede_poteri"):
+                continue
+            pc = sum(1 for x in r if x["a"] and x["clausole"][c["id"]]) / len(r)       # P(vinci E la condizione)
+            ev = pc * q0 * c["k"]
+            if ev > peggiore.get(c["id"], (0, ""))[0]:
+                peggiore[c["id"]] = (ev, nome)
+    for cid, (ev, nome) in peggiore.items():
+        rep.riga("Z6b", f"clausola {cid}: strategia migliore ({nome})", f"{ev:.2f} per ¤", "<= 1,05 (nessuna macchina da soldi)", ev <= 1.05)
+
+    # 8) robustezza: duelli casuali con gli azzardi accesi
+    fz = max(2000, a.n)
+    out = es.mappa(_lavoro_fuzz_azzardo, [(fz // blocchi, a.seed * 71 + i) for i in range(blocchi)])
+    eccez, lunghi = Counter(), 0
+    for e, lu in out:
+        eccez.update(e)
+        lunghi += lu
+    rep.riga("Z7", f"eccezioni su {fz // blocchi * blocchi} duelli con gli azzardi", str(sum(eccez.values())), "0",
+             sum(eccez.values()) == 0)
+    rep.riga("Z7", f"duelli non finiti entro {CAP_ROUND} round", str(lunghi), "0", lunghi == 0)
+    for firma, c in eccez.most_common(3):
+        rep.info(f"{c}x {firma}")
+
+
+def _lavoro_fuzz_azzardo(args):
+    n, seed = args
+    applica_what_if(WHAT_IF)
+    random.seed(seed)
+    profilo_neutro()
+    eccez, lunghi = Counter(), 0
+    for _ in range(n):
+        try:
+            usati, ps = set(), []
+            for _k in range(2):
+                p = E.personaggio_casuale(DB["attacchi"], DB["poteri"], DB["stances"], usati)
+                usati.add(p.nome)
+                p.livello = random.randint(1, 20)
+                app._equipaggia_cpu(p, p.livello)
+                p.pol_azzardo = random.choice(("saggio", "saggio", "folle", "mai"))
+                ps.append(p)
+            d = app.DuelloWeb(pg=ps[0], avversario=ps[1], azzardo_attivo=True)
+            d.tavolo.tifo = random.uniform(-90, 90)
+            while not d.finito and d.round < CAP_ROUND:
+                if d.fase == "risposta":
+                    difendi(d)
+                elif d.fase in ("player", "cpu"):
+                    d.cpu_step()
+                else:
+                    break
+            lunghi += not d.finito
+        except Exception as ex:  # noqa: BLE001
+            tb = traceback.extract_tb(ex.__traceback__)[-1]
+            eccez[f"{type(ex).__name__}: {ex} @ {os.path.basename(tb.filename)}:{tb.lineno}"] += 1
+    return eccez, lunghi
+
+
 COMANDI = {"lunghezza": m_lunghezza, "ladder": m_ladder, "mira": m_mira,
            "decisioni": m_decisioni, "equip": m_equip,
-           "poteri": m_poteri, "matchmaking": m_matchmaking, "torneo": m_torneo, "fuzz": m_fuzz}
+           "poteri": m_poteri, "matchmaking": m_matchmaking, "torneo": m_torneo, "fuzz": m_fuzz,
+           "azzardo": m_azzardo}
 
 
 def main():

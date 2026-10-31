@@ -1,6 +1,7 @@
-"""Urban — app web (Flask). Modalità Arena: box, contratti, negozio, duelli.
+"""Urban — app web (Flask). Modalità Arena: palestra, aspiranti, negozio, duelli. Modalità a parte: Torneo Evo.
 Avvio: python app.py  →  http://127.0.0.1:5000
-La logica di gioco vive in engine.py (condivisa con l'editor e con il harness balance.py).
+La logica di gioco vive in engine.py (condivisa con l'editor e con il harness balance.py); la vita della palestra
+(calendario, allenamento, tratti, eventi) in palestra.py.
 """
 import json
 import os
@@ -14,10 +15,13 @@ from flask import (Flask, render_template, redirect, url_for, request,
 import math
 
 import aspetto
+import azzardo
+import nemesi
+import palestra
 import tattiche
 from engine import (BONUS_RANGO, LOCAZIONI, STATS, SKILLS, FALLBACK, MAX_POTERI, DADO_BASE,
                     MARGINE_CAP, MARGINE_FATTORE, MIRA_PENALITA, MIRA_DURA_TURNO, costo_azioni, prob_supera,
-                    umanita_max,
+                    umanita_max, nome_casuale,
                     Personaggio, personaggio_casuale, eroe_base, carica_db,
                     bonus_colpire, dotazione_base, valuta, costo_upgrade)
 
@@ -27,34 +31,23 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 SAVE_DIR = os.environ.get("URBAN_SAVE_DIR") or os.path.join(BASE, "save")
 STATE_FILE = os.path.join(SAVE_DIR, "state.json")
 
-CREDITI_INIZIALI = 300
+CREDITI_INIZIALI = 300      # (resta il riferimento con cui si stimano i crediti attesi: v. crediti_attesi)
+CREDITI_PARTENZA = 500      # i crediti di una partita nuova: due allievi, o uno e qualcosa per lui
 RICOMPENSA_VITTORIA = 150
 PREZZO_MEDIKIT = 30
-RIGEN_HP_MIN = 5    # hp al minuto per locazione, da coscienti
-RIGEN_COMA_MIN = 1  # hp al minuto in coma: uscirne richiede ore
-N_CONTRATTI = 3
+N_CONTRATTI = 3             # aspiranti che si presentano alla palestra ogni settimana
+PREZZO_CERCA_ALTRI = 60     # un aspirante in piu' (passaparola)
+MAX_ASPIRANTI = 5
+# la posta di un duello: quanto paga, e quanto e' pericoloso. E' un gancio dell'Opzione B (i locali dei distretti)
+POSTA_BASE = {"nome": "Ring clandestino", "paga": RICOMPENSA_VITTORIA, "morte": 1.0}
 
 # quote: P(vittoria) = sigmoide(K_VALUTA * dvaluta + K_HP * dhp), ricavati con una regressione
-# logistica su 20.000 duelli veri (valuta e hp al round 3); MARGINE_BANCO = 1/(1-10%)
+# logistica su 20.000 duelli veri (valuta e hp al round 3). Il margine del banco, le puntate, le clausole, la folla e gli
+# azzardi vivono in azzardo.py (progetto e misure in AZZARDO.md).
 K_VALUTA = 0.036
 K_HP = 3.0
-MARGINE_BANCO = 1.1
 
-MAX_SCOMMESSA_TORNEO = 500  # puntata virtuale per round nel Torneo Evo (niente crediti reali in gioco)
-
-# ---------------------------------------------------------------- sponsor (Arena + Torneo Evo)
-# ogni sponsor paga un bonus SOLO se vinci E rispetti la condizione (verificata da
-# DuelloWeb._sponsor_condizione, che legge lo stato tracciato durante il duello).
-SPONSOR = [
-    {"id": "lampo", "nome": "Sponsor Lampo", "bonus": 150,
-     "descrizione": "Paga se vinci entro il round 3."},
-    {"id": "bestia", "nome": "Sponsor Bestia", "bonus": 80,
-     "descrizione": "Paga se vinci avendo attivato almeno un potere."},
-    {"id": "stoico", "nome": "Sponsor Stoico", "bonus": 180,
-     "descrizione": "Paga se vinci senza mai attivare un potere."},
-    {"id": "incassatore", "nome": "Sponsor Incassatore", "bonus": 220,
-     "descrizione": "Paga se vinci dopo essere sceso sotto il 30% degli hp totali."},
-]
+MAX_SCOMMESSA_TORNEO = 500  # puntata virtuale (per puntata) nel Torneo Evo: niente crediti reali in gioco
 
 app = Flask(__name__)
 app.secret_key = "urban-dev"  # ponytail: fisso in dev; da env quando andrà online
@@ -71,8 +64,11 @@ HP_VERSIONE = 2  # 1 = testa 50 / busto 150; 2 = proporzioni dell'overhaul (engi
 
 
 def stato_default():
-    return {"crediti": CREDITI_INIZIALI, "personaggi": [], "prossimo_id": 1,
-            "contratti": [], "hp_versione": HP_VERSIONE}
+    """Una partita nuova: palestra vuota, lunedi' della prima settimana, i crediti per cominciare."""
+    s = {"crediti": CREDITI_PARTENZA, "personaggi": [], "prossimo_id": 1,
+         "contratti": [], "hp_versione": HP_VERSIONE, "rivali": [], "prossimo_rivale": 1}
+    palestra.stato_palestra(s)
+    return s
 
 
 def migra_stato(stato):
@@ -105,7 +101,7 @@ def salva_stato():
 
 
 def assegna_aspetti(stato):
-    """Personaggi (box e contratti) senza un aspetto valido (salvataggi precedenti): ognuno riceve il suo,
+    """Personaggi (palestra e aspiranti) senza un aspetto valido (salvataggi precedenti): ognuno riceve il suo,
     diverso dagli altri (v. aspetto.py). Ritorna True se ha cambiato qualcosa."""
     tutti = stato.get("personaggi", []) + stato.get("contratti", [])
     usati = [c["aspetto"] for c in tutti if aspetto.valido(c.get("aspetto"))]
@@ -115,12 +111,15 @@ def assegna_aspetti(stato):
             c["aspetto"] = aspetto.genera(c["nome"], usati)
             usati.append(c["aspetto"])
             cambiato = True
+        elif aspetto.completa(c["aspetto"]):      # aspetto di prima dei copricapo: si tira il suo cappello (o niente)
+            cambiato = True
     return cambiato
 
 
 STATO = carica_stato()
 _cambiato = migra_stato(STATO)
 _cambiato = assegna_aspetti(STATO) or _cambiato
+_cambiato = palestra.migra_stato(STATO) or _cambiato      # dopo gli aspetti: la bio dipende dal sesso
 if _cambiato:
     salva_stato()
 
@@ -146,8 +145,7 @@ def nuovo_record(p):
             "augments": [s["def"]["id"] for s in p.augments],
             "vittorie": 0, "sconfitte": 0, "morto": False,
             "aspetto": getattr(p, "aspetto", None) or aspetto.genera(
-                p.nome, [c.get("aspetto") for c in STATO["personaggi"] + STATO.get("contratti", [])]),
-            "last_heal": time.time()}
+                p.nome, [c.get("aspetto") for c in STATO["personaggi"] + STATO.get("contratti", [])])}
 
 
 def umanita_max_record(c):
@@ -157,7 +155,14 @@ def umanita_max_record(c):
 
 
 def umanita_usata(c):
-    """Umanità già spesa in protesi/augment installati (il limite è umanita_max())."""
+    """Umanità spesa e non ancora recuperata: quella degli oggetti installati meno i punti ridonati dai colloqui
+    (`umanita_recuperata`, mai piu' di quelli spesi: il massimo non cresce). Il limite è umanita_max()."""
+    inst = umanita_installata(c)
+    return inst - min(max(0, c.get("umanita_recuperata", 0)), inst)
+
+
+def umanita_installata(c):
+    """Umanità che costano protesi e augment installati."""
     tot = 0
     for pid in c.get("protesi", []):
         pr = next((x for x in DB["protesi"] if x["id"] == pid), None)
@@ -240,6 +245,8 @@ def assegna_xp(rec, xp):
         rec["livello"] = rec.get("livello", 1) + 1
         rec["token"] = rec.get("token", 0) + 1
         note.append(f"LIVELLO {rec['livello']}! +1 Token 🧬")
+        if rec["livello"] == nemesi.SOPRANNOME_LIVELLO:
+            note.append("🏷 Ha un nome che circola: può scegliersi un soprannome.")
         if len(rec.get("poteri", [])) < MAX_POTERI and random.random() < PROB_NUOVO_POTERE:
             noti = {pw["id"] for pw in rec["poteri"]}
             nuovi = [pw for pw in DB["poteri"] if pw["id"] not in noti]
@@ -250,52 +257,9 @@ def assegna_xp(rec, xp):
     return note
 
 
-def stato_salute(c):
-    if c.get("morto"):
-        return "morto"
-    if c["hp"]["testa"] <= 0 or c["hp"]["busto"] <= 0:
-        return "coma"
-    if any(c["hp"][l] < LOCAZIONI[l] for l in LOCAZIONI):
-        return "ferito"
-    return "pronto"
-
-
-def riposa(c, ora=None):
-    """Cura passiva nel box in base al tempo reale trascorso.
-    Più si è feriti più tempo serve; dal coma si esce molto lentamente."""
-    if c.get("morto"):
-        return
-    ora = ora or time.time()
-    minuti = (ora - c.get("last_heal", ora)) / 60.0
-    if minuti < 1:
-        return  # granularità al minuto: last_heal resta indietro e il tempo si accumula
-    # ponytail: rate fisso ricalcolato a ogni visita; niente simulazione minuto-per-minuto
-    rate = RIGEN_COMA_MIN if stato_salute(c) == "coma" else RIGEN_HP_MIN
-    rate *= 1 + c.get("toughness", 0) / 100  # la Toughness accorcia guarigione e coma
-    amt = int(minuti * rate)
-    if amt <= 0:
-        return
-    for l in LOCAZIONI:
-        c["hp"][l] = min(LOCAZIONI[l], c["hp"][l] + amt)
-    c["crippled"] = [l for l in c.get("crippled", []) if c["hp"][l] < LOCAZIONI[l]]
-    c["last_heal"] = ora
-
-
-def minuti_recupero(c):
-    """Stima dei minuti al pieno recupero (None se morto o già al pieno)."""
-    if c.get("morto"):
-        return None
-    rate = RIGEN_COMA_MIN if stato_salute(c) == "coma" else RIGEN_HP_MIN
-    rate *= 1 + c.get("toughness", 0) / 100
-    mancanti = max(LOCAZIONI[l] - c["hp"][l] for l in LOCAZIONI)
-    return None if mancanti <= 0 else int(mancanti / rate)
-
-
-def riposa_tutti():
-    ora = time.time()
-    for c in STATO["personaggi"]:
-        riposa(c, ora)
-    salva_stato()
+# la guarigione non passa piu' col tempo reale: ogni giorno di gioco (palestra.avanza_giorno) cura chi riposa
+stato_salute = palestra.salute
+giorni_recupero = palestra.giorni_recupero
 
 
 def trova_record(pid):
@@ -321,19 +285,31 @@ def costo_contratto(c):
     return 50 + 15 * sum(c["stats"].values()) + 60 * len(c["poteri"])
 
 
+def nuovo_aspirante(usati_nomi, usati_aspetti):
+    """Un aspirante della palestra: un eroe base con la sua faccia, la sua eta', i suoi tratti (se ne vede uno), il suo prezzo."""
+    p = eroe_base(DB["attacchi"], DB["poteri"], DB["stances"], usati_nomi)
+    usati_nomi.add(p.nome)
+    p.aspetto = aspetto.genera(p.nome, usati_aspetti)   # ognuno ha il suo, diverso da quelli della palestra e degli altri aspiranti
+    usati_aspetti.append(p.aspetto)
+    rec = nuovo_record(p)
+    rec["costo"] = costo_contratto(rec)
+    palestra.completa_record(rec, STATO, nuovo=True)    # eta' (dal calendario), bio, tratti, fiducia, prezzo ritoccato dai tratti
+    return rec
+
+
 def genera_contratti():
+    """Gli aspiranti della settimana (si rinnovano da soli quando la settimana finisce)."""
     usati = {c["nome"] for c in STATO["personaggi"]}
     usati_asp = [c.get("aspetto") for c in STATO["personaggi"]]
-    pool = []
-    for _ in range(N_CONTRATTI):
-        p = eroe_base(DB["attacchi"], DB["poteri"], DB["stances"], usati)
-        usati.add(p.nome)
-        p.aspetto = aspetto.genera(p.nome, usati_asp)   # ognuno ha il suo, diverso da quelli del box e degli altri contratti
-        usati_asp.append(p.aspetto)
-        rec = nuovo_record(p)
-        rec["costo"] = costo_contratto(rec)
-        pool.append(rec)
-    STATO["contratti"] = pool
+    STATO["contratti"] = [nuovo_aspirante(usati, usati_asp) for _ in range(N_CONTRATTI)]
+    salva_stato()
+
+
+def aggiungi_aspirante():
+    """Passaparola: un aspirante in piu' questa settimana."""
+    usati = {c["nome"] for c in STATO["personaggi"] + STATO["contratti"]}
+    usati_asp = [c.get("aspetto") for c in STATO["personaggi"] + STATO["contratti"]]
+    STATO["contratti"].append(nuovo_aspirante(usati, usati_asp))
     salva_stato()
 
 
@@ -343,8 +319,15 @@ def pannello(p, turno):
         "nome": p.nome, "turno": turno, "sconfitto": p.sconfitto(),
         "aspetto": getattr(p, "aspetto", None),
         "hp": {l: {"val": p.hp[l], "max": p.hp_max[l], "arm": p.armatura.get(l, 0),
-                   "crippled": l in p.crippled, "protesi": l in p.protesi_locazioni}
+                   "crippled": l in p.crippled, "protesi": l in p.protesi_locazioni,
+                   "tipi": dict(p.danni_tipo.get(l, {}))}
                for l in p.hp},
+        # cosa mostrare oltre al corpo: ali (potere Ali), braccia extra (2x2), il corpo che fluttua (stance Volo) e, col rango del
+        # potere attivo (0 = spento), l'animazione piu' veloce (Supervelocita': +25% per rango) e braccia e busto piu' grandi
+        # (Super Forza: +18,75% per rango, +75% al quarto)
+        "extra": {"ali": p.potere_attivo("Ali"), "braccia": p.potere_attivo("2x2"),
+                  "volo": any(x["def"]["nome"] == "Volo" for x in p.stance_attive),
+                  "velocita": p.rango_potere_attivo("Supervelocità"), "forza": p.rango_potere_attivo("Super Forza")},
         "risorse": {"azioni": p.azioni, "n_azioni": p.n_azioni,
                     "bonus": p.bonus, "n_bonus": p.n_bonus,
                     "risposte": p.risposte, "n_risposte": p.n_risposte,
@@ -372,20 +355,21 @@ def pannello(p, turno):
 PROFILO_FILE = os.path.join(SAVE_DIR, "cpu_profile.json")
 FEEDBACK_FILE = os.path.join(SAVE_DIR, "feedback.jsonl")
 PROFILO_DEFAULT = {"potere_subito": 0.8, "mira": 0.35, "stance": 0.5,
-                   "aggressivita": 0.7, "bias_matchmaking": 0}
+                   "aggressivita": 0.7, "azzardo": 0.5, "bias_matchmaking": 0}
 # limiti delle manopole: un profilo saturo (0.95 su tutto, come nel save dopo molti survey
 # "tutto no") renderebbe la CPU deterministica e ingiocabile. Vale anche in lettura, cosi' un
 # cpu_profile.json gia' saturo non va riscritto. bias_matchmaking e' OBSOLETO (v. bias per
 # personaggio): resta nel file per compatibilita' ma non viene mai letto.
 LIMITI_PROFILO = {"potere_subito": (0.3, 0.9), "mira": (0.05, 0.6), "stance": (0.1, 0.8),
-                  "aggressivita": (0.3, 0.9)}
+                  "aggressivita": (0.3, 0.9), "azzardo": (0.1, 0.9)}
 BIAS_MAX = 2          # livelli di scarto massimo della CPU rispetto al personaggio
 DUELLI_PER_RIENTRO = 3  # il bias rientra di 1 ogni tanti duelli
 
 
 def _limita(profilo):
     for chiave, (lo, hi) in LIMITI_PROFILO.items():
-        profilo[chiave] = round(min(hi, max(lo, profilo[chiave])), 3)
+        if chiave in profilo:     # un profilo di prima di una manopola nuova non ce l'ha: resta il default
+            profilo[chiave] = round(min(hi, max(lo, profilo[chiave])), 3)
     return profilo
 
 
@@ -450,6 +434,10 @@ def aggiorna_profilo(risposte, rec=None):
         spingi("aggressivita", 0.08)
     if r.get("stance_corrette") == "no":
         spingi("stance", 0.05)
+    if r.get("azzardo_troppo") == "si":
+        spingi("azzardo", -0.1)
+    if r.get("azzardo_poco") == "si":
+        spingi("azzardo", 0.1)
     salva_profilo()
 
 
@@ -719,15 +707,113 @@ def info_attacco(att):
     return {"nome": att["nome"], "desc": descrizione_attacco(att), "tags": tags, "effetti": effetti}
 
 
+def nomi_in_uso():
+    return {c["nome"] for c in STATO["personaggi"] + STATO.get("contratti", []) + STATO.get("rivali", [])}
+
+
+def _nuovo_rivale(record, pg):
+    """Il rivale della prima volta: la CPU "specchio" del matchmaking (cpu_bilanciata), da qui in poi una persona che resta nel mondo."""
+    c = cpu_bilanciata(pg, record.get("bias", 0))
+    usati = nomi_in_uso() | {pg.nome}
+    if c.nome in usati:
+        c.nome = nome_casuale(usati)
+    rec = nuovo_record(c)
+    rec.update(id=STATO.setdefault("prossimo_rivale", 1), livello=c.livello, xp=0, token=0, rapporti={}, incontri=0,
+               creato=STATO.get("giorno", 0), soprannome=None)
+    STATO["prossimo_rivale"] += 1
+    nemesi.assegna_soprannome(rec)
+    return rec
+
+
+def scegli_rivale(record, pg):
+    """Chi si trova davanti un allievo sul ring (Nemesis system, NEMESI.md): spesso qualcuno che ha gia' incontrato, o che ha incontrato la
+    palestra, che nel frattempo e' cresciuto; altrimenti, la prima volta, uno nuovo scelto dal matchmaking."""
+    rivali = STATO.setdefault("rivali", [])
+    bias = max(-BIAS_MAX, min(BIAS_MAX, record.get("bias", 0)))
+    r = nemesi.scegli(rivali, record.get("id"), getattr(pg, "livello", 1) + bias, ultimo_id=record.get("ultimo_rivale"))
+    if r is None:
+        r = _nuovo_rivale(record, pg)
+        rivali.append(r)
+        nemesi.pota(rivali, protetti={r["id"]})
+    return r
+
+
+def genera_avversario(record, pg):
+    """Chi si trova davanti un allievo sul ring: un rivale persistente (v. scegli_rivale), pronto al duello (hp pieni).
+    Gancio dell'Opzione B (OPZIONE_B_CIRCUITO.md): qui si pescherebbe invece un rivale vero dalle crew dei distretti."""
+    r = scegli_rivale(record, pg)
+    c = record_to_pg(r)
+    c.nome = nemesi.nome_completo(r)
+    c.rivale = r
+    return c
+
+
+def valore_equip(rec):
+    """Quanto vale (in ¤ di listino) l'equipaggiamento di un record."""
+    cat = (("armi", "equip"), ("protesi", "protesi"), ("augments", "augments"))
+    tot = sum(next((x for x in DB[k] if x["id"] == i), {}).get("valore", 0) for lista, k in cat for i in rec.get(lista, []))
+    return tot + next((x for x in DB["armor"] if x["id"] == rec.get("armatura_equip")), {}).get("valore", 0)
+
+
+def _rivale_compra(riv):
+    """Quando un rivale sale di livello puo' permettersi un oggetto in piu': uno solo, a caso, con gli stessi vincoli del negozio."""
+    budget = budget_cpu(riv["livello"]) - valore_equip(riv)
+    libera = umanita_max_record(riv) - umanita_installata(riv)
+    occupate = {next((x for x in DB["protesi"] if x["id"] == i), {}).get("locazione") for i in riv.get("protesi", [])}
+    cat = []
+    if len(riv.get("armi", [])) < MAX_ARMI:
+        cat += [("armi", x) for x in DB["equip"] if x["id"] not in riv.get("armi", [])]
+    if riv.get("armatura_equip") is None:
+        cat += [("armatura_equip", x) for x in DB["armor"]]
+    cat += [("protesi", x) for x in DB["protesi"] if x["locazione"] not in occupate and x["id"] not in riv.get("protesi", [])]
+    cat += [("augments", x) for x in DB["augments"] if x["id"] not in riv.get("augments", [])]
+    random.shuffle(cat)
+    for campo, item in cat:
+        if item.get("valore", 0) > budget or item.get("costo_umanita", 0) > libera:
+            continue
+        if campo == "armatura_equip":
+            riv[campo] = item["id"]
+        else:
+            riv.setdefault(campo, []).append(item["id"])
+        return item["nome"]
+    return None
+
+
+def cresce_rivale(riv, vinto_allievo):
+    """Dopo ogni incontro il rivale cresce, piano: gli XP di un duello (e un po' di piu' se ha vinto: assapora la vittoria) con gli stessi
+    livelli, Token e sblocchi di un allievo, ma combatte molto meno di lui. Ritorna le righe da mostrare."""
+    liv0 = riv["livello"]
+    xp = 100 if vinto_allievo else int(300 * nemesi.TOKEN_VITTORIA)
+    assegna_xp(riv, xp)
+    pg = record_to_pg(riv)
+    riv["token"] = _spendi_token_cpu(pg, riv.get("token", 0))
+    riv["stats"], riv["skills"] = dict(pg.stats), dict(pg.skills)
+    riv["poteri"] = [{"id": s["def"]["id"], "rango": s["rango"]} for s in pg.poteri]
+    righe = []
+    if riv["livello"] > liv0:
+        righe.append(f"⚔ {nemesi.nome_completo(riv)} sale di livello: {riv['livello']}.")
+        oggetto = _rivale_compra(riv)
+        if oggetto:
+            righe.append(f"Ora porta {oggetto}.")
+        if nemesi.assegna_soprannome(riv):
+            righe.append(f"Soprannome: «{riv['soprannome']}».")
+    return righe
+
+
 class DuelloWeb:
     """Stato del duello lato server, pilotato da /api/duello/azione."""
 
-    def __init__(self, record=None, pg=None, avversario=None, torneo=None):
-        self.rec = record  # None = duello senza box: torneo (o CPU vs CPU)
+    def __init__(self, record=None, pg=None, avversario=None, torneo=None, posta=None, azzardo_attivo=None):
+        self.rec = record  # None = duello senza palestra: torneo (o CPU vs CPU)
         self.torneo = torneo  # riferimento al TorneoEvo, se questo duello ne fa parte
+        self.posta = dict(POSTA_BASE, **(posta or {}))   # quanto paga la vittoria e quanto e' pericolosa la morte
+        self.rivale = None       # il rivale persistente di questo duello (Nemesis system), se c'e'
+        self._segno_rivincita = 0
         if record is not None:
             self.p = record_to_pg(record)
-            self.cpu = cpu_bilanciata(self.p, record.get("bias", 0))
+            self.p.nome = nemesi.nome_completo(record)
+            self.cpu = avversario if avversario is not None else genera_avversario(record, self.p)
+            self.rivale = getattr(self.cpu, "rivale", None)
         else:
             self.p = pg
             self.cpu = avversario
@@ -742,17 +828,16 @@ class DuelloWeb:
         self.survey_fatto = False
         self.fase = None     # "player" | "cpu" | "risposta" | "fine"
         self.pending = None
-        # arena: scommesse/sponsor/pubblico — nei duelli veri e nel Torneo Evo (dove i bonus
-        # vinti si accumulano nel montepremi e si riscattano solo diventando campioni)
+        # arena: il Banco (puntate, clausole, folla, azzardi: azzardo.py) — nei duelli veri e nel Torneo Evo (dove le
+        # vincite sono soltanto un punteggio). `azzardo_attivo` accende folla e azzardi senza soldi (il harness li misura cosi')
         self.arena_attiva = record is not None or torneo is not None
-        self.scommessa = None    # {"importo": int, "quota": float}
-        self.sponsor = None      # uno degli elementi di SPONSOR, una volta scelto
-        self.sponsor_offerte = random.sample(SPONSOR, 2) if self.arena_attiva else None
-        # le scelte del giocatore si registrano solo nel gioco vero (duello del box o torneo), mai nel harness
+        self.db = DB
+        giocabile = self.arena_attiva if azzardo_attivo is None else bool(azzardo_attivo)
+        self.tavolo = azzardo.Tavolo(self, banco=self.arena_attiva) if (self.arena_attiva or giocabile) else None
+        # le scelte del giocatore si registrano solo nel gioco vero (duello della palestra o torneo), mai nel harness
         self.reg = tattiche.Registratore("torneo" if torneo is not None else "duello") if self.arena_attiva else None
-        self.usato_potere = False   # per lo sponsor "stoico"/"bestia"
-        self.min_hp_pct = 1.0       # hp minimi (%) toccati dal player, per "incassatore"
-        self.hype = 50               # umore del pubblico, 0-100
+        self.usato_potere = False   # per le clausole "stoico"/"bestia"
+        self.min_hp_crit = 1.0      # hp minimi (frazione di testa + busto) toccati dal player, per la clausola "incassatore"
         self.scriv("=== DUELLO ===")
         self.scriv(f"{self.p.nome} (LIV {getattr(self.p, 'livello', 1)}) contro "
                    f"{self.cpu.nome} (LIV {getattr(self.cpu, 'livello', 1)}) — "
@@ -770,6 +855,43 @@ class DuelloWeb:
         self.evento("inizio", nome1=self.p.nome, tiro1=r1, nome2=self.cpu.nome, tiro2=r2,
                     primo=self.ordine[0].nome)
         self.nuovo_round()
+        self._rivalita()
+
+    # ---------- il Nemesis system: chi sei per lui ----------
+    def _rivalita(self):
+        """All'inizio del duello con un rivale che si conosce: chi ha perso l'ultima volta parte con la RIVINCITA (+1 a colpire e ai
+        riflessi per 3 turni propri), la folla la vuole (tifo di partenza), la quota lo sa, sul rivale pesa una TAGLIA e il log avverte."""
+        riv = self.rivale
+        if riv is None or self.rec is None:
+            return
+        pid = self.rec.get("id")
+        eti = nemesi.etichetta(riv, pid, STATO.get("giorno"))
+        self.scriv(f"⚔ Rivale: {self.cpu.nome} (livello {riv['livello']}). {eti['testo']}", "crit" if eti["stato"] != "nuovo" else None)
+        cerca = nemesi.chi_cerca_rivincita(riv, pid)
+        self._segno_rivincita = nemesi.segno_rivincita(riv, pid)
+        if cerca:
+            chi = self.p if cerca == "a" else self.cpu
+            eid = next((e["id"] for e in DB["effetti"] if e["nome"] == "Rivincita"), None)
+            if eid is not None:      # stessi turni di gioco per tutti e due: chi agisce per secondo ha ancora un tick da fare
+                chi.applica_effetti([{"effetto": eid, "turni": 3 if chi is self.ordine[0] else 4}], DB["effetti"])
+            self.scriv(f"🔥 {chi.nome} vuole la rivincita: +1 a colpire e ai riflessi per 3 turni.")
+            if self.tavolo is not None:
+                self.tavolo.tifo = float(nemesi.TIFO_RIVINCITA if cerca == "a" else -nemesi.TIFO_RIVINCITA)
+        t = nemesi.taglia(riv)
+        if t:
+            self.posta = dict(self.posta, paga=self.posta["paga"] + t, taglia=t)
+            self.scriv(f"💰 Taglia sul rivale: +{t}¤ alla vittoria.")
+
+    def info_rivale(self):
+        """Per il client: chi e' l'avversario per questo allievo (nuovo, battuto, nemico...), taglia compresa."""
+        riv = self.rivale
+        if riv is None or self.rec is None:
+            return None
+        eti = nemesi.etichetta(riv, self.rec.get("id"), STATO.get("giorno"))
+        r = nemesi.rapporto(riv, self.rec.get("id"))
+        return {"nome": nemesi.nome_completo(riv), "livello": riv["livello"], "stato": eti["stato"], "testo": eti["testo"], "breve": eti["breve"],
+                "vinte": r["vinte"], "perse": r["perse"], "taglia": self.posta.get("taglia", 0),
+                "rivincita": nemesi.chi_cerca_rivincita(riv, self.rec.get("id")), "incontri": riv.get("incontri", 0)}
 
     # ---------- log ----------
     def scriv(self, msg, tag=None):
@@ -802,12 +924,16 @@ class DuelloWeb:
         self.idx = 0
         for p in (self.p, self.cpu):
             p.azioni, p.bonus, p.risposte = p.n_azioni, p.n_bonus, p.n_risposte
+        if self.tavolo is not None:
+            self.tavolo.nuovo_round()
         self.scriv(f"— ROUND {self.round} —", "round")
         self.inizia_turno()
 
     def inizia_turno(self):
         self.attivo = self.ordine[self.idx]
         self.altro = self.ordine[1 - self.idx]
+        if self.tavolo is not None:
+            self.tavolo.inizio_turno(self.attivo)
         self.scriv(f"▸ Turno di {self.attivo.nome}", "turno")
         i0 = len(self.log)
         for r in self.attivo.tick_turno():
@@ -834,6 +960,8 @@ class DuelloWeb:
     def fine_turno(self):
         if MIRA_DURA_TURNO:
             self.attivo.mira = None   # una mira di turno non si porta in quello dopo
+        if self.tavolo is not None:
+            self.tavolo.fine_turno(self.attivo)
         if self.idx == 0:
             self.idx = 1
             self.inizia_turno()
@@ -847,7 +975,7 @@ class DuelloWeb:
             self.vincitore = vincitore
             self.scriv(f"*** {chi.nome} è sconfitto! {vincitore.nome} vince! ***", "crit")
 
-    # ---------- arena: bookmaker live, sponsor, pubblico ----------
+    # ---------- arena: il Banco (puntate, clausole, folla, azzardi: v. azzardo.py) ----------
     def prob_vittoria(self):
         """Probabilita' stimata di vittoria del player: logistica del gap di potenziale piu' quello
         di hp (frazione degli hp totali rimasti) — coefficienti misurati su duelli veri (v.
@@ -855,80 +983,68 @@ class DuelloWeb:
         hp_p = sum(max(0, self.p.hp[l]) for l in self.p.hp) / max(1, sum(self.p.hp_max.values()))
         hp_c = sum(max(0, self.cpu.hp[l]) for l in self.cpu.hp) / max(1, sum(self.cpu.hp_max.values()))
         z = K_VALUTA * (valuta(self.p) - valuta(self.cpu)) + K_HP * (hp_p - hp_c)
+        if self.round <= nemesi.TURNI_RIVINCITA:       # chi ha perso l'ultima volta parte motivato: il banco lo sa
+            z += nemesi.K_RIVINCITA * self._segno_rivincita
         return 1 / (1 + math.exp(-z))
 
     def quota_attuale(self):
-        """Quota per una scommessa sul player: l'inverso della probabilita' di vittoria con il
-        margine del banco (a 50% paga 2.2x, come prima). È la leva del comeback: favorito 1.4x ->
-        perdi metà vita -> sfavorito e la stessa scommessa paga di più. Una quota alta corrisponde
-        a una vera possibilità di impresa (la scala dei ranghi 0/1/2/3 le rende possibili)."""
-        return round(min(6.0, max(1.1, MARGINE_BANCO / max(self.prob_vittoria(), 1e-6))), 2)
+        """Quota per una puntata sul player (v. azzardo.quota): l'inverso della probabilita' di vittoria meno il margine del
+        banco, quindi a 50% paga 1,8x. Favorito 1,3x -> perdi meta' vita -> sfavorito: la stessa puntata, fatta ora, paga di piu'."""
+        return azzardo.quota(self.prob_vittoria())
 
     def _traccia_hp_minimo(self):
-        if not self.arena_attiva:
+        if not self.arena_attiva and self.tavolo is None:
             return
-        tot = sum(max(0, self.p.hp[l]) for l in self.p.hp)
-        mx = sum(self.p.hp_max.values())
-        self.min_hp_pct = min(self.min_hp_pct, tot / max(1, mx))
+        tot = sum(max(0, self.p.hp[l]) for l in ("testa", "busto"))
+        mx = self.p.hp_max["testa"] + self.p.hp_max["busto"]
+        self.min_hp_crit = min(self.min_hp_crit, tot / max(1, mx))
 
-    def _hype(self, delta):
-        self.hype = max(0, min(100, self.hype + delta))
+    # il portafoglio del tavolo: crediti veri nel duello della palestra, punti virtuali nel Torneo Evo
+    def fondi(self):
+        """Il tetto di una puntata: i crediti che hai (palestra) o il massimo per puntata (torneo)."""
+        return STATO["crediti"] if self.rec is not None else MAX_SCOMMESSA_TORNEO
 
-    def pubblico_stato(self):
-        if self.hype >= 80:
-            testo = "Il pubblico è in delirio!"
-        elif self.hype >= 60:
-            testo = "La folla è elettrizzata."
-        elif self.hype >= 40:
-            testo = "Il pubblico segue con interesse."
-        elif self.hype >= 20:
-            testo = "Qualche fischio dagli spalti."
-        else:
-            testo = "Il pubblico si sta annoiando..."
-        q = self.quota_attuale()
-        if q >= 2.5:
-            tifo = f"Il pubblico sogna la rimonta di {self.p.nome}!"
-        elif q <= 1.4:
-            tifo = f"Il pubblico dà per scontata la vittoria di {self.p.nome}."
-        else:
-            tifo = "Il pubblico è diviso, equilibrio totale."
-        return {"hype": self.hype, "testo": testo, "tifo": tifo}
+    def preleva(self, importo):
+        """La posta lascia subito il portafoglio (e il salvataggio: chiudere il gioco a meta' duello non la restituisce)."""
+        if self.rec is not None:
+            STATO["crediti"] -= importo
+            salva_stato()
 
-    def _sponsor_fallito(self, sp):
-        """Per il display live: la condizione (a parte vincere) è già impossibile?"""
-        if sp["id"] == "lampo":
-            return self.round > 3
-        if sp["id"] == "stoico":
-            return self.usato_potere
-        return False  # bestia/incassatore restano raggiungibili fino alla fine
+    def accredita(self, importo):
+        """Soldi che tornano subito al giocatore (incasso anticipato): crediti veri, o punti del torneo."""
+        if self.rec is not None:
+            STATO["crediti"] += importo
+            salva_stato()
+        elif self.torneo is not None:
+            self.torneo.bonus_accumulato += importo
+            self.torneo.log_arena.append(f"🎰 +{importo} punti (incasso anticipato).")
 
-    def _sponsor_condizione(self, sp):
-        """Verifica finale (a fine duello) della condizione dello sponsor, vittoria esclusa."""
-        return {"lampo": self.round <= 3, "bestia": self.usato_potere,
-                "stoico": not self.usato_potere,
-                "incassatore": self.min_hp_pct <= 0.30}.get(sp["id"], False)
+    def rischio_morte(self, chi):
+        """Chance che un crollo sia mortale: solo un allievo della palestra puo' morire (v. chiudi_duello); None per gli altri."""
+        if self.rec is None or chi is not self.p:
+            return None
+        return round(min(1.0, max(0.10, 0.75 - self.rec.get("toughness", 0) * 0.01) * self.posta.get("morte", 1.0)), 2)
+
+    def stima_colpo_di(self, att):
+        return stima_colpo(att)
+
+    def _spettacolo(self, chi, tipo):
+        """La folla apprezza chi accende un potere o assume una stance."""
+        if self.tavolo is not None:
+            self.tavolo.spettacolo(chi, tipo)
 
     def info_arena(self):
-        if not self.arena_attiva:
+        if self.tavolo is None or not self.arena_attiva:
             return None
-        sponsor_vivo = None
-        if self.sponsor is not None:
-            sponsor_vivo = dict(self.sponsor, fallito=self._sponsor_fallito(self.sponsor))
-        return {
-            "quota": self.quota_attuale(),
-            "scommessa": self.scommessa,
-            "crediti": STATO["crediti"],
-            "sponsor_offerte": self.sponsor_offerte if self.sponsor is None else None,
-            "sponsor": sponsor_vivo,
-            "pubblico": self.pubblico_stato(),
-            # nel torneo le vincite non toccano i crediti reali finché non diventi campione
-            "torneo_pot": self.torneo.bonus_accumulato if self.torneo is not None else None,
-        }
+        info = self.tavolo.info()
+        # nel torneo le vincite sono soltanto un punteggio: non toccano i crediti veri
+        info["torneo_pot"] = self.torneo.bonus_accumulato if self.torneo is not None else None
+        return info
 
     # ---------- azioni comuni ----------
     def usa_potere(self, chi, slot):
         if not chi.puo_attivare_potere(slot):
-            self.scriv(f"{slot['def']['nome']} è inutilizzabile: un arto è a 0 hp.")
+            self.scriv(f"{slot['def']['nome']} {chi.motivo_blocco_potere(slot)}.")
             return
         chi.azioni -= 1
         i0 = len(self.log)
@@ -938,7 +1054,7 @@ class DuelloWeb:
                     desc=slot["def"].get("descrizione", ""), righe=[x["t"] for x in self.log[i0:]])
         if chi is self.p:
             self.usato_potere = True
-        self._hype(4)
+        self._spettacolo(chi, "potere")
 
     def usa_augment(self, chi, slot):
         if not chi.puo_attivare_augment(slot):
@@ -952,7 +1068,7 @@ class DuelloWeb:
                     desc=slot["def"].get("descrizione", ""), righe=[x["t"] for x in self.log[i0:]])
         if chi is self.p:
             self.usato_potere = True  # un augment è meccanicamente un potere
-        self._hype(4)
+        self._spettacolo(chi, "potere")
 
     def usa_stance(self, chi, sdef, avversario):
         chi.bonus -= 1
@@ -961,7 +1077,7 @@ class DuelloWeb:
             self.scriv(r)
         self.evento("stance", i0 + 1, titolo=sdef["nome"], desc=sdef.get("descrizione", ""),
                     righe=[x["t"] for x in self.log[i0:]])
-        self._hype(2)
+        self._spettacolo(chi, "stance")
 
     def usa_attacco(self, att):
         a, d = self.attivo, self.altro
@@ -983,6 +1099,8 @@ class DuelloWeb:
                 and not a.ha_flag("immune_melee")):
             self.scriv(f"{d.nome} è in volo: le mosse non a distanza non lo raggiungono!",
                        "immune")
+            if self.tavolo is not None:
+                self.tavolo.rilancio_mancato(a, stima_colpo(att))     # un colpo rilanciato che non arriva si paga lo stesso
             return
         self._tira_colpo(att, mirata, loc, colpi)
 
@@ -1143,9 +1261,18 @@ class DuelloWeb:
                 difese.append(d.bonus_tiro("armi_corpo_a_corpo", a))
             if att.get("can_dodge") and d.puo_schivare():
                 return 0.0   # la schivata riesce sempre: contro la migliore difesa non si colpisce
-        k = (a.bonus_tiro(self._skill_attacco(att), d) + bonus_colpire(a, d)
-             - max(difese) - pen)
-        return round(prob_supera(k), 2)
+        fisso = a.bonus_tiro(self._skill_attacco(att), d) - max(difese) - pen
+        # una stance che tira dadi dentro il bonus a colpire (la Taunt) fa oscillare una stima sola da -2 a +9: si fa la media,
+        # altrimenti la percentuale mostrata balla a ogni aggiornamento e chi aspetta il numero giusto sceglie solo il rumore
+        n = 32 if self._bonus_colpire_casuale(a, d) else 1
+        return round(sum(prob_supera(fisso + bonus_colpire(a, d)) for _ in range(n)) / n, 2)
+
+    @staticmethod
+    def _bonus_colpire_casuale(a, d):
+        """True se una stance in campo tira dadi nel bonus a colpire (v. engine.bonus_colpire)."""
+        return any(m.get("dado_proprio") or m.get("dado_avversario")
+                   for st in a.stance_attive + d.stance_attive for m in st["def"].get("modificatori", [])
+                   if m["tipo"] in ("colpire_proprio", "colpire_avversario"))
 
     def info_attacco_in_corso(self):
         """Cosa sta per colpire il giocatore (solo in fase 'risposta'): attacco, tiro, bersaglio,
@@ -1201,14 +1328,20 @@ class DuelloWeb:
         loc = loc_attacco
         mirata, colpi_rimasti = pend.get("mirata"), pend.get("colpi_rimasti", 1)
         tipo_danno = att.get("tipo_danno", "contundente")
-        quota_prima = self.quota_attuale() if self.arena_attiva else None
         mitiga_meta = False
         i0 = len(self.log)
         base = margine = danno = danno_reale = 0
         assorbito = 0
         arm_prima = sum(d.armatura.values())
+        crip_prima = set(d.crippled)
         split = att.get("split_danni", False)
         skill_dif = {"parata": "armi corpo a corpo", "schivata": "acrobatica"}.get(scelta, "riflessi")
+        # con che probabilita' questo colpo andava a segno contro la difesa scelta (la folla premia l'improbabile, v. azzardo.sorpresa)
+        if scelta == "schivata":
+            p_colpo = 0.0
+        else:
+            b_dif = d.bonus_tiro("armi_corpo_a_corpo" if scelta == "parata" else "riflessi", a)
+            p_colpo = max(0.0, min(1.0, (ta - b_dif - pen_mira - 1) / DADO_BASE))
         if scelta == "parata":
             d.risposte -= 1
             # solo la parata sceglie con cosa assorbire QUESTO colpo: non è la locazione
@@ -1239,13 +1372,16 @@ class DuelloWeb:
             if not colpito:
                 self.scriv(f"{d.nome} schiva d'istinto!", "miss")
         if not colpito:
-            self._hype({"schivata": 6, "parata": 4}.get(scelta, -2))
+            if self.tavolo is not None:
+                self.tavolo.rilancio_mancato(a, stima_colpo(att))     # il colpo azzardato non e' andato a segno: si paga
             for r in a.scatta_trigger("manchi", d, DB["effetti"]):
                 self.scriv("  " + r)
         else:
             margine = min(max(ta - td, 0), MARGINE_CAP) * MARGINE_FATTORE
             base = a.tira_formula(att["danno"], d)
             danno = base + margine
+            if self.tavolo is not None:
+                danno = self.tavolo.danno_rilanciato(a, d, loc, danno)     # ...e se e' a segno la posta paga
             if mitiga_meta:
                 danno //= 2
             self.scriv(f"Colpito! {danno} danni ({tipo_danno})"
@@ -1253,12 +1389,6 @@ class DuelloWeb:
             hp_prima = sum(d.hp.values())
             for r in d.applica_danno(loc, danno, tipo_danno, split=split):
                 self.scriv("  " + r)
-            # il pubblico si accende per i colpi pesanti, e va in delirio se è
-            # il player-sfavorito (quota alta) a piazzare il colpo: la rimonta
-            bonus_hype = 8 if (split or danno >= d.hp_max.get(loc, 100) * 0.3) else 5
-            if a is self.p and quota_prima is not None and quota_prima >= 2.5:
-                bonus_hype += 10
-            self._hype(bonus_hype)
             if att.get("speciale") == "assorbi_caratteristica":
                 for r in a.assorbi_caratteristica(d, att.get("speciale_turni", 3)):
                     self.scriv("  " + r)
@@ -1287,6 +1417,9 @@ class DuelloWeb:
             base=base, margine=margine, danno=danno, tipo_danno=tipo_danno,
             hp_persi=danno_reale, assorbito=assorbito, ucciso=d.sconfitto(),
             effetti=info_attacco(att)["effetti"] if colpito else [])
+        if self.tavolo is not None:       # la folla reagisce dopo la scheda del colpo, non prima
+            self.tavolo.dopo_scambio(a, d, scelta, bool(colpito), p_colpo, danno_reale, loc,
+                                     d.crippled - crip_prima, d.sconfitto())
         self._continua_o_fine(att, mirata, loc_attacco, colpi_rimasti)
 
     # ---------- CPU ----------
@@ -1313,6 +1446,9 @@ class DuelloWeb:
         """Un'azione della CPU per volta (il client richiama con un delay).
         Le probabilità vengono dal PROFILO, che si aggiorna con i survey."""
         a = self.attivo
+        # l'azzardo viene prima della resa: chi sta per perdere si gioca l'Ultima Puntata invece di alzare bandiera bianca
+        if self.tavolo is not None and self.tavolo.cpu_azzarda(a, PROFILO["azzardo"]):
+            return
         if self._cpu_vuole_arrendersi():
             self.resa(self.cpu)
             return
@@ -1362,6 +1498,8 @@ class DuelloWeb:
                 azione(a, slot)
                 return
             scelto = self.scegli_attacco(a, self.altro)
+            if self.tavolo is not None:          # chi ha rilanciato la posta attacca col colpo che aveva scelto
+                scelto = self.tavolo.attacco_pianificato(a) or scelto
             if scelto is not None:
                 self.usa_attacco(scelto)
                 return
@@ -1449,41 +1587,22 @@ class DuelloWeb:
             if self.fase == "cpu" and not self.finito:
                 self.cpu_step()
             return None
-        if tipo == "scommetti":
-            # si può scommettere su se stessi in qualsiasi momento del duello,
-            # non solo nel proprio turno: è la leva del "comeback" del bookmaker live
-            if not self.arena_attiva:
+        # il Banco: si punta, si firma una clausola e si incassa in qualsiasi momento del duello, non solo nel proprio turno
+        # (le quote si muovono con i colpi: e' la leva del bookmaker live). Gli azzardi invece costano l'azione bonus.
+        if tipo == "scommetti":      # il nome di prima delle puntate
+            tipo = "punta"
+        if tipo in ("punta", "clausola", "incassa"):
+            if self.tavolo is None or not self.arena_attiva:
                 return "questa modalità non ha scommesse"
-            if self.scommessa is not None:
-                return "hai già scommesso su questo duello"
-            importo = dati.get("importo")
-            if not isinstance(importo, int) or importo <= 0:
-                return "importo non valido"
-            if self.rec is not None:
-                # duello vero: puntata reale, scalata subito dai crediti
-                if importo > STATO["crediti"]:
-                    return "crediti insufficienti"
-                STATO["crediti"] -= importo
-                salva_stato()
-            elif self.torneo is not None and importo > MAX_SCOMMESSA_TORNEO:
-                return f"puntata massima nel torneo: {MAX_SCOMMESSA_TORNEO}¤"
-            quota = self.quota_attuale()
-            self.scommessa = {"importo": importo, "quota": quota}
-            extra = (" (nel montepremi del torneo: si riscatta solo diventando campione)"
-                    if self.torneo is not None else "")
-            self.scriv(f"🎰 Scommessa piazzata: {importo}¤ su {self.p.nome} a quota {quota}x{extra}.")
-            return None
-        if tipo == "sponsor":
-            if not self.arena_attiva:
-                return "questa modalità non ha sponsor"
-            if self.sponsor is not None:
-                return "hai già scelto uno sponsor"
-            sp = next((s for s in (self.sponsor_offerte or []) if s["id"] == dati.get("id")), None)
-            if sp is None:
-                return "sponsor non disponibile"
-            self.sponsor = sp
-            self.scriv(f"📣 {sp['nome']} ti sponsorizza: {sp['descrizione']}")
-            return None
+            if tipo == "punta":
+                return self.tavolo.punta(dati.get("importo"))
+            if tipo == "clausola":
+                return self.tavolo.firma(dati.get("id"), dati.get("importo"))
+            return self.tavolo.incassa(dati.get("id"))
+        if tipo == "azzardo":
+            if self.tavolo is None:
+                return "questa modalità non ha azzardi"
+            return self.tavolo.azzarda(self.p, dati.get("id"), dati.get("livello", 1))
         if self.fase != "player":
             return "non è il tuo turno"
         a = self.p
@@ -1524,7 +1643,7 @@ class DuelloWeb:
             if a.azioni < 1:
                 return "azioni esaurite"
             if not a.puo_attivare_potere(slot):
-                return "potere inutilizzabile: un arto è a 0 hp"
+                return "potere inutilizzabile: un arto è a 0 hp" if a.arto_potere_rotto(slot) else "potere spento in questo turno: si riaccende dal prossimo"
             self.usa_potere(a, slot)
         elif tipo == "disattiva_potere":
             slot = next((s for s in a.poteri
@@ -1589,7 +1708,7 @@ class DuelloWeb:
             "poteri": [{"id": s["def"]["id"], "nome": s["def"]["nome"],
                         "rango": s["rango"], "desc": s["def"].get("descrizione", ""),
                         "ok": a.azioni >= 1 and a.puo_attivare_potere(s),
-                        "rotto": not a.puo_attivare_potere(s)}
+                        "rotto": a.arto_potere_rotto(s), "spento_ora": bool(s.get("spento_ora"))}
                        for s in a.poteri if not s["attivo"]],
             "poteri_attivi": [{"id": s["def"]["id"], "nome": s["def"]["nome"],
                                "rango": s["rango"], "ok": a.bonus >= 1}
@@ -1610,17 +1729,24 @@ class DuelloWeb:
                         "usi_rimasti": a.stato_stance(s)["usi_rimasti"]}
                        for s in a.stance_conosciute
                        if all(x["def"]["id"] != s["id"] for x in a.stance_attive)],
+            # gli azzardi: la Ruota, il Rilancio, l'Ultima Puntata (azzardo.py), con le probabilita' di adesso
+            "azzardi": self.tavolo.menu(a) if self.tavolo is not None else None,
         }
 
     def stato(self):
+        pl = pannello(self.p, self.attivo is self.p and not self.finito)
+        cp = pannello(self.cpu, self.attivo is self.cpu and not self.finito)
+        if self.tavolo is not None:     # rilancio in corso, Ultima Puntata gia' giocata, pip della folla: per entrambi uguale
+            pl["azzardo"], cp["azzardo"] = self.tavolo.stato_lato(self.p), self.tavolo.stato_lato(self.cpu)
         return {
             "fase": self.fase, "round": self.round, "finito": self.finito,
             "vincitore": self.vincitore.nome if self.vincitore else None,
             "vinto_dal_player": self.vincitore is self.p if self.finito else None,
-            "ricompensa": RICOMPENSA_VITTORIA,
+            "ricompensa": self.posta["paga"],
             "log": self.log,
-            "player": pannello(self.p, self.attivo is self.p and not self.finito),
-            "cpu": pannello(self.cpu, self.attivo is self.cpu and not self.finito),
+            "player": pl,
+            "cpu": cp,
+            "folla": self.tavolo.info()["folla"] if self.tavolo is not None else None,
             "opzioni": (self.pending or {}).get("opzioni", []) if self.fase == "risposta" else [],
             "in_corso": self.info_attacco_in_corso() if self.fase == "risposta" else None,
             "eventi": self.eventi[-12:],
@@ -1630,6 +1756,7 @@ class DuelloWeb:
             "survey_fatto": self.survey_fatto,
             "torneo": self.rec is None,
             "arena": self.info_arena(),
+            "rivale": self.info_rivale(),
         }
 
 
@@ -1639,7 +1766,7 @@ DUELLO = None  # ponytail: un solo duello alla volta (single-player locale)
 # ---------------------------------------------------------------- torneo evo
 class TorneoEvo:
     """Eliminazione diretta a 16: si parte da eroi base che evolvono a ogni turno.
-    Il giocatore usa un personaggio casuale (non del box); se vince, entra nel box.
+    Il giocatore usa un eroe casuale (non della palestra). E' una modalita' a parte: vincere non da' nulla (v. _premia).
     ponytail: vive in memoria come DUELLO — riavviare il server azzera il torneo."""
 
     NOMI_TURNI = ["Ottavi", "Quarti", "Semifinale", "Finale"]
@@ -1664,8 +1791,8 @@ class TorneoEvo:
         self.scelte = None
         self.scelte_item = None
         self.campione = None
-        # arena: le vincite di scommesse/sponsor di ogni round si accumulano qui e si
-        # riscattano in crediti reali solo se si diventa campioni; altrimenti vanno perse
+        # arena: le vincite di puntate/clausole di ogni round si sommano qui. Il Torneo Evo e' una modalita' a parte:
+        # non da' premi (ne' crediti, ne' l'eroe nella palestra), quindi e' soltanto un punteggio
         self.bonus_accumulato = 0
         self.log_arena = []
 
@@ -1690,6 +1817,7 @@ class TorneoEvo:
         for l in e.hp:
             e.hp[l] = e.hp_max[l]
         e.crippled = set()
+        e.danni_tipo = {}
         e.init_stamina()
 
     def _reset_combattimento(self, e):
@@ -1754,27 +1882,14 @@ class TorneoEvo:
         e.upgrade_torneo.append({"round": self.round, "novita": nuovi})
         self._cura_totale(e)
 
-    # ---------- arena: le vincite si accumulano, si riscattano solo da campioni ----------
+    # ---------- arena: puntate e clausole valgono soltanto come punteggio ----------
     def _risolvi_arena(self, d):
-        """Chiude scommessa/sponsor del duello appena finito: se vinto, il bonus va
-        nel montepremi del torneo (niente crediti reali finché non vinci tutto)."""
-        vinto = d.vincitore is d.p
-        if d.scommessa:
-            if vinto:
-                vincita = int(d.scommessa["importo"] * d.scommessa["quota"])
-                self.bonus_accumulato += vincita
-                self.log_arena.append(f"🎰 +{vincita}¤ nel montepremi (scommessa a "
-                                      f"{d.scommessa['quota']}x).")
-            else:
-                self.log_arena.append(f"🎰 Scommessa persa: {d.scommessa['importo']}¤ "
-                                      "andati (non erano nel montepremi).")
-        if d.sponsor:
-            if vinto and d._sponsor_condizione(d.sponsor):
-                self.bonus_accumulato += d.sponsor["bonus"]
-                self.log_arena.append(f"📣 {d.sponsor['nome']}: +{d.sponsor['bonus']}¤ "
-                                      "nel montepremi.")
-            else:
-                self.log_arena.append(f"📣 {d.sponsor['nome']}: condizione non rispettata.")
+        """Paga le puntate ancora aperte del duello appena finito: le vincite si sommano al punteggio del torneo."""
+        if d.tavolo is None or not d.tavolo.banco:
+            return
+        liq = d.tavolo.liquida(d.vincitore is d.p)
+        self.bonus_accumulato += liq["totale"]
+        self.log_arena.extend(testo for testo, _ in liq["righe"])
 
     # ---------- flusso ----------
     def risolvi_duello(self, vinto, duello=None):
@@ -1797,9 +1912,6 @@ class TorneoEvo:
                 vincitori = [x["win"] for x in prossimo]
             self.campione = self.eroi[vincitori[0]].nome
             self.fase = "eliminato"
-            if self.bonus_accumulato:
-                self.log_arena.append(f"💸 Eliminato: il montepremi ({self.bonus_accumulato}¤) "
-                                      "è andato perso.")
             return
         if len(vincitori) == 1:
             self.campione = self.eroi[self.io].nome
@@ -1865,21 +1977,10 @@ class TorneoEvo:
         return None
 
     def _premia(self):
-        """Il campione entra nel box, riposato e già di livello 5."""
-        e = self.eroi[self.io]
-        self._reset_combattimento(e)
-        rec = nuovo_record(e)
-        rec["id"] = STATO["prossimo_id"]
-        STATO["prossimo_id"] += 1
-        rec["hp"] = dict(LOCAZIONI)
-        rec["livello"] = 5
-        rec["bio"] = "Campione del Torneo Evo."
-        STATO["personaggi"].append(rec)
-        if self.bonus_accumulato:
-            # campione: tutto il montepremi accumulato durante il torneo diventa reale
-            STATO["crediti"] += self.bonus_accumulato
-            self.log_arena.append(f"🏆 Campione! Montepremi riscattato: +{self.bonus_accumulato}¤.")
-        salva_stato()
+        """Il Torneo Evo e' una modalita' a parte: chi lo vince non porta a casa niente. Niente eroe nel box, niente crediti
+        (il punteggio resta il punteggio). Qui si rimette solo a posto l'eroe, per la schermata finale."""
+        self._reset_combattimento(self.eroi[self.io])
+        self._cura_totale(self.eroi[self.io])
 
     # ---------- api ----------
     def stato(self):
@@ -1964,25 +2065,25 @@ def registra_incontro(d):
 
 
 def chiudi_duello():
-    """Applica al box i danni del duello, ricompense comprese. Idempotente."""
+    """Applica alla palestra i danni del duello, ricompense comprese (e cio' che il ring lascia dentro l'allievo:
+    fiducia, stress, lutto). Idempotente."""
     d = DUELLO
     if d is None or d.chiuso or not d.finito:
         return
     d.chiuso = True
     registra_incontro(d)
-    if d.rec is None:  # duello di torneo: niente record del box da aggiornare
+    if d.rec is None:  # duello di torneo: niente record della palestra da aggiornare
         return
     rec = d.rec
     rientro_bias(rec)
     # solo le locazioni base: gli arti extra dei poteri (es. ali) esistono solo in duello
     rec["hp"] = {l: d.p.hp[l] for l in LOCAZIONI}
     rec["crippled"] = sorted(l for l in d.p.crippled if l in LOCAZIONI)
-    rec["last_heal"] = time.time()
     danni_subiti = sum(max(0, LOCAZIONI[l] - d.p.hp[l]) for l in LOCAZIONI)
     # oltre il fondo scala su testa/busto la morte è probabilistica:
-    # la Toughness accumulata riduce la chance (min 10%)
+    # la Toughness accumulata riduce la chance (min 10%); la posta del duello puo' renderla piu' o meno probabile
     if d.p.hp["testa"] <= -LOCAZIONI["testa"] or d.p.hp["busto"] <= -LOCAZIONI["busto"]:
-        prob = max(0.10, 0.75 - rec.get("toughness", 0) * 0.01)
+        prob = min(1.0, max(0.10, 0.75 - rec.get("toughness", 0) * 0.01) * d.posta.get("morte", 1.0))
         if random.random() < prob:
             rec["morto"] = True
             d.scriv(f"{rec['nome']} non ce l'ha fatta.", "crit")
@@ -1991,24 +2092,36 @@ def chiudi_duello():
     vittoria = d.vincitore is d.p
     if vittoria:
         rec["vittorie"] = rec.get("vittorie", 0) + 1
-        STATO["crediti"] += RICOMPENSA_VITTORIA
+        STATO["crediti"] += d.posta["paga"]
     else:
         rec["sconfitte"] = rec.get("sconfitte", 0) + 1
-    # bookmaker: la puntata è già stata scalata al momento della scommessa
-    if d.scommessa:
-        if vittoria:
-            vincita = int(d.scommessa["importo"] * d.scommessa["quota"])
-            STATO["crediti"] += vincita
-            d.scriv(f"🎰 Scommessa vinta: +{vincita}¤ (quota {d.scommessa['quota']}x).", "crit")
-        else:
-            d.scriv(f"🎰 Scommessa persa: -{d.scommessa['importo']}¤.", "miss")
-    # sponsor: paga solo se vinci E rispetti la condizione
-    if d.sponsor:
-        if vittoria and d._sponsor_condizione(d.sponsor):
-            STATO["crediti"] += d.sponsor["bonus"]
-            d.scriv(f"📣 {d.sponsor['nome']} paga il bonus: +{d.sponsor['bonus']}¤!", "crit")
-        else:
-            d.scriv(f"📣 {d.sponsor['nome']}: condizione non rispettata, nessun bonus.")
+    # la palestra: fiducia e stress dell'allievo, il segno nel registro; se e' morto, il lutto e il lascito
+    palestra.dopo_duello(STATO, rec, vittoria, d.cpu.nome, danni_subiti)
+    if rec.get("morto"):
+        palestra.morte(STATO, rec)
+    # il Nemesis system: il rivale ricorda com'e' andata e cresce; l'allievo ne porta il segno (la vendetta compiuta, o il nemico che ritorna)
+    riv = d.rivale
+    if riv is not None:
+        prima = nemesi.rapporto(riv, rec.get("id"))["ultimo"]
+        nemesi.registra(riv, rec.get("id"), vittoria, STATO["giorno"])
+        rec["ultimo_rivale"] = riv["id"]
+        if prima == "r" and vittoria:
+            palestra.cambia_fiducia(rec, nemesi.FIDUCIA_VENDETTA)
+            palestra.cambia_stress(rec, nemesi.STRESS_VENDETTA)
+            d.scriv(f"🔥 Vendetta! {rec['nome']} batte chi l'aveva battuto: fiducia su, stress giù.", "crit")
+        elif prima == "r" and not vittoria:
+            palestra.cambia_fiducia(rec, nemesi.FIDUCIA_SCONFITTA)
+            palestra.cambia_stress(rec, nemesi.STRESS_SCONFITTA)
+            d.scriv(f"{rec['nome']} perde ancora con lo stesso nemico: fiducia e stress ne risentono.", "miss")
+        for riga in cresce_rivale(riv, vittoria):
+            d.scriv(riga)
+    # il Banco: le puntate sono già state scalate dai crediti quando le hai fatte (e quelle incassate sono già tornate):
+    # qui si pagano le aperte, con la serie di azzardi che hai messo insieme
+    if d.tavolo is not None and d.tavolo.banco:
+        liq = d.tavolo.liquida(vittoria)
+        STATO["crediti"] += liq["totale"]
+        for testo, tag in liq["righe"]:
+            d.scriv(testo, tag)
     if not rec.get("morto"):
         # Toughness: cresce incassando danni — senza danni subiti, niente tempra
         if danni_subiti > 0:
@@ -2027,9 +2140,14 @@ def chiudi_duello():
 
 
 # ---------------------------------------------------------------- route
+ASSET_V = int(time.time())     # un numero di versione per gli script della palestra: a ogni avvio il browser li rilegge
+
+
 @app.context_processor
 def inject_globals():
-    return {"crediti": STATO["crediti"]}
+    g = STATO.get("giorno", 0)
+    return {"crediti": STATO["crediti"], "data_breve": palestra.data_breve(g), "giorno_n": g + 1, "asset_v": ASSET_V,
+            "eventi_attesa": len(STATO.get("palestra", {}).get("eventi", []))}
 
 
 @app.route("/")
@@ -2102,20 +2220,99 @@ def api_torneo_azione():
 
 @app.route("/box")
 def box():
-    riposa_tutti()
-    pgs = [{"rec": c, "stato": stato_salute(c), "recupero": minuti_recupero(c),
-            "hp_tot": sum(max(0, c["hp"][l]) for l in LOCAZIONI),
-            "hp_max_tot": sum(LOCAZIONI.values())} for c in STATO["personaggi"]]
-    return render_template("box.html", personaggi=pgs)
+    """Il vecchio nome della palestra (link e segnalibri di prima)."""
+    return redirect(url_for("palestra_pagina"))
+
+
+@app.route("/palestra")
+def palestra_pagina():
+    if not STATO["contratti"]:
+        genera_contratti()
+    return render_template("palestra.html")
+
+
+def risposta_palestra(**extra):
+    """Lo stato della palestra, per la pagina (piu' cio' che e' appena successo)."""
+    out = {"ok": True, "stato": palestra.vista(STATO, DB)}
+    out.update(extra)
+    return jsonify(out)
+
+
+@app.route("/api/palestra/stato")
+def api_palestra_stato():
+    return jsonify(palestra.vista(STATO, DB))
+
+
+def _allievo(pid):
+    """Il record di un allievo vivo e in attivita' (non un istruttore, non un morto), o None."""
+    c = trova_record(pid) if isinstance(pid, int) else None
+    return c if c is not None and c in palestra.membri_attivi(STATO) else None
+
+
+@app.route("/api/palestra/azione", methods=["POST"])
+def api_palestra_azione():
+    dati = request.get_json(silent=True) or {}
+    tipo = dati.get("tipo")
+
+    def errore(msg):
+        return jsonify({"ok": False, "errore": msg, "stato": palestra.vista(STATO, DB)}), 400
+
+    if tipo in ("avanti", "settimana"):
+        if STATO["palestra"]["eventi"]:
+            return errore("Prima rispondi agli eventi in sospeso.")
+        riepiloghi, avviso = [], None
+        for _ in range(7 if tipo == "settimana" else 1):
+            ok, motivo = palestra.puo_chiudere_giornata(STATO)
+            if not ok:                      # tre giornate senza serata: ora si combatte
+                if not riepiloghi:
+                    return errore(motivo)
+                avviso = motivo
+                break
+            r = palestra.avanza_giorno(STATO, DB, alla_settimana=lambda st: genera_contratti())
+            riepiloghi.append(r)
+            if STATO["palestra"]["eventi"] or r["settimana_chiusa"]:
+                break                       # "passa la settimana" si ferma alla fine di essa, o appena succede qualcosa
+        salva_stato()
+        return risposta_palestra(riepiloghi=riepiloghi, avviso=avviso)
+
+    if tipo == "evento":
+        r = palestra.risolvi_evento(STATO, DB, dati.get("id"), dati.get("scelta"))
+        if not r["ok"]:
+            return errore(r["errore"])
+        salva_stato()
+        return risposta_palestra(esito=r)
+
+    c = _allievo(dati.get("pid"))
+    if c is None:
+        return errore("Allievo non trovato.")
+    try:
+        if tipo == "piano":
+            ok = palestra.imposta_piano(c, int(dati.get("giorno")), dati.get("sessione"))
+        elif tipo == "focus":
+            ok = palestra.imposta_focus(c, dati.get("sessione"), dati.get("voce"))
+        elif tipo == "auto_riposo":
+            c["auto_riposo"] = bool(dati.get("valore"))
+            ok = True
+        elif tipo == "riposo":
+            c["riposo_giorni"] = max(0, min(7, int(dati.get("giorni", 0))))
+            ok = True
+        else:
+            return errore("Azione sconosciuta.")
+    except (TypeError, ValueError):
+        ok = False
+    if not ok:
+        return errore("Valore non valido.")
+    salva_stato()
+    return risposta_palestra()
 
 
 @app.route("/personaggio/<int:pid>")
 def personaggio(pid):
-    riposa_tutti()
     c = trova_record(pid)
     if c is None:
         flash("Personaggio non trovato.")
-        return redirect(url_for("box"))
+        return redirect(url_for("palestra_pagina"))
+    palestra.completa_record(c, STATO)       # (un record di un salvataggio vecchio: lo porta al formato della palestra)
     poteri = []
     for pw in c["poteri"]:
         pd = next((x for x in DB["poteri"] if x["id"] == pw["id"]), None)
@@ -2127,43 +2324,68 @@ def personaggio(pid):
     protesi = [{"def": pr, "loc": pr["locazione"]} for pr in DB["protesi"]
               if pr["id"] in c.get("protesi", [])]
     augments = [a for a in DB["augments"] if a["id"] in c.get("augments", [])]
-    return render_template("personaggio.html", c=c, stato=stato_salute(c),
-                           recupero=minuti_recupero(c), poteri=poteri,
+    g = STATO["giorno"]
+    legami = sorted(((x, palestra.legame(c, x)) for x in palestra.membri_attivi(STATO) if x is not c),
+                    key=lambda t: -t[1])
+    return render_template("personaggio.html", c=c, stato=stato_salute(c), nome_completo=nemesi.nome_completo(c),
+                           sopr_pool=nemesi.soprannomi_disponibili(c), sopr_livello=nemesi.SOPRANNOME_LIVELLO,
+                           recupero=giorni_recupero(c), poteri=poteri,
                            upgrades=lista_upgrade(c), armi=armi, armatura=armatura,
                            protesi=protesi, augments=augments,
                            umanita_max=umanita_max_record(c),
                            umanita_usata=umanita_usata(c), MAX_ARMI=MAX_ARMI,
                            soglia=soglia_xp(c.get("livello", 1)),
                            LOCAZIONI=LOCAZIONI, STATS=STATS, SKILLS=SKILLS,
-                           BONUS_RANGO=BONUS_RANGO, FALLBACK=FALLBACK)
+                           BONUS_RANGO=BONUS_RANGO, FALLBACK=FALLBACK,
+                           eta=palestra.eta(c, g), data=palestra.descrivi_data(g),
+                           tratti=palestra.tratti_visibili(c),
+                           nascosti=len(c.get("tratti", [])) - c.get("tratti_noti", 0),
+                           bio=palestra.bio_completa(c), legami=legami,
+                           sessioni=palestra.SESSIONI, sessioni_piano=palestra.SESSIONI_PIANO,
+                           focus=palestra.opzioni_focus(c, DB), giorni=palestra.GIORNI,
+                           puo_parlare=palestra.puo_parlare(STATO, c), approcci=palestra.APPROCCI,
+                           vuole_combattere=palestra.vuole_combattere(c),
+                           istruttore=c.get("ruolo") == "istruttore",
+                           voce_istruttore=palestra.nome_voce(c.get("voce_istruttore", "stat:fisico"), DB),
+                           registro=list(reversed(c.get("registro", [])))[:20],
+                           punti_rango=palestra.PUNTI_BASE, soglia_rifiuto=palestra.soglia_rifiuto(c))
 
 
 def lista_upgrade(c):
-    """Le voci livellabili coi Token: stat, skill e poteri (vincolo controllo)."""
+    """Le voci livellabili: stat, skill e poteri. Salire di rango costa Token E richiede la maturazione (i punti che si
+    guadagnano allenandosi nella voce): il Token e' il permesso, l'allenamento la capacita'. Poteri: vincolo controllo."""
     token = c.get("token", 0)
     out = []
+
+    def voce(tipo, nome, label, rango, chiave, vincolo=False):
+        costo = costo_upgrade(rango)
+        req = palestra.punti_per_rango(rango)
+        punti = palestra.punti_voce(c, chiave)
+        maturo = punti >= req - 1e-9
+        if vincolo:
+            motivo = "serve controllo più alto"
+        elif not maturo:
+            motivo = f"serve allenamento ({str(round(punti, 1)).replace('.', ',')}/{req})"
+        else:
+            motivo = ""
+        out.append({"tipo": tipo, "nome": nome, "label": label, "rango": rango, "costo": costo,
+                    "ok": token >= costo and maturo and not vincolo, "motivo": motivo,
+                    "chiave": chiave, "punti": round(punti, 1), "richiesti": req, "maturo": maturo})
+
     for s in STATS:
         r = c["stats"].get(s, 1)
         if r < 4:
-            costo = costo_upgrade(r)
-            out.append({"tipo": "stat", "nome": s, "label": s, "rango": r,
-                        "costo": costo, "ok": token >= costo, "motivo": ""})
+            voce("stat", s, s, r, palestra.chiave_voce("stat", s))
     for s in SKILLS:
         r = c["skills"].get(s, 1)
         if r < 4:
-            costo = costo_upgrade(r)
-            out.append({"tipo": "skill", "nome": s, "label": s.replace("_", " "),
-                        "rango": r, "costo": costo, "ok": token >= costo, "motivo": ""})
+            voce("skill", s, s.replace("_", " "), r, palestra.chiave_voce("skill", s))
     for pw in c.get("poteri", []):
         pd = next((x for x in DB["poteri"] if x["id"] == pw["id"]), None)
         if pd is None or pw["rango"] >= 4:
             continue
-        costo = costo_upgrade(pw["rango"])
-        vincolo = pw["rango"] >= c["stats"].get("controllo", 1)
-        out.append({"tipo": "potere", "nome": str(pw["id"]), "label": pd["nome"],
-                    "rango": pw["rango"], "costo": costo,
-                    "ok": token >= costo and not vincolo,
-                    "motivo": "serve controllo più alto" if vincolo else ""})
+        voce("potere", str(pw["id"]), pd["nome"], pw["rango"], palestra.chiave_voce("potere", pw["id"]),
+             vincolo=pw["rango"] >= c["stats"].get("controllo", 1))
     return out
 
 
@@ -2172,46 +2394,118 @@ def personaggio_upgrade(pid):
     c = trova_record(pid)
     if c is None:
         flash("Personaggio non trovato.")
-        return redirect(url_for("box"))
+        return redirect(url_for("palestra_pagina"))
     tipo, nome = request.form.get("tipo"), request.form.get("nome", "")
-    token = c.get("token", 0)
-    if tipo == "stat" and nome in c["stats"]:
-        r = c["stats"][nome]
-        if r < 4 and token >= costo_upgrade(r):
-            c["token"] = token - costo_upgrade(r)
-            c["stats"][nome] = r + 1
-            flash(f"{nome} sale a rango {r + 1}.")
-    elif tipo == "skill" and nome in c["skills"]:
-        r = c["skills"][nome]
-        if r < 4 and token >= costo_upgrade(r):
-            c["token"] = token - costo_upgrade(r)
-            c["skills"][nome] = r + 1
-            flash(f"{nome} sale a rango {r + 1}.")
-    elif tipo == "potere":
-        pw = next((x for x in c["poteri"] if str(x["id"]) == nome), None)
-        if pw and pw["rango"] < 4 and token >= costo_upgrade(pw["rango"]):
-            # il rango di un potere non può superare il rango del dado controllo
-            if pw["rango"] < c["stats"].get("controllo", 1):
-                c["token"] = token - costo_upgrade(pw["rango"])
-                pw["rango"] += 1
-                flash(f"Potere a rango {pw['rango']}.")
-            else:
-                flash("Il rango del potere non può superare quello di controllo.")
+    voce = next((u for u in lista_upgrade(c) if u["tipo"] == tipo and u["nome"] == nome), None)
+    if voce is None:
+        flash("Voce non valida.")
+    elif voce["motivo"] == "serve controllo più alto":
+        flash("Il rango del potere non può superare quello di controllo.")
+    elif not voce["maturo"]:
+        flash(f"{voce['label']} non è ancora maturo: servono altre sessioni di allenamento ({voce['punti']}/{voce['richiesti']}).")
+    elif c.get("token", 0) < voce["costo"]:
+        flash("Token insufficienti.")
+    else:
+        c["token"] -= voce["costo"]
+        if tipo == "stat":
+            c["stats"][nome] = c["stats"].get(nome, 1) + 1
+            nuovo = c["stats"][nome]
+        elif tipo == "skill":
+            c["skills"][nome] = c["skills"].get(nome, 1) + 1
+            nuovo = c["skills"][nome]
+        else:
+            pw = next(x for x in c["poteri"] if str(x["id"]) == nome)
+            pw["rango"] += 1
+            nuovo = pw["rango"]
+        palestra.consuma_punti(c, voce["chiave"], voce["rango"])
+        palestra.registra(STATO, f"{palestra.nome_breve(c)}: {voce['label']} sale a rango {nuovo}.", rec=c)
+        flash(f"{voce['label']} sale a rango {nuovo}.")
     salva_stato()
     return redirect(url_for("personaggio", pid=pid))
 
 
+@app.route("/personaggio/<int:pid>/programma", methods=["POST"])
+def personaggio_programma(pid):
+    """Il piano settimanale e il focus di allenamento, dalla scheda."""
+    c = trova_record(pid)
+    if c is None or c.get("ruolo", "combattente") != "combattente":
+        flash("Personaggio non trovato.")
+        return redirect(url_for("palestra_pagina"))
+    for i in range(7):
+        palestra.imposta_piano(c, i, request.form.get(f"giorno{i}", c["piano"][i]))
+    for sid in palestra.SESSIONI_PIANO:
+        v = request.form.get(f"focus_{sid}")
+        if v:
+            palestra.imposta_focus(c, sid, v)
+    c["auto_riposo"] = request.form.get("auto_riposo") == "on"
+    salva_stato()
+    flash("Programma aggiornato.")
+    return redirect(url_for("personaggio", pid=pid))
+
+
+@app.route("/personaggio/<int:pid>/colloquio", methods=["POST"])
+def personaggio_colloquio(pid):
+    c = _allievo(pid)
+    if c is None:
+        flash("Personaggio non trovato.")
+        return redirect(url_for("palestra_pagina"))
+    r = palestra.colloquio(STATO, c, request.form.get("approccio", ""), umanita_installata=umanita_installata(c))
+    flash(r["testo"])
+    salva_stato()
+    return redirect(url_for("personaggio", pid=pid))
+
+
+@app.route("/personaggio/<int:pid>/soprannome", methods=["POST"])
+def personaggio_soprannome(pid):
+    """Il soprannome di un allievo si sceglie (e si cambia) quando si vuole, tra quelli dei suoi poteri; dal livello 3."""
+    c = _allievo(pid)
+    if c is None:
+        flash("Personaggio non trovato.")
+        return redirect(url_for("palestra_pagina"))
+    err = nemesi.imposta_soprannome(c, request.form.get("soprannome", ""))
+    flash(err.capitalize() + "." if err else (f"Soprannome: «{c['soprannome']}»." if c.get("soprannome") else "Niente soprannome."))
+    salva_stato()
+    return redirect(url_for("personaggio", pid=pid))
+
+
+@app.route("/personaggio/<int:pid>/congeda", methods=["POST"])
+def personaggio_congeda(pid):
+    c = trova_record(pid)
+    if c is None or c.get("morto"):
+        flash("Personaggio non trovato.")
+        return redirect(url_for("palestra_pagina"))
+    nome = c["nome"]
+    palestra.congeda(STATO, c, "congedato")
+    salva_stato()
+    flash(f"{nome} ha lasciato la palestra. Armi e armatura sono in magazzino.")
+    return redirect(url_for("palestra_pagina"))
+
+
+# ---------------------------------------------------------------- aspiranti
 @app.route("/contratti")
 def contratti():
     if not STATO["contratti"]:
         genera_contratti()
-    return render_template("contratti.html", contratti=STATO["contratti"],
-                           STATS=STATS, DB=DB)
+    return render_template("contratti.html", contratti=STATO["contratti"], STATS=STATS, DB=DB,
+                           TRATTI=palestra.TRATTI, posti=palestra.posti_liberi(STATO),
+                           eta_di={c["nome"]: palestra.eta(c, STATO["giorno"]) for c in STATO["contratti"]},
+                           capienza=palestra.capienza(STATO), data=palestra.descrivi_data(STATO["giorno"]),
+                           settimana=palestra.numero_settimana(STATO["giorno"]),
+                           prezzo_altri=PREZZO_CERCA_ALTRI, max_aspiranti=MAX_ASPIRANTI)
 
 
-@app.route("/contratti/rinnova", methods=["POST"])
-def contratti_rinnova():
-    genera_contratti()
+@app.route("/contratti/cerca", methods=["POST"])
+def contratti_cerca():
+    """Passaparola: un aspirante in piu' per questa settimana, a pagamento."""
+    if len(STATO["contratti"]) >= MAX_ASPIRANTI:
+        flash("Per questa settimana non si presenta nessun altro.")
+    elif STATO["crediti"] < PREZZO_CERCA_ALTRI:
+        flash("Crediti insufficienti.")
+    else:
+        STATO["crediti"] -= PREZZO_CERCA_ALTRI
+        aggiungi_aspirante()
+        flash("Il passaparola ha funzionato: si è fatto vivo qualcun altro.")
+    salva_stato()
     return redirect(url_for("contratti"))
 
 
@@ -2221,6 +2515,9 @@ def contratti_ingaggia(idx):
         flash("Contratto non valido.")
         return redirect(url_for("contratti"))
     c = STATO["contratti"][idx]
+    if palestra.posti_liberi(STATO) <= 0:
+        flash("La palestra è piena: congeda qualcuno o monta un dormitorio.")
+        return redirect(url_for("contratti"))
     if STATO["crediti"] < c["costo"]:
         flash("Crediti insufficienti.")
         return redirect(url_for("contratti"))
@@ -2228,25 +2525,78 @@ def contratti_ingaggia(idx):
     c.pop("costo", None)
     c["id"] = STATO["prossimo_id"]
     STATO["prossimo_id"] += 1
-    c["last_heal"] = time.time()
+    c["ingaggio"] = STATO["giorno"]
     STATO["personaggi"].append(c)
     STATO["contratti"].pop(idx)
+    palestra.registra(STATO, f"{c['nome']} entra in palestra.", rec=c)
     salva_stato()
-    flash(f"{c['nome']} è entrato nel tuo box!")
-    return redirect(url_for("box"))
+    flash(f"{c['nome']} è entrato in palestra!")
+    return redirect(url_for("palestra_pagina"))
+
+
+# ---------------------------------------------------------------- negozio
+def _catalogo(categoria):
+    return {"arma": DB["equip"], "armatura": DB["armor"], "protesi": DB["protesi"],
+            "augment": DB["augments"]}.get(categoria)
+
+
+def _equipaggia(c, categoria, item):
+    """Mette `item` addosso al combattente se lo slot e l'umanita' lo permettono. Ritorna (ok, messaggio di rifiuto).
+    Non tocca i crediti. Un'armatura che ne sostituisce un'altra la manda in magazzino."""
+    iid = item["id"]
+    if categoria == "arma":
+        if iid in c.get("armi", []):
+            return False, f"{c['nome']} possiede già {item['nome']}."
+        if len(c.get("armi", [])) >= MAX_ARMI:
+            return False, f"{c['nome']} ha già {MAX_ARMI} armi equipaggiate: rimuovine una prima."
+        c.setdefault("armi", []).append(iid)
+    elif categoria == "armatura":
+        if c.get("armatura_equip"):
+            palestra.deposita(STATO, "armatura", c["armatura_equip"])   # quella che sostituisce non si butta
+        c["armatura_equip"] = iid
+    elif categoria == "protesi":
+        occupata = next((p for p in DB["protesi"] if p["id"] in c.get("protesi", [])
+                         and p["locazione"] == item["locazione"]), None)
+        if occupata:
+            return False, f"{c['nome']} ha già una protesi su {item['locazione']}."
+        if umanita_usata(c) + item.get("costo_umanita", 0) > umanita_max_record(c):
+            return False, "Umanità insufficiente."
+        c.setdefault("protesi", []).append(iid)
+    else:  # augment
+        if iid in c.get("augments", []):
+            return False, f"{c['nome']} ha già {item['nome']}."
+        if umanita_usata(c) + item.get("costo_umanita", 0) > umanita_max_record(c):
+            return False, "Umanità insufficiente."
+        c.setdefault("augments", []).append(iid)
+    return True, ""
 
 
 @app.route("/negozio")
 def negozio():
-    riposa_tutti()
-    curabili = [c for c in STATO["personaggi"]
-                if not c.get("morto") and stato_salute(c) != "pronto"]
-    vivi = [c for c in STATO["personaggi"] if not c.get("morto")]
+    curabili = [c for c in palestra.membri_attivi(STATO) if stato_salute(c) != "pronto"]
+    vivi = palestra.membri_attivi(STATO)
     umanita = {c["id"]: (umanita_usata(c), umanita_max_record(c)) for c in vivi}
+    magazzino = []
+    for i, voce in enumerate(STATO["palestra"]["magazzino"]):
+        item = next((x for x in (_catalogo(voce["cat"]) or []) if x["id"] == voce["id"]), None)
+        if item:
+            magazzino.append({"indice": i, "cat": voce["cat"], "item": item})
     return render_template("negozio.html", curabili=curabili, vivi=vivi,
                            equip=DB["equip"], armor=DB["armor"], protesi=DB["protesi"],
                            augments=DB["augments"], umanita=umanita,
-                           max_armi=MAX_ARMI, prezzo_medikit=PREZZO_MEDIKIT)
+                           max_armi=MAX_ARMI, prezzo_medikit=PREZZO_MEDIKIT,
+                           attrezzi=palestra.ATTREZZI, posseduti=palestra.attrezzi_posseduti(STATO),
+                           magazzino=magazzino, capienza=palestra.capienza(STATO),
+                           occupati=len(vivi))
+
+
+@app.route("/negozio/attrezzo", methods=["POST"])
+def negozio_attrezzo():
+    ok, msg = palestra.compra_attrezzo(STATO, request.form.get("id", ""))
+    flash(msg)
+    if ok:
+        salva_stato()
+    return redirect(url_for("negozio") + "#attrezzi")
 
 
 @app.route("/negozio/equip", methods=["POST"])
@@ -2256,8 +2606,7 @@ def negozio_equip():
     categoria = request.form.get("categoria")
     iid = request.form.get("iid", type=int)
     c = trova_record(pid)
-    catalogo = {"arma": DB["equip"], "armatura": DB["armor"],
-               "protesi": DB["protesi"], "augment": DB["augments"]}.get(categoria)
+    catalogo = _catalogo(categoria)
     if c is None or c.get("morto") or catalogo is None:
         flash("Acquisto non valido.")
         return redirect(url_for("negozio"))
@@ -2268,45 +2617,43 @@ def negozio_equip():
     if STATO["crediti"] < item.get("valore", 0):
         flash("Crediti insufficienti.")
         return redirect(url_for("negozio"))
-
-    if categoria == "arma":
-        if iid in c.get("armi", []):
-            flash(f"{c['nome']} possiede già {item['nome']}.")
-            return redirect(url_for("negozio"))
-        if len(c.get("armi", [])) >= MAX_ARMI:
-            flash(f"{c['nome']} ha già {MAX_ARMI} armi equipaggiate: rimuovine una prima.")
-            return redirect(url_for("negozio"))
-        c.setdefault("armi", []).append(iid)
-    elif categoria == "armatura":
-        c["armatura_equip"] = iid  # sostituisce quella indossata, se c'era (nessun rimborso)
-    elif categoria == "protesi":
-        occupata = next((p for p in DB["protesi"] if p["id"] in c.get("protesi", [])
-                         and p["locazione"] == item["locazione"]), None)
-        if occupata:
-            flash(f"{c['nome']} ha già una protesi su {item['locazione']}.")
-            return redirect(url_for("negozio"))
-        if umanita_usata(c) + item.get("costo_umanita", 0) > umanita_max_record(c):
-            flash("Umanità insufficiente.")
-            return redirect(url_for("negozio"))
-        c.setdefault("protesi", []).append(iid)
-    else:  # augment
-        if iid in c.get("augments", []):
-            flash(f"{c['nome']} ha già {item['nome']}.")
-            return redirect(url_for("negozio"))
-        if umanita_usata(c) + item.get("costo_umanita", 0) > umanita_max_record(c):
-            flash("Umanità insufficiente.")
-            return redirect(url_for("negozio"))
-        c.setdefault("augments", []).append(iid)
-
+    ok, msg = _equipaggia(c, categoria, item)
+    if not ok:
+        flash(msg)
+        return redirect(url_for("negozio"))
     STATO["crediti"] -= item.get("valore", 0)
     salva_stato()
     flash(f"{item['nome']} consegnata a {c['nome']}.")
     return redirect(url_for("negozio"))
 
 
+@app.route("/negozio/magazzino/equip", methods=["POST"])
+def negozio_magazzino_equip():
+    """Dal magazzino addosso a un allievo: gratis."""
+    c = _allievo(request.form.get("pid", type=int))
+    indice = request.form.get("indice", type=int)
+    m = STATO["palestra"]["magazzino"]
+    if c is None or indice is None or not (0 <= indice < len(m)):
+        flash("Oggetto non valido.")
+        return redirect(url_for("negozio") + "#magazzino")
+    voce = m[indice]
+    item = next((x for x in (_catalogo(voce["cat"]) or []) if x["id"] == voce["id"]), None)
+    if item is None:
+        flash("Oggetto non valido.")
+        return redirect(url_for("negozio") + "#magazzino")
+    ok, msg = _equipaggia(c, voce["cat"], item)
+    if not ok:
+        flash(msg)
+    else:
+        palestra.riprendi(STATO, indice)
+        salva_stato()
+        flash(f"{item['nome']} passa a {c['nome']}.")
+    return redirect(url_for("negozio") + "#magazzino")
+
+
 @app.route("/negozio/disequip", methods=["POST"])
 def negozio_disequip():
-    """Rimuove arma/armatura/protesi/augment equipaggiati. Nessun rimborso."""
+    """Toglie arma/armatura/protesi/augment equipaggiati: finiscono in magazzino (si possono rimontare gratis)."""
     pid = request.form.get("pid", type=int)
     categoria = request.form.get("categoria")
     iid = request.form.get("iid", type=int)
@@ -2315,19 +2662,28 @@ def negozio_disequip():
         flash("Personaggio non valido.")
         return redirect(url_for("negozio"))
     if categoria == "arma":
-        c["armi"] = [x for x in c.get("armi", []) if x != iid]
+        if iid in c.get("armi", []):
+            c["armi"] = [x for x in c["armi"] if x != iid]
+            palestra.deposita(STATO, "arma", iid)
     elif categoria == "armatura":
+        if c.get("armatura_equip"):
+            palestra.deposita(STATO, "armatura", c["armatura_equip"])
         c["armatura_equip"] = None
     elif categoria == "protesi":
-        c["protesi"] = [x for x in c.get("protesi", []) if x != iid]
+        if iid in c.get("protesi", []):
+            c["protesi"] = [x for x in c["protesi"] if x != iid]
+            palestra.deposita(STATO, "protesi", iid)
     elif categoria == "augment":
-        c["augments"] = [x for x in c.get("augments", []) if x != iid]
+        if iid in c.get("augments", []):
+            c["augments"] = [x for x in c["augments"] if x != iid]
+            palestra.deposita(STATO, "augment", iid)
     else:
         flash("Categoria non valida.")
         return redirect(url_for("negozio"))
     salva_stato()
-    flash("Rimosso.")
-    return redirect(url_for("negozio"))
+    flash("Rimosso: è in magazzino.")
+    indietro = request.form.get("indietro", "")
+    return redirect(indietro if indietro.startswith("/") and not indietro.startswith("//") else url_for("negozio"))
 
 
 @app.route("/negozio/medikit", methods=["POST"])
@@ -2343,7 +2699,6 @@ def negozio_medikit():
     STATO["crediti"] -= PREZZO_MEDIKIT
     c["hp"] = dict(LOCAZIONI)
     c["crippled"] = []
-    c["last_heal"] = time.time()
     salva_stato()
     flash(f"{c['nome']} è stato curato completamente.")
     return redirect(url_for("negozio"))
@@ -2351,22 +2706,49 @@ def negozio_medikit():
 
 @app.route("/duelli")
 def duelli():
-    riposa_tutti()
-    idonei = [{"rec": c, "stato": stato_salute(c)} for c in STATO["personaggi"]
-              if stato_salute(c) in ("pronto", "ferito")]
-    return render_template("duelli.html", idonei=idonei,
-                           ricompensa=RICOMPENSA_VITTORIA)
+    """La serata: chi manda sul ring oggi. Un duello occupa la giornata dell'allievo (niente allenamento)."""
+    g = STATO["giorno"]
+    idonei = []
+    for c in palestra.membri_attivi(STATO):
+        ok, motivo = palestra.puo_combattere(STATO, c)
+        idonei.append({"rec": c, "stato": stato_salute(c), "ok": ok, "motivo": motivo,
+                       "eta": palestra.eta(c, g), "piano": palestra.assegnazione(STATO, c)})
+    return render_template("duelli.html", idonei=idonei, ricompensa=POSTA_BASE["paga"], serate=palestra.serate(STATO),
+                           data=palestra.descrivi_data(g), sessioni=palestra.SESSIONI,
+                           speciali=palestra.ATTIVITA_SPECIALI)
+
+
+@app.route("/rivali")
+def rivali():
+    """Il registro dei rivali (Nemesis system, NEMESI.md): chi c'e' in giro, come e' andata con ciascun allievo e quanto vale la sua taglia."""
+    g = STATO["giorno"]
+    membri = palestra.membri_attivi(STATO)
+    nomi_poteri = {p["id"]: p["nome"] for p in DB["poteri"]}
+    schede = []
+    for r in sorted(STATO.get("rivali", []), key=lambda x: (-x.get("incontri", 0), -x.get("livello", 1))):
+        rapporti = []
+        for c in membri:
+            if nemesi.conosciuti(r, c["id"]):
+                eti = nemesi.etichetta(r, c["id"], g)
+                rap = nemesi.rapporto(r, c["id"])
+                rapporti.append({"nome": c["nome"], "stato": eti["stato"], "breve": eti["breve"], "vinte": rap["vinte"], "perse": rap["perse"]})
+        schede.append({"rec": r, "nome": nemesi.nome_completo(r), "poteri": [nomi_poteri.get(p["id"], "?") for p in r.get("poteri", [])],
+                       "taglia": nemesi.taglia(r), "rapporti": rapporti})
+    return render_template("rivali.html", schede=schede, max_rivali=nemesi.MAX_RIVALI)
 
 
 @app.route("/duelli/avvia", methods=["POST"])
 def duelli_avvia():
     global DUELLO
     pid = request.form.get("pid", type=int)
-    c = trova_record(pid)
-    if c is None or stato_salute(c) not in ("pronto", "ferito"):
-        flash("Questo personaggio non può combattere.")
+    c = _allievo(pid)
+    ok, motivo = palestra.puo_combattere(STATO, c) if c is not None else (False, "non può combattere")
+    if not ok:
+        flash(f"{c['nome'] if c else 'Questo personaggio'} {motivo}.")
         return redirect(url_for("duelli"))
     DUELLO = DuelloWeb(c)
+    c["ultimo_duello"] = STATO["giorno"]     # la serata e' sua: oggi non si allena
+    palestra.registra_serata(STATO)          # ...e il conto delle giornate saltate riparte
     # marcatore persistente: se il processo muore a duello aperto,
     # al prossimo avvio viene contata la sconfitta a tavolino
     STATO["duello_pendente"] = pid
@@ -2424,7 +2806,6 @@ def api_duello_survey():
 # ---------------------------------------------------------------- debug
 @app.route("/debug")
 def debug():
-    riposa_tutti()
     return render_template("debug.html",
                            personaggi=[{"rec": c, "stato": stato_salute(c)}
                                        for c in STATO["personaggi"]])
@@ -2447,10 +2828,23 @@ def debug_cura():
         c["hp"] = dict(LOCAZIONI)
         c["crippled"] = []
         c["morto"] = False  # in debug la cura resuscita anche i morti
-        c["last_heal"] = time.time()
+        c.pop("giorno_morte", None)
+        c["stress"] = 0
     salva_stato()
     flash("Cura completa applicata.")
     return redirect(url_for("debug"))
+
+
+@app.route("/debug/nuova_partita", methods=["POST"])
+def debug_nuova_partita():
+    """Cancella la partita (non i dati di apprendimento della CPU) e ricomincia da lunedi' della prima settimana."""
+    global DUELLO
+    DUELLO = None
+    STATO.clear()
+    STATO.update(stato_default())
+    genera_contratti()
+    flash("Partita nuova: palestra vuota, lunedì della prima settimana.")
+    return redirect(url_for("palestra_pagina"))
 
 
 @app.route("/debug/elimina", methods=["POST"])

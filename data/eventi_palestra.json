@@ -1,0 +1,260 @@
+[
+  {"id": "litigio", "titolo": "Litigio nello spogliatoio", "peso": 1.0, "cooldown": 8,
+   "ruoli": {"a": {}, "b": {"legame_max": 25}},
+   "testo": "{a} e {b} sono venuti alle mani per un asciugamano. Il resto della palestra guarda in silenzio.",
+   "scelte": [
+     {"id": "sparring", "testo": "Li fai sparare insieme domani, sul tatami",
+      "esito": "Sul tatami si sfogano. Alla fine si stringono la mano, a malincuore.",
+      "effetti": [{"legame": ["a", "b", 8]}, {"chi": "a", "stress": -8}, {"chi": "b", "stress": -8},
+                  {"caso": 0.35, "allora": [{"chi": "a", "ferita": [10, 25]}, {"testo": "{a} esce dallo sparring con un livido da ricordare."}]}]},
+     {"id": "punisci", "testo": "Dai ragione a {b} e mandi {a} a pulire gli spogliatoi",
+      "esito": "{a} lava i pavimenti in silenzio. {b} sorride.",
+      "effetti": [{"chi": "a", "fiducia": -8}, {"chi": "b", "fiducia": 4}, {"legame": ["a", "b", -6]}]},
+     {"id": "lascia", "testo": "Lasci correre",
+      "esito": "Non succede niente, ed è questo il problema.",
+      "effetti": [{"legame": ["a", "b", -10]}, {"chi": "a", "stress": 5}, {"chi": "b", "stress": 5}]}
+   ]},
+
+  {"id": "anticipo", "titolo": "Una richiesta di soldi", "peso": 0.9, "cooldown": 14, "peso_tratto": {"avido": 3},
+   "ruoli": {"a": {"giorni_min": 7}},
+   "testo": "{a} ti ferma prima dell'allenamento: ha un debito da saldare e ti chiede 80¤ in anticipo sulle prossime vittorie.",
+   "scelte": [
+     {"id": "paga", "testo": "Gli dai i soldi (80¤)", "richiede_crediti": 80,
+      "esito": "{a} ti ringrazia con la voce rotta. Ora ti deve qualcosa, e lo sa.",
+      "effetti": [{"crediti": -80}, {"chi": "a", "fiducia": 12}, {"chi": "a", "stress": -10}]},
+     {"id": "meta", "testo": "Gliene dai 40 e gli dici di arrangiarsi (40¤)", "richiede_crediti": 40,
+      "esito": "Non basta, ma è meglio di niente. {a} annuisce.",
+      "effetti": [{"crediti": -40}, {"chi": "a", "fiducia": 3}]},
+     {"id": "rifiuta", "testo": "Rifiuti: qui non si fa credito",
+      "esito": "{a} non dice niente. Non è un buon segno.",
+      "effetti": [{"chi": "a", "fiducia": -8}, {"chi": "a", "stress": 6}]}
+   ]},
+
+  {"id": "ex_compagno", "titolo": "Una vecchia conoscenza", "peso": 0.8, "cooldown": 12,
+   "ruoli": {"a": {"giorni_min": 14}},
+   "testo": "Un vecchio compagno di {a} passa a salutare. Ha le mani di chi non ha mai smesso di lavorare.",
+   "scelte": [
+     {"id": "allena", "testo": "Lo fai allenare con {a} per un pomeriggio",
+      "esito": "I due si rimettono in riga a vicenda. Sembrano ragazzini.",
+      "effetti": [{"chi": "a", "punti": 1, "voce": "casuale"}, {"chi": "a", "fiducia": 5}, {"chi": "a", "stress": 4}]},
+     {"id": "manda", "testo": "Lo saluti e lo mandi via",
+      "esito": "{a} lo accompagna alla porta con lo sguardo basso.",
+      "effetti": [{"chi": "a", "fiducia": -4}]}
+   ]},
+
+  {"id": "offerta_rivale", "titolo": "Un'offerta dall'altra parte della città", "peso": 1.2, "cooldown": 20,
+   "ruoli": {"a": {"fiducia_max": 45, "giorni_min": 14}},
+   "testo": "Il promotore di un'altra palestra ha avvicinato {a} all'uscita: soldi e un posto da titolare. {a} non ha ancora risposto.",
+   "scelte": [
+     {"id": "controfferta", "testo": "Fai una controfferta (100¤)", "richiede_crediti": 100,
+      "esito": "{a} resta. Ma ha capito quanto vale per te.",
+      "effetti": [{"crediti": -100}, {"chi": "a", "fiducia": 15}]},
+     {"id": "parla", "testo": "Ci parli da persona a persona",
+      "esito": "Parlate a lungo, sul retro, sotto la luce che manda il lampione.",
+      "effetti": [{"caso": 0.5,
+                   "allora": [{"chi": "a", "fiducia": 12}, {"testo": "{a} resta: gli bastava sentirsi dire che conta."}],
+                   "altrimenti": [{"chi": "a", "va_via": true}, {"testo": "{a} ascolta tutto e se ne va lo stesso. Aveva già deciso."}]}]},
+     {"id": "libero", "testo": "Gli dici che è libero di andare",
+      "esito": "Lo guardi negli occhi finché non risponde.",
+      "effetti": [{"caso": 0.6,
+                   "allora": [{"chi": "a", "va_via": true}, {"testo": "{a} raccoglie la borsa e saluta tutti, uno per uno."}],
+                   "altrimenti": [{"chi": "a", "fiducia": 6}, {"testo": "{a} resta: la libertà di scegliere pesa più dell'offerta."}]}]}
+   ]},
+
+  {"id": "crisi", "titolo": "Notti in bianco", "peso": 1.3, "cooldown": 10,
+   "ruoli": {"a": {"stress_min": 60}},
+   "testo": "{a} non dorme da giorni. Ha gli occhi cerchiati e allo specchio non si guarda più.",
+   "scelte": [
+     {"id": "riposo", "testo": "Due giorni di riposo, ordine tuo",
+      "esito": "Non protesta. Dorme quattordici ore di fila.",
+      "effetti": [{"chi": "a", "riposo": 2}, {"chi": "a", "stress": -20}, {"chi": "a", "fiducia": 4}]},
+     {"id": "sprona", "testo": "Lo sproni: la fatica passa allenandosi",
+      "esito": "{a} stringe i denti e fa quello che chiedi. Ma qualcosa si è incrinato.",
+      "effetti": [{"chi": "a", "punti": 1, "voce": "casuale"}, {"chi": "a", "stress": 10}, {"chi": "a", "fiducia": -6}]},
+     {"id": "psicologo", "testo": "Paghi una visita da uno specialista (80¤)", "richiede_crediti": 80,
+      "esito": "Esce dallo studio più leggero. Non dice cosa si sono detti.",
+      "effetti": [{"crediti": -80}, {"chi": "a", "stress": -40}, {"chi": "a", "fiducia": 6}]}
+   ]},
+
+  {"id": "giornalista", "titolo": "Un cronista in palestra", "peso": 0.7, "cooldown": 20,
+   "ruoli": {"a": {"fiducia_min": 30, "giorni_min": 14}},
+   "testo": "Un cronista di un sito sulla lotta clandestina vuole intervistare {a}. Promette un pezzo onesto.",
+   "scelte": [
+     {"id": "parla", "testo": "Lasci che parli",
+      "esito": "{a} si siede e comincia a raccontare.",
+      "effetti": [{"caso": 0.55,
+                   "allora": [{"chi": "a", "fiducia": 10}, {"crediti": 60}, {"testo": "L'articolo funziona: {a} ne esce come un duro e arrivano 60¤ di nuovi iscritti."}],
+                   "altrimenti": [{"chi": "a", "fiducia": -6}, {"chi": "a", "stress": 8}, {"testo": "Il pezzo storpia ogni frase. {a} lo legge tre volte e non dice niente."}]}]},
+     {"id": "rifiuta", "testo": "Rifiuti: niente stampa",
+      "esito": "Il cronista scrive due righe e se ne va. Nessuno saprà mai com'è andata.",
+      "effetti": []}
+   ]},
+
+  {"id": "donazione", "titolo": "Un regalo in palestra", "peso": 0.5, "cooldown": 30,
+   "richiede": {"attrezzo_regalabile": true}, "ruoli": {"a": {}},
+   "testo": "Un ex pugile ha chiuso la sua palestra e ti regala qualcosa che non gli serve più: {attrezzo}. Ti chiede solo di farci lavorare {a}.",
+   "scelte": [
+     {"id": "accetta", "testo": "Accetti e lo fai montare",
+      "esito": "Passa un pomeriggio intero a montarlo, con {a} che regge e impreca.",
+      "effetti": [{"attrezzo": "regalabile"}, {"chi": "a", "stress": 4}, {"chi": "a", "fiducia": 4}]},
+     {"id": "rifiuta", "testo": "Rifiuti: non vuoi debiti con nessuno",
+      "esito": "L'ex pugile alza le spalle e riporta tutto sul furgone.",
+      "effetti": []}
+   ]},
+
+  {"id": "rissa_strada", "titolo": "Una rissa al lavoro", "peso": 1.0, "automatico": true,
+   "ruoli": {"a": {}},
+   "testo": "{a} è finit{o_a} in mezzo a una rissa mentre lavorava in strada. Chiamano dal bar all'angolo: serve qualcuno.",
+   "scelte": [
+     {"id": "paga", "testo": "Paghi i danni e porti {lui_a} via (40¤)", "richiede_crediti": 40,
+      "esito": "Lo recuperi sul marciapiede. Una mano sanguina, ma niente di rotto.",
+      "effetti": [{"crediti": -40}, {"chi": "a", "fiducia": 4}]},
+     {"id": "lascia", "testo": "Se la sbrighi da sol{o_a}",
+      "esito": "Non rispondi. Si arrangerà.",
+      "effetti": [{"caso": 0.5,
+                   "allora": [{"chi": "a", "ferita": [15, 30]}, {"chi": "a", "fiducia": -3}, {"testo": "{a} torna a casa tardi, con un labbro spaccato."}],
+                   "altrimenti": [{"chi": "a", "fiducia": 6}, {"testo": "{a} ne esce in piedi e con le tasche piene: si è fatto rispettare."}]}]}
+   ]},
+
+  {"id": "compleanno", "titolo": "Compleanno", "automatico": true,
+   "ruoli": {"a": {}},
+   "testo": "Oggi {a} compie {eta_a} anni.",
+   "scelte": [
+     {"id": "torta", "testo": "Una torta in palestra (10¤)", "richiede_crediti": 10,
+      "esito": "Gli allievi cantano stonati. {a} spegne le candele e fa finta di non commuoversi.",
+      "effetti": [{"crediti": -10}, {"chi": "a", "fiducia": 6}, {"chi": "tutti", "stress": -3}]},
+     {"id": "auguri", "testo": "Un augurio veloce, poi si lavora",
+      "esito": "{a} ringrazia e va a scaldarsi.",
+      "effetti": [{"chi": "a", "fiducia": -1}]}
+   ]},
+
+  {"id": "lutto", "titolo": "Un posto vuoto", "automatico": true,
+   "ruoli": {},
+   "testo": "{m} non c'è più. La sua borsa è ancora appesa allo spogliatoio e nessuno ha il coraggio di toccarla.",
+   "scelte": [
+     {"id": "silenzio", "testo": "Un minuto di silenzio e una targa sul muro (30¤)", "richiede_crediti": 30,
+      "esito": "Nessuno parla. Qualcuno si asciuga la faccia con l'asciugamano.",
+      "effetti": [{"crediti": -30}, {"chi": "tutti", "fiducia": 4}, {"chi": "amici", "fiducia": 6}, {"chi": "amici", "stress": -10}]},
+     {"id": "avanti", "testo": "Si va avanti: il ring non aspetta nessuno",
+      "esito": "Gli allenamenti riprendono il giorno dopo. Il rumore dei sacchi copre tutto.",
+      "effetti": [{"chi": "amici", "fiducia": -8}, {"chi": "tutti", "stress": 3}]}
+   ]},
+
+  {"id": "ritiro", "titolo": "Le ginocchia non perdonano", "automatico": true,
+   "ruoli": {"a": {}},
+   "testo": "{a} ha {eta_a} anni e ogni mattina fatica un po' di più a scendere dal letto. Ha smesso di nasconderlo.",
+   "scelte": [
+     {"id": "istruttore", "testo": "Lo ringrazi: da domani è il tuo istruttore",
+      "esito": "{a} appende i guantoni al chiodo. Domani sarà l'ultimo ad andarsene dalla palestra e il primo ad arrivare.",
+      "effetti": [{"chi": "a", "istruttore": true}, {"chi": "tutti", "fiducia": 2}]},
+     {"id": "ultima", "testo": "Gli chiedi un'ultima stagione",
+      "esito": "{a} accetta. Ma ti guarda in un modo che non dimenticherai.",
+      "effetti": [{"chi": "a", "rinvia_ritiro": 56}, {"chi": "a", "fiducia": -5}]}
+   ]},
+
+  {"id": "maestro", "titolo": "Un vecchio maestro", "peso": 0.7, "cooldown": 14,
+   "ruoli": {"a": {"giorni_min": 7}},
+   "testo": "Un vecchio maestro di strada offre una lezione a {a}: quarant'anni di ring in un pomeriggio.",
+   "scelte": [
+     {"id": "paga", "testo": "Paghi la lezione (60¤)", "richiede_crediti": 60,
+      "esito": "{a} esce dalla stanza con le mani aperte e la testa piena.",
+      "effetti": [{"crediti": -60}, {"chi": "a", "punti": 2, "voce": "casuale"}, {"chi": "a", "stress": 4}]},
+     {"id": "gratis", "testo": "Lo inviti a restare gratis: ti ripagherà in racconti",
+      "esito": "Il maestro parla per ore. {a} impara meno, e ascolta di più.",
+      "effetti": [{"chi": "a", "punti": 1, "voce": "casuale"}, {"chi": "a", "stress": 6}, {"chi": "a", "fiducia": 2}]}
+   ]},
+
+  {"id": "notte_brava", "titolo": "Una serata fuori misura", "peso": 0.8, "cooldown": 10,
+   "ruoli": {"a": {"stress_min": 35}},
+   "testo": "{a} ha passato la notte fuori a bere con gli amici. Alle sei era ancora al bancone.",
+   "scelte": [
+     {"id": "ignora", "testo": "Fai finta di niente",
+      "esito": "Non ti vede nemmeno, mentre si trascina verso l'armadietto.",
+      "effetti": [{"chi": "a", "stress": -20}, {"chi": "a", "fiducia": 3},
+                  {"caso": 0.35, "allora": [{"chi": "a", "ferita": [10, 22]}, {"testo": "{a} torna con un occhio nero e una storia poco credibile."}]}]},
+     {"id": "rimprovera", "testo": "Lo rimproveri davanti agli altri",
+      "esito": "Il silenzio nella palestra è assoluto. Nessuno sgarrerà per un po'.",
+      "effetti": [{"chi": "a", "fiducia": -7}, {"chi": "a", "stress": 4}, {"chi": "altri", "stress": -1}]}
+   ]},
+
+  {"id": "ispezione", "titolo": "Un ispettore alla porta", "peso": 0.6, "cooldown": 25,
+   "ruoli": {},
+   "testo": "Un tizio in giacca dice di essere dell'ufficio sanitario. Guarda i tatami, le brande, e poi te.",
+   "scelte": [
+     {"id": "paga", "testo": "Una busta e un sorriso (50¤)", "richiede_crediti": 50,
+      "esito": "L'uomo sorride e se ne va. La busta no.",
+      "effetti": [{"crediti": -50}]},
+     {"id": "collabora", "testo": "Gli mostri tutto, sperando bene",
+      "esito": "Gli apri ogni stanza. Prende appunti.",
+      "effetti": [{"caso": 0.65, "allora": [{"testo": "Se ne va senza una parola."}],
+                   "altrimenti": [{"crediti": -120}, {"testo": "Una multa da 120¤. Poteva andare peggio."}]}]},
+     {"id": "porta", "testo": "Gli chiudi la porta in faccia",
+      "esito": "La porta sbatte. Dietro di te, tutti trattengono il fiato.",
+      "effetti": [{"caso": 0.4,
+                   "allora": [{"chi": "tutti", "fiducia": 3}, {"testo": "Gli allievi lo vengono a sapere e ti guardano con rispetto."}],
+                   "altrimenti": [{"crediti": -200}, {"testo": "Torna il giorno dopo con la multa: 200¤."}]}]}
+   ]},
+
+  {"id": "fan", "titolo": "Qualcuno aspetta all'uscita", "peso": 0.7, "cooldown": 15,
+   "ruoli": {"a": {"vittorie_min": 1}},
+   "testo": "Una persona aspetta {a} all'uscita con un taccuino in mano: dice di aver visto tutti i suoi incontri.",
+   "scelte": [
+     {"id": "firma", "testo": "Lasci che {a} si fermi a parlare",
+      "esito": "Per la prima volta da settimane, {a} sorride davvero.",
+      "effetti": [{"chi": "a", "fiducia": 7}, {"chi": "a", "stress": -5}]},
+     {"id": "via", "testo": "Tiri dritto: niente distrazioni",
+      "esito": "{a} si volta indietro una volta sola.",
+      "effetti": [{"chi": "a", "fiducia": -2}, {"chi": "a", "punti": 0.5, "voce": "casuale"}]}
+   ]},
+
+  {"id": "amicizia", "titolo": "Un'amicizia", "peso": 0.8, "cooldown": 10,
+   "ruoli": {"a": {}, "b": {"legame_min": -5, "legame_max": 30}},
+   "testo": "{a} e {b} hanno passato la pausa a raccontarsi come hanno cominciato a combattere. Da oggi si cercano con lo sguardo.",
+   "scelte": [
+     {"id": "ok", "testo": "Bene così",
+      "esito": "Le cose migliori in palestra non si decidono.",
+      "effetti": [{"legame": ["a", "b", 15]}, {"chi": "a", "fiducia": 3}, {"chi": "b", "fiducia": 3}]}
+   ]},
+
+  {"id": "rivalita", "titolo": "Una rivalità", "peso": 0.8, "cooldown": 12,
+   "ruoli": {"a": {"tratto_o": ["orgoglioso", "ambizioso"]}, "b": {"legame_max": 10}},
+   "testo": "{a} non ha mai digerito i progressi di {b}. Si guardano come due cani da combattimento.",
+   "scelte": [
+     {"id": "alimenta", "testo": "Alimenti la rivalità: sul tatami ognuno farà meglio dell'altro",
+      "esito": "Per una settimana si spingeranno oltre ogni limite.",
+      "effetti": [{"legame": ["a", "b", -20]}, {"chi": "a", "punti": 0.5, "voce": "casuale"}, {"chi": "b", "punti": 0.5, "voce": "casuale"},
+                  {"chi": "a", "stress": 6}, {"chi": "b", "stress": 6}]},
+     {"id": "spegni", "testo": "Spegni la tensione sul nascere",
+      "esito": "Li metti a pulire insieme gli attrezzi. Nessuno parla, ma nessuno se ne va.",
+      "effetti": [{"legame": ["a", "b", 6]}, {"chi": "a", "fiducia": -3}, {"chi": "a", "stress": -4}]}
+   ]},
+
+  {"id": "sparring_partner", "titolo": "Un ragazzo chiede un posto", "peso": 0.7, "cooldown": 12,
+   "ruoli": {"a": {}},
+   "testo": "Un ragazzo del quartiere chiede di allenarsi qui una settimana, in cambio di qualche sparring con {a}.",
+   "scelte": [
+     {"id": "accetta", "testo": "Lo accogli",
+      "esito": "Il ragazzo tira come un mulo. {a} impara in fretta a stare in guardia.",
+      "effetti": [{"chi": "a", "punti": 1, "voce": "sessione:sparring"}, {"chi": "a", "stress": 4},
+                  {"caso": 0.25, "allora": [{"crediti": -30}, {"testo": "Sparisce a fine settimana, con 30¤ dalla cassa."}]}]},
+     {"id": "rifiuta", "testo": "Gli dici di tornare quando avrai più posto",
+      "esito": "Il ragazzo se ne va senza fare storie.",
+      "effetti": []}
+   ]},
+
+  {"id": "dolore", "titolo": "Un dolore che non passa", "peso": 1.0, "cooldown": 8,
+   "ruoli": {"a": {"ferito": true}},
+   "testo": "{a} si tiene un fianco da due giorni e finge che non sia niente. Continua a presentarsi in palestra come se niente fosse.",
+   "scelte": [
+     {"id": "riposo", "testo": "Lo costringi a stare fermo per due giorni",
+      "esito": "Protesta, poi si arrende. Dorme nella branda in fondo.",
+      "effetti": [{"chi": "a", "riposo": 2}, {"chi": "a", "fiducia": 3}]},
+     {"id": "medikit", "testo": "Gli paghi una visita (30¤)", "richiede_crediti": 30,
+      "esito": "Il medico dice che non è niente di grave, ma che doveva venire prima.",
+      "effetti": [{"crediti": -30}, {"chi": "a", "cura": 30}, {"chi": "a", "fiducia": 5}]},
+     {"id": "stringe", "testo": "Lasci che stringa i denti",
+      "esito": "Non ti ringrazia, ma continua a venire.",
+      "effetti": [{"chi": "a", "punti": 1, "voce": "casuale"}, {"chi": "a", "stress": 8},
+                  {"caso": 0.3, "allora": [{"chi": "a", "ferita": [10, 25]}, {"testo": "Il fianco cede a metà allenamento."}]}]}
+   ]}
+]

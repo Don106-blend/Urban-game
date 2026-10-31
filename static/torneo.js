@@ -68,8 +68,8 @@ function potHtml() {
   const pot = S.bonus_accumulato || 0;
   const log = (S.log_arena || []).map(l => `<div class="evo-arena-riga">${l}</div>`).join("");
   return `<div class="evo-montepremi">
-    <div class="evo-montepremi-val">💰 Montepremi torneo: <b>${pot}¤</b>
-      <span class="muted">— si riscatta tutto solo diventando campione, si perde se vieni eliminato</span></div>
+    <div class="evo-montepremi-val">🏅 Punteggio del torneo: <b>${pot}</b>
+      <span class="muted">— soltanto un punteggio: il Torneo Evo non dà premi</span></div>
     ${log ? `<div class="evo-arena-log">${log}</div>` : ""}
   </div>`;
 }
@@ -108,11 +108,11 @@ function render() {
 function renderLanding() {
   app().innerHTML = `
     <div class="evo-hero">
-      <div class="evo-kicker">MODALITÀ ARENA</div>
+      <div class="evo-kicker">MODALITÀ A PARTE</div>
       <h1 class="evo-title">TORNEO <span>EVO</span></h1>
       <p class="muted evo-pitch">16 partecipanti. Si parte da zero: un eroe casuale, un potere.
       Ogni turno superato: cure, un potere nuovo a scelta tra tre, una statistica potenziata.
-      Chi vince entra nel box. Chi perde è fuori.</p>
+      Chi perde è fuori. È una modalità a parte: non tocca la tua palestra e non dà premi, solo la gloria.</p>
       <button class="btn btn-volt evo-cta" onclick='azione({tipo:"inizia"})'>INIZIA TORNEO</button>
     </div>`;
 }
@@ -299,12 +299,12 @@ function renderVittoria() {
       <div class="evo-trofeo">🏆</div>
       <h1 class="evo-title">CAMPIONE <span>EVO</span></h1>
       <div class="evo-eroe-nome">${S.eroe.nome}</div>
-      <p class="muted">Ha superato il torneo ed è entrato nel tuo box (LIV 5).</p>
+      <p class="muted">Ha vinto il Torneo Evo. Nessun premio, nessun posto in palestra: resta la gloria.</p>
       ${eroeCard()}
       ${potHtml()}
       <div class="evo-azioni-finali">
-        <a class="btn btn-volt" href="/box" onclick='azione({tipo:"chiudi"})'>Vai al box →</a>
-        <button class="btn btn-ghost" onclick='azione({tipo:"chiudi"})'>Nuovo torneo</button>
+        <button class="btn btn-volt" onclick='azione({tipo:"chiudi"})'>Nuovo torneo</button>
+        <a class="btn btn-ghost" href="/palestra" onclick='azione({tipo:"chiudi"})'>Torna alla palestra →</a>
       </div>
     </div>`;
 }

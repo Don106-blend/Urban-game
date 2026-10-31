@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "urban-palestra-demo",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["tools/demo_palestra.py"],
+      "port": 5057
+    }
+  ]
+}

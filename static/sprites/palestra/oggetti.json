@@ -1,0 +1,146 @@
+{
+ "sacco": {
+  "file": "sacco.png",
+  "w": 18,
+  "h": 42,
+  "perno": [
+   9,
+   0
+  ]
+ },
+ "bilanciere": {
+  "file": "bilanciere.png",
+  "w": 40,
+  "h": 13,
+  "perno": [
+   20,
+   6
+  ]
+ },
+ "pesi": {
+  "file": "pesi.png",
+  "w": 48,
+  "h": 42,
+  "perno": [
+   24,
+   42
+  ]
+ },
+ "pesi_vuoto": {
+  "file": "pesi_vuoto.png",
+  "w": 48,
+  "h": 42,
+  "perno": [
+   24,
+   42
+  ]
+ },
+ "manichino": {
+  "file": "manichino.png",
+  "w": 22,
+  "h": 70,
+  "perno": [
+   11,
+   70
+  ]
+ },
+ "lavagna": {
+  "file": "lavagna.png",
+  "w": 46,
+  "h": 60,
+  "perno": [
+   23,
+   60
+  ]
+ },
+ "bacheca": {
+  "file": "bacheca.png",
+  "w": 36,
+  "h": 28,
+  "perno": [
+   18,
+   28
+  ]
+ },
+ "specchio": {
+  "file": "specchio.png",
+  "w": 58,
+  "h": 66,
+  "perno": [
+   29,
+   66
+  ]
+ },
+ "infermeria": {
+  "file": "infermeria.png",
+  "w": 54,
+  "h": 36,
+  "perno": [
+   27,
+   36
+  ]
+ },
+ "dormitorio": {
+  "file": "dormitorio.png",
+  "w": 50,
+  "h": 50,
+  "perno": [
+   25,
+   50
+  ]
+ },
+ "camera": {
+  "file": "camera.png",
+  "w": 68,
+  "h": 14,
+  "perno": [
+   34,
+   14
+  ]
+ },
+ "tatami": {
+  "file": "tatami.png",
+  "w": 102,
+  "h": 10,
+  "perno": [
+   51,
+   10
+  ]
+ },
+ "targa": {
+  "file": "targa.png",
+  "w": 14,
+  "h": 19,
+  "perno": [
+   7,
+   0
+  ]
+ },
+ "finestra": {
+  "file": "finestra.png",
+  "w": 40,
+  "h": 46,
+  "perno": [
+   20,
+   46
+  ]
+ },
+ "poster": {
+  "file": "poster.png",
+  "w": 30,
+  "h": 40,
+  "perno": [
+   15,
+   40
+  ]
+ },
+ "lampada": {
+  "file": "lampada.png",
+  "w": 16,
+  "h": 22,
+  "perno": [
+   8,
+   0
+  ]
+ }
+}

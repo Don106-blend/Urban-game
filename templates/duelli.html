@@ -1,33 +1,62 @@
 {% extends "base.html" %}
-{% block title %}Duelli — Urban{% endblock %}
+{% block title %}La serata — Urban{% endblock %}
 {% block content %}
 <div class="page-head">
-  <h1>DUELLI</h1>
-  <p class="muted">Scegli chi manderai sul ring. Vittoria: <strong class="volt">¤ {{ ricompensa }}</strong>.
-     I danni restano addosso — anche la morte.</p>
+  <h1>LA SERATA</h1>
+  <p class="muted">{{ data }}. Scegli chi sale sul ring: vittoria <strong class="volt">¤ {{ ricompensa }}</strong>.
+     Il duello occupa la giornata di chi combatte (oggi non si allena). I danni restano addosso — anche la morte.</p>
+</div>
+
+<div class="serate-riga">
+  {% set pieni = 0 if serate.fatta_oggi else serate.saltate %}
+  <span class="serate {{ 'bloccato' if serate.bloccato }}" title="Giornate chiuse di fila senza una serata sul ring: al massimo {{ serate.max }}, poi se ne gioca almeno una">
+    <span>Serate saltate</span>
+    <span class="pallini">{% for i in range(serate.max) %}<i class="pallino {{ 'on' if i < pieni }}"></i>{% endfor %}</span>
+  </span>
+  <span class="muted">
+    {% if serate.bloccato %}Hai chiuso {{ serate.max }} giornate senza una serata: oggi qualcuno sale sul ring.
+    {% elif serate.fatta_oggi %}Serata di oggi fatta: il conto riparte da zero.
+    {% elif not serate.possibile %}Oggi nessuno può salire sul ring: non conta come giornata saltata.
+    {% else %}Puoi chiudere ancora {{ serate.max - serate.saltate }} giornat{{ 'a' if serate.max - serate.saltate == 1 else 'e' }} senza una serata.{% endif %}
+  </span>
 </div>
 
 {% if not idonei %}
   <div class="empty">
-    <p>Nessun combattente in grado di battersi (in coma, morti o box vuoto).</p>
-    <a class="btn btn-volt" href="{{ url_for('contratti') }}">Vai ai contratti →</a>
+    <p>Nessuno in palestra in grado di battersi (vuota, o tutti in coma).</p>
+    <a class="btn btn-volt" href="{{ url_for('contratti') }}">Vai agli aspiranti →</a>
   </div>
 {% else %}
 <div class="card-grid">
   {% for p in idonei %}
   {% set c = p.rec %}
-  <div class="fighter-card">
+  <div class="fighter-card {{ 'non-pronto' if not p.ok }}">
+    <div class="fc-preview"><canvas class="anteprima" data-aspetto='{{ c.aspetto|tojson|forceescape }}' aria-label="Anteprima di {{ c.nome }}"></canvas></div>
     <div class="fc-top">
-      <span class="fc-nome">{{ c.nome }}</span>
+      <a class="fc-nome" href="{{ url_for('personaggio', pid=c.id) }}">{{ c.nome }}</a>
       <span class="badge badge-{{ p.stato }}">{{ p.stato|upper }}</span>
     </div>
-    <div class="fc-liv">LIV {{ c.livello }} · {{ c.vittorie }}V / {{ c.sconfitte }}S</div>
+    <div class="fc-liv">LIV {{ c.livello }} · {{ p.eta }} anni · {{ c.vittorie }}V / {{ c.sconfitte }}S</div>
+    <div class="barre-fs">
+      <div title="Fiducia {{ c.fiducia }}/100"><span class="muted">Fiducia</span>
+        <div class="hpbar"><div class="hpbar-fill {{ 'pct-hi' if c.fiducia >= 50 else ('pct-mid' if c.fiducia >= 25 else 'pct-low') }}" style="width: {{ c.fiducia }}%"></div></div></div>
+      <div title="Stress {{ c.stress }}/100"><span class="muted">Stress</span>
+        <div class="hpbar"><div class="hpbar-fill {{ 'pct-hi' if c.stress < 50 else ('pct-mid' if c.stress < 80 else 'pct-low') }}" style="width: {{ c.stress }}%"></div></div></div>
+    </div>
+    <div class="muted oggi-riga">Oggi sarebbe: {{ sessioni[p.piano.pianificata].nome if p.piano.pianificata in sessioni else p.piano.pianificata }}
+      {% if p.piano.attivita == 'duello' %}· già sul ring{% endif %}</div>
+    {% if p.ok %}
     <form method="post" action="{{ url_for('duelli_avvia') }}">
       <input type="hidden" name="pid" value="{{ c.id }}">
       <button class="btn btn-volt full">Sali sul ring →</button>
     </form>
+    {% else %}
+    <button class="btn btn-ghost full" disabled>{{ c.nome.split(' ')[0] }} {{ p.motivo }}</button>
+    {% endif %}
   </div>
   {% endfor %}
 </div>
 {% endif %}
+<script src="{{ url_for('static', filename='arena.js') }}"></script>
+<script src="{{ url_for('static', filename='anteprima.js') }}" data-ripeti></script>
 {% endblock %}

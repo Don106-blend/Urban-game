@@ -323,5 +323,193 @@
         "delta": 2
       }
     ]
+  },
+  {
+    "id": 18,
+    "nome": "Incitamento",
+    "descrizione": "La folla ti spinge: +1 ai tiri per colpire e ai riflessi.",
+    "tipo": "modificatore",
+    "tipo_danno": "",
+    "split": false,
+    "formula": {
+      "dadi": [],
+      "flat": 0,
+      "mult": 1
+    },
+    "modificatori": [
+      {
+        "tipo": "colpire",
+        "flat": 1
+      },
+      {
+        "tipo": "flat_risultato",
+        "statistica": "riflessi",
+        "valore": 1
+      }
+    ]
+  },
+  {
+    "id": 19,
+    "nome": "Boato",
+    "descrizione": "La folla ruggisce: +2 ai tiri per colpire e ai riflessi.",
+    "tipo": "modificatore",
+    "tipo_danno": "",
+    "split": false,
+    "formula": {
+      "dadi": [],
+      "flat": 0,
+      "mult": 1
+    },
+    "modificatori": [
+      {
+        "tipo": "colpire",
+        "flat": 2
+      },
+      {
+        "tipo": "flat_risultato",
+        "statistica": "riflessi",
+        "valore": 2
+      }
+    ]
+  },
+  {
+    "id": 20,
+    "nome": "Ovazione",
+    "descrizione": "Il pubblico e' in piedi per te: +1 ai tiri per colpire e ai riflessi.",
+    "tipo": "modificatore",
+    "tipo_danno": "",
+    "split": false,
+    "formula": {
+      "dadi": [],
+      "flat": 0,
+      "mult": 1
+    },
+    "modificatori": [
+      {
+        "tipo": "colpire",
+        "flat": 1
+      },
+      {
+        "tipo": "flat_risultato",
+        "statistica": "riflessi",
+        "valore": 1
+      }
+    ]
+  },
+  {
+    "id": 21,
+    "nome": "Furia",
+    "descrizione": "Una scarica di adrenalina: +2 ai tiri per colpire e ai riflessi.",
+    "tipo": "modificatore",
+    "tipo_danno": "",
+    "split": false,
+    "formula": {
+      "dadi": [],
+      "flat": 0,
+      "mult": 1
+    },
+    "modificatori": [
+      {
+        "tipo": "colpire",
+        "flat": 2
+      },
+      {
+        "tipo": "flat_risultato",
+        "statistica": "riflessi",
+        "valore": 2
+      }
+    ]
+  },
+  {
+    "id": 22,
+    "nome": "Fischi",
+    "descrizione": "Il pubblico ti fischia: -1 ai tiri per colpire e ai riflessi.",
+    "tipo": "modificatore",
+    "tipo_danno": "",
+    "split": false,
+    "formula": {
+      "dadi": [],
+      "flat": 0,
+      "mult": 1
+    },
+    "modificatori": [
+      {
+        "tipo": "colpire",
+        "flat": -1
+      },
+      {
+        "tipo": "flat_risultato",
+        "statistica": "riflessi",
+        "valore": -1
+      }
+    ]
+  },
+  {
+    "id": 23,
+    "nome": "Sfiga nera",
+    "descrizione": "Oggi non e' la tua serata: -2 ai tiri per colpire e ai riflessi.",
+    "tipo": "modificatore",
+    "tipo_danno": "",
+    "split": false,
+    "formula": {
+      "dadi": [],
+      "flat": 0,
+      "mult": 1
+    },
+    "modificatori": [
+      {
+        "tipo": "colpire",
+        "flat": -2
+      },
+      {
+        "tipo": "flat_risultato",
+        "statistica": "riflessi",
+        "valore": -2
+      }
+    ]
+  },
+  {
+    "id": 24,
+    "nome": "Esposto",
+    "descrizione": "Ti sei scoperto con un colpo azzardato: -1 ai riflessi (si somma).",
+    "tipo": "modificatore",
+    "tipo_danno": "",
+    "split": false,
+    "formula": {
+      "dadi": [],
+      "flat": 0,
+      "mult": 1
+    },
+    "modificatori": [
+      {
+        "tipo": "flat_risultato",
+        "statistica": "riflessi",
+        "valore": -1
+      }
+    ]
+  },
+  {
+    "id": 25,
+    "nome": "Rivincita",
+    "descrizione": "Vuoi la rivincita: +1 ai tiri per colpire e ai riflessi.",
+    "tipo": "modificatore",
+    "tipo_danno": "",
+    "split": false,
+    "formula": {
+      "dadi": [],
+      "flat": 0,
+      "mult": 1
+    },
+    "modificatori": [
+      {
+        "tipo": "colpire",
+        "flat": 1
+      },
+      {
+        "tipo": "flat_risultato",
+        "statistica": "riflessi",
+        "valore": 1
+      }
+    ]
   }
 ]

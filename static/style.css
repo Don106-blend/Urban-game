@@ -297,28 +297,52 @@ a.fighter-card:hover { transform: translateY(-3px); border-color: var(--volt); }
 .esito.vittoria { background: rgba(215, 255, 62, .12); color: var(--volt); border: 1px solid var(--volt); }
 .esito.sconfitta { background: rgba(255, 70, 85, .12); color: var(--danger); border: 1px solid var(--danger); }
 
-/* ---------- arena: bookmaker live, sponsor, pubblico ---------- */
-.arena-sec { border-top: 1px dashed var(--line); padding-top: 10px; }
-.arena-sec h4:not(:first-child) { margin-top: 10px; }
-.arena-riga { font-size: 12.5px; line-height: 1.5; margin-bottom: 4px; }
+/* ---------- il Banco: puntate, folla e azzardi (azzardo.py) ---------- */
+.arena-sec { border-top: 1px dashed var(--line); padding-top: 10px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.arena-sec .pan-inline { margin-top: 0; }
+.arena-riga { font-size: 12.5px; line-height: 1.5; }
 .quota-val { color: var(--volt); font-weight: 800; }
-.arena-scommessa-form { display: flex; gap: 6px; margin-top: 4px; }
-.arena-scommessa-form input {
-  width: 72px; background: var(--panel-2); border: 1px solid var(--line);
-  color: var(--text); border-radius: 6px; padding: 4px 6px; font: inherit;
-}
-.arena-scommessa-form .btn { padding: 4px 10px; font-size: 11.5px; }
-.arena-sponsor-card {
-  background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px;
-  padding: 8px; margin-bottom: 6px; font-size: 12px;
-}
-.arena-sponsor-card .btn { margin-top: 6px; padding: 3px 10px; font-size: 11px; }
-.sponsor-scelto.fallito { opacity: .55; }
-.hype-bar { height: 6px; border-radius: 999px; background: #22262d; overflow: hidden; margin-bottom: 4px; }
-.hype-fill {
-  height: 100%; border-radius: 999px; transition: width .4s;
-  background: linear-gradient(90deg, var(--teal), var(--volt), var(--danger));
-}
+.arena-sec .btn-sm { padding: 6px 12px; }
+
+/* la barra della folla, nella testata del duello: da sinistra il giocatore (volt), da destra l'avversario (danger) */
+.folla { flex: 1 1 240px; max-width: 460px; min-width: 0; margin-left: auto; display: flex; flex-direction: column; gap: 4px; }
+.folla-barra { position: relative; height: 6px; border-radius: 999px; background: #22262d; overflow: hidden; }
+.folla-fill { position: absolute; top: 0; bottom: 0; transition: width .4s; }
+.folla-fill.p { right: 50%; background: var(--volt); }
+.folla-fill.c { left: 50%; background: var(--danger); }
+.folla-centro { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--muted); }
+.folla-testo { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--muted); }
+.folla-testo b { font-weight: 800; white-space: nowrap; }
+@media (max-width: 700px) { .duello-head { flex-wrap: wrap; } .folla { flex-basis: 100%; max-width: none; margin-left: 0; } }
+
+/* la finestra del Banco */
+.banco-form { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.banco-importo { width: 96px; background: var(--panel-2); border: 1px solid var(--line); color: var(--text); border-radius: 6px; padding: 8px 10px;
+                 font: inherit; font-size: 15px; font-weight: 800; }
+.banco-importo:focus-visible { outline: 2px solid var(--volt); outline-offset: 1px; }
+.banco-anteprima { font-size: 14px; line-height: 1.5; }
+.banco-nota { font-size: 12px; line-height: 1.4; }
+.azioni > .banco-esito { grid-column: 1 / -1; margin-top: 0; }
+
+/* gli azzardi nel menu delle mosse */
+.az-extra { justify-self: end; min-width: 0; display: inline-flex; gap: 6px; }
+.azz-attivo, .azz-errore { font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 999px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.azz-attivo { background: rgba(255, 176, 32, .12); border: 1px solid var(--warn); color: var(--warn); }
+.azz-errore { background: rgba(255, 70, 85, .1); border: 1px solid var(--danger); color: var(--danger); }
+.azz-barra { display: flex; width: 100%; height: 5px; border-radius: 999px; overflow: hidden; background: #22262d; margin-top: 2px; }
+.azz-barra i { display: block; height: 100%; }
+.azz-barra .male { background: var(--danger); }
+.azz-barra .neutro { background: var(--muted); }
+.azz-barra .bene { background: var(--teal); }
+.scena-allarme { flex: 1 1 100%; text-align: center; font-size: 12.5px; font-weight: 800; letter-spacing: .5px; color: var(--warn); }
+.esito-colpo.e-bene { color: var(--teal); }
+.esito-colpo.e-male { color: var(--danger); }
+.esito-colpo.e-neutro { color: var(--muted); }
+.fl-bene { color: var(--teal); font-size: 28px; }
+.fl-male { color: var(--danger); font-size: 28px; }
+.fl-neutro { color: var(--muted); font-size: 24px; }
+.fl-rischio { color: var(--warn); font-size: 28px; }
+.fl-jackpot { color: var(--volt); font-size: 34px; text-shadow: 0 0 18px rgba(215, 255, 62, .6); }
 
 /* ---------- stamina: tacchette oblique tipo batteria ---------- */
 .stamina-bar { display: inline-flex; align-items: center; gap: 2px; }
@@ -392,7 +416,7 @@ a.fighter-card:hover { transform: translateY(-3px); border-color: var(--volt); }
 .evo-stat b { color: var(--volt); letter-spacing: 1px; }
 .evo-poteri { font-size: 13px; }
 
-/* montepremi del torneo (scommesse/sponsor accumulati, si riscattano da campioni) */
+/* punteggio del torneo (puntate e clausole vinte: soltanto un punteggio) */
 .evo-montepremi { display: inline-block; background: var(--panel-2); border: 1px solid var(--line);
                   border-radius: 12px; padding: 12px 20px; margin: 8px auto 18px; text-align: left;
                   max-width: 420px; }
@@ -574,9 +598,6 @@ a.fighter-card:hover { transform: translateY(-3px); border-color: var(--volt); }
 .pi { background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; }
 .pi small { font-size: 10px; font-weight: 800; }
 .arena-sec .arena-riga { margin-bottom: 3px; font-size: 12px; }
-.arena-sec .hype-bar { margin: 4px 0; }
-.arena-sponsor-card { padding: 6px 8px; }
-.arena-sponsor-card .btn { margin-top: 3px; }
 
 .azioni { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 6px; align-content: start; }
 .azioni > .titolo-menu, .azioni > .esito, .azioni > .attesa, .azioni > .survey { grid-column: 1 / -1; }
@@ -614,9 +635,6 @@ a.fighter-card:hover { transform: translateY(-3px); border-color: var(--volt); }
   body.duello-mode .storico { padding: 4px 12px; }
 }
 
-.arena-sponsor-card { display: grid; grid-template-columns: 1fr auto; gap: 2px 6px; align-items: center; }
-.arena-sponsor-card > div:nth-child(2) { grid-column: 1 / -1; grid-row: 2; font-size: 11px; line-height: 1.3; }
-.arena-sponsor-card .btn { grid-column: 2; grid-row: 1; margin-top: 0; }
 @media (min-width: 981px) and (max-height: 740px) {
   body.duello-mode .scena-top { display: none; }          /* i nomi sono già sulle schede laterali */
   body.duello-mode .cron-riga:nth-child(n+4) { display: none; }
@@ -720,3 +738,310 @@ a.fighter-card:hover { transform: translateY(-3px); border-color: var(--volt); }
   body.duello-mode .dado { min-width: 120px; }
   body.duello-mode .dado-titolo, body.duello-mode .dado-sotto { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
+
+/* anteprima del personaggio (Box, Contratti): il corpo a riposo sopra il nome, pixel netti */
+.fc-preview { display: flex; justify-content: center; align-items: flex-end; height: 224px; margin: -4px 0 10px;
+              border-radius: 10px; background: radial-gradient(ellipse at 50% 100%, #232933 0%, #14171c 70%); border: 1px solid var(--line); }
+.fc-preview canvas { image-rendering: pixelated; width: 96px; height: 222px; }
+.fighter-card.stato-morto .fc-preview canvas { filter: grayscale(1); }
+
+/* ======================================================================================================================
+   La Palestra (Opzione A): calendario, scena, allievi, eventi, tratti, scheda
+   ====================================================================================================================== */
+.nav-badge { margin-left: 6px; background: var(--danger); color: #fff; border-radius: 999px; padding: 1px 7px; font-size: 11px; font-weight: 900; }
+.nav a.on .nav-badge { background: #0b0d10; color: var(--volt); }
+.nav a.nav-torneo { margin-left: 18px; border: 1px dashed var(--line); }
+.nav a.nav-torneo.on { border-style: solid; }
+.data-chip { font-weight: 700; font-size: 14px; padding: 8px 14px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--line); white-space: nowrap; }
+.chip-info { display: inline-block; font-size: 12px; font-weight: 700; padding: 5px 12px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--line); color: var(--muted); }
+.chip-pieno { color: var(--warn); border-color: var(--warn); }
+.mode-card.torneo:hover { border-color: var(--teal); }
+.mode-card.torneo .mode-name .slash { color: var(--teal); }
+
+/* tratti */
+.tratti-riga { display: flex; gap: 6px; flex-wrap: wrap; }
+.tratto { font-size: 11px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase; padding: 3px 9px; border-radius: 6px;
+          background: rgba(33, 208, 178, .12); color: var(--teal); border: 1px solid rgba(33, 208, 178, .28); cursor: help; }
+.tratto.nascosto { background: transparent; color: var(--muted); border: 1px dashed var(--line); }
+.tratti-elenco { display: flex; flex-direction: column; gap: 8px; }
+.tratto-card { background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--teal); border-radius: 8px; padding: 10px 14px; }
+.tratto-card.nascosto { border-left-color: var(--line); opacity: .8; }
+.tratto-effetto { margin-top: 4px; font-size: 13px; color: var(--volt); }
+.colloquio { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 4px; }
+.colloquio form { display: inline; }
+.asp-bio { font-size: 13px; min-height: 36px; }
+.asp-barra { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; flex-basis: 100%; margin-top: 4px; }
+.avviso-pieno { background: rgba(255, 176, 32, .1); border: 1px solid var(--warn); border-radius: 8px; padding: 10px 16px; margin-bottom: 18px; color: var(--warn); }
+.avviso-pieno a { text-decoration: underline; }
+.fighter-card.non-pronto { opacity: .8; }
+.oggi-riga { font-size: 12px; }
+.barre-fs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 11px; }
+.barre-fs > div { display: flex; flex-direction: column; gap: 4px; }
+.cv-fs { width: 100%; grid-template-columns: 1fr; }
+.cv-preview { width: 100%; height: 232px; margin: 0; }
+.cv-preview canvas { height: 222px; }
+
+/* maturazione, programma, legami, registro (scheda) */
+.maturazione { display: block; height: 4px; width: 160px; background: #22262d; border-radius: 999px; margin: 5px 0 2px; overflow: hidden; }
+.maturazione-fill { display: block; height: 100%; background: var(--teal); }
+.upgrade-row.maturo .maturazione-fill { background: var(--volt); }
+.maturazione-txt { font-size: 11px; }
+.upgrade-grid.maturo-grid { max-width: 620px; }
+.programma { display: flex; flex-direction: column; gap: 12px; }
+.prog-giorni { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 8px; }
+.prog-focus { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px; align-items: end; }
+.programma label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; text-transform: uppercase; letter-spacing: .8px; }
+.programma select { text-transform: none; letter-spacing: 0; }
+.prog-sub { font-size: 14px; letter-spacing: .5px; margin-top: 4px; color: var(--muted); }
+.prog-auto { flex-direction: row !important; align-items: center; text-transform: none !important; letter-spacing: 0 !important; font-size: 14px !important; }
+.legami { display: flex; flex-direction: column; gap: 6px; max-width: 560px; }
+.legame-riga { display: grid; grid-template-columns: 180px 1fr 90px; gap: 12px; align-items: center; font-size: 14px; }
+.legame-riga:hover span:first-child { color: var(--volt); }
+.legame-barra { position: relative; height: 6px; border-radius: 999px; background: #22262d; }
+.legame-barra::after { content: ""; position: absolute; left: 50%; top: -2px; width: 1px; height: 10px; background: #3a4150; }
+.legame-fill { position: absolute; top: 0; height: 100%; border-radius: 999px; }
+.legame-fill.pos { background: var(--teal); }
+.legame-fill.neg { background: var(--danger); }
+.registro-lista { list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.registro-lista li { border-left: 2px solid var(--line); padding-left: 10px; }
+
+/* negozio */
+.neg-sub { font-size: 18px; font-style: italic; letter-spacing: 1px; margin: 26px 0 12px; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+.attrezzo-effetto { color: var(--volt); font-size: 13px; font-weight: 700; }
+.shop-item.posseduto { opacity: .65; }
+
+/* ======================================================================================================================
+   la pagina della palestra: UNA schermata (barra di comando in alto, scena, allievi in basso). Niente liste da scorrere:
+   scheda dell'allievo, eventi, registro e struttura si aprono in finestre a comparsa (<dialog>) e menu (popover).
+   ====================================================================================================================== */
+@media (min-width: 981px) {
+  body.palestra-mode { height: 100vh; height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
+  body.palestra-mode .topbar, body.palestra-mode .flash-wrap { flex: 0 0 auto; }
+  body.palestra-mode .page { flex: 1 1 auto; min-height: 0; max-width: none; width: 100%; box-sizing: border-box; padding: 12px 16px; display: flex; flex-direction: column; }
+}
+#pal-app { display: flex; flex-direction: column; gap: 12px; flex: 1 1 auto; min-height: 0; }
+.btn-sm { padding: 8px 14px; font-size: 12px; }
+
+/* barra di comando: titolo e data, la settimana, i comandi */
+.pal-hud { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; flex: 0 0 auto; }
+.pal-titolo h1 { font-size: 22px; font-style: italic; font-weight: 900; letter-spacing: 1.5px; line-height: 1.1; }
+.pal-data { font-size: 13px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+.pal-settimana { display: flex; align-items: center; gap: 10px; flex: 1 1 280px; max-width: 380px; }
+.pal-settimana > span { font-size: 11px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.pal-giorni { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; flex: 1; }
+.pal-giorno { text-align: center; padding: 6px 2px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); font-size: 12px; font-weight: 700; color: var(--muted); }
+.pal-giorno.oggi { background: var(--volt); color: #0b0d10; border-color: var(--volt); font-weight: 900; }
+.pal-giorno.passato { opacity: .45; }
+.pal-comandi { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; margin-left: auto; }
+.pal-eventi-btn { animation: pal-pulsa 1.6s ease-in-out infinite; }
+@keyframes pal-pulsa { 0%, 100% { box-shadow: 0 0 0 0 rgba(255, 176, 32, .5); } 50% { box-shadow: 0 0 0 6px rgba(255, 176, 32, 0); } }
+
+/* la scena: prende tutto lo spazio che resta tra la barra e gli allievi (la scala la sceglie scena_palestra.js) */
+.pal-scena-wrap { position: relative; flex: 1 1 0; min-height: 150px; display: flex; align-items: center; }
+.pal-scena-wrap .arena.pal-scena { flex: 1 1 auto; height: 100%; min-height: 0; width: 100%; }
+.pal-toasts { position: absolute; right: 12px; top: 12px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; max-width: min(380px, calc(100% - 24px)); z-index: 3; pointer-events: none; }
+.pal-toast { pointer-events: auto; background: rgba(20, 23, 28, .94); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; font-size: 13px; line-height: 1.4;
+             box-shadow: 0 8px 24px rgba(0, 0, 0, .5); animation: pal-entra .18s ease-out; }
+.pal-toast-testa { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; font-size: 12px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); }
+.pal-toast-riga { padding: 2px 0; }
+.pal-toast-riga.ferita { color: var(--warn); }
+.pal-toast-riga.nota { color: var(--teal); }
+.pal-toast-piede { margin-top: 6px; }
+.pal-aviso { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 3; background: var(--warn); color: #0b0d10; font-weight: 800; font-size: 13px;
+             padding: 8px 16px; border-radius: 999px; box-shadow: 0 8px 24px rgba(0, 0, 0, .5); animation: pal-entra .18s ease-out; max-width: calc(100% - 24px); }
+.pal-caricamento { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--muted); font-style: italic; }
+@keyframes pal-entra { from { opacity: 0; translate: 0 6px; } to { opacity: 1; translate: 0 0; } }
+
+/* gli allievi: una cartina a testa, si tocca per aprire la scheda */
+.pal-dock { display: flex; gap: 8px; flex: 0 0 auto; overflow-x: auto; padding: 2px 2px 4px; scroll-snap-type: x proximity; }
+.pal-allievo { flex: 1 1 0; min-width: 150px; max-width: 280px; display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 4px 10px; align-items: start; text-align: left;
+               background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; cursor: pointer; font-family: inherit;
+               scroll-snap-align: start; transition: transform .12s, border-color .12s; }
+.pal-allievo:hover, .pal-allievo.on, .pal-allievo:focus-visible { border-color: var(--volt); transform: translateY(-2px); outline: none; }
+.pal-allievo.stato-ferito { border-color: rgba(255, 176, 32, .5); }
+.pal-allievo.stato-coma { border-color: var(--danger); }
+.pal-allievo.stato-ferito:hover, .pal-allievo.stato-ferito.on, .pal-allievo.stato-coma:hover, .pal-allievo.stato-coma.on { border-color: var(--volt); }
+.pal-ritratto { display: block; width: 48px; height: 56px; overflow: hidden; border-radius: 8px; border: 1px solid var(--line); background: radial-gradient(ellipse at 50% 100%, #232933 0%, #14171c 70%); }
+.pal-ritratto canvas { display: block; width: 48px; height: 111px; image-rendering: pixelated; }
+.pal-ritratto.grande { width: 72px; height: 84px; }
+.pal-ritratto.grande canvas { width: 72px; height: 167px; }
+.pal-al-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pal-al-nome { display: flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 800; }
+.pal-al-nome > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pal-punto { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; background: var(--warn); }
+.pal-punto.coma { background: var(--danger); }
+.pal-al-sub { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pal-al-oggi { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pal-sigla { display: inline-block; min-width: 16px; text-align: center; padding: 0 4px; margin-right: 4px; border-radius: 4px; background: rgba(215, 255, 62, .14); color: var(--volt); font-size: 11px; font-weight: 900; }
+.pal-mini { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 4px; }
+.pal-mini > span { display: flex; flex-direction: column; gap: 3px; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+.pal-mini .hpbar { height: 6px; }
+.pal-vuota { flex: 1; display: flex; align-items: center; justify-content: center; gap: 16px; flex-wrap: wrap; padding: 16px; border: 1px dashed var(--line); border-radius: 12px; color: var(--muted); }
+
+/* finestre a comparsa: la scheda dell'allievo (cassetto a destra), gli eventi, il registro, la struttura */
+dialog.pal-dlg { margin: auto; padding: 0; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); color: var(--text); width: min(560px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow: hidden; }
+dialog.pal-dlg[open] { display: flex; flex-direction: column; animation: pal-entra .16s ease-out; }
+dialog.pal-dlg::backdrop { background: rgba(5, 6, 8, .72); backdrop-filter: blur(2px); }
+dialog.pal-drawer { margin: 0 0 0 auto; width: min(480px, 100vw); height: 100vh; height: 100dvh; max-height: none; border-radius: 14px 0 0 14px; border-right: none; }
+.pal-dlg-testa { display: flex; align-items: center; gap: 10px; padding: 14px 16px 10px; flex: 0 0 auto; }
+.pal-dlg-titolo { flex: 1; min-width: 0; }
+.pal-dlg-titolo h2 { font-size: 20px; font-style: italic; font-weight: 900; letter-spacing: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pal-icona { width: 32px; height: 32px; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; border: 1px solid var(--line); background: transparent;
+             color: var(--text); font-size: 18px; line-height: 1; cursor: pointer; font-family: inherit; }
+.pal-icona:hover { border-color: var(--volt); color: var(--volt); }
+.pal-tabs { display: flex; gap: 4px; padding: 0 16px; border-bottom: 1px solid var(--line); flex: 0 0 auto; }
+.pal-tab { background: none; border: none; border-bottom: 2px solid transparent; color: var(--muted); font-family: inherit; font-size: 12px; font-weight: 800; letter-spacing: 1px;
+           text-transform: uppercase; padding: 8px 12px; cursor: pointer; margin-bottom: -1px; }
+.pal-tab:hover { color: var(--text); }
+.pal-tab[aria-selected="true"] { color: var(--volt); border-bottom-color: var(--volt); }
+.pal-dlg-corpo { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 12px; }
+.pal-dlg-corpo, .pal-dock, .pal-menu { scrollbar-width: thin; scrollbar-color: #3a3f48 transparent; }
+.pal-dlg-piede { flex: 0 0 auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 10px 16px 14px; border-top: 1px solid var(--line); }
+.pal-sez { display: flex; flex-direction: column; gap: 8px; }
+.pal-sez h3 { font-size: 12px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); }
+.pal-riga-id { display: flex; gap: 14px; align-items: center; }
+.pal-riga-id > div { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.pal-badges { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; font-size: 12px; }
+.pal-stat { display: grid; grid-template-columns: 64px 1fr 40px; gap: 10px; align-items: center; font-size: 13px; }
+.pal-stat > span:first-child { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+.pal-stat > span:last-child { text-align: right; font-weight: 700; }
+.pal-oggi { font-size: 14px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; line-height: 1.5; }
+.pal-avviso-card { background: rgba(255, 70, 85, .1); border: 1px solid var(--danger); color: var(--danger); border-radius: 8px; padding: 6px 10px; font-size: 13px; }
+.pal-auto { font-size: 13px; color: var(--muted); display: flex; gap: 8px; align-items: center; cursor: pointer; }
+.pal-piano { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.pal-cella { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 2px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text);
+             font-family: inherit; cursor: pointer; transition: border-color .12s; }
+.pal-cella:hover { border-color: var(--volt); }
+.pal-cella > span:first-child { font-size: 10px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+.pal-cella .pal-sigla { margin: 0; font-size: 16px; padding: 2px 8px; }
+.pal-cella > span:last-child { font-size: 10px; line-height: 1.2; color: var(--muted); text-align: center; word-break: break-word; }
+.pal-cella.oggi { border-color: var(--volt); }
+.pal-cella.oggi > span:first-child { color: var(--volt); }
+.pal-voce { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.pal-voce:last-child { border-bottom: none; }
+.pal-voce > span:first-child { font-size: 13px; font-weight: 700; }
+.pal-voce .hpbar { grid-column: 1 / -1; height: 6px; }
+.pal-voce-nota { grid-column: 1 / -1; font-size: 12px; color: var(--muted); }
+.pal-scelte { display: flex; flex-direction: column; gap: 8px; }
+.pal-scelta { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; text-transform: none; letter-spacing: 0; font-weight: 700; font-size: 14px; width: 100%; }
+.pal-scelta small { font-size: 12px; font-weight: 400; opacity: .8; }
+.pal-testo { line-height: 1.5; font-size: 14px; }
+.pal-esito-righe { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--teal); }
+.pal-elenco { display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
+.pal-elenco li { list-style: none; display: flex; flex-direction: column; gap: 2px; }
+.pal-elenco a:hover { color: var(--volt); }
+.pal-rie-giorno { font-size: 12px; color: var(--volt); font-weight: 800; margin-top: 8px; }
+.pal-rie-riga { font-size: 14px; padding: 2px 0; }
+.pal-rie-riga.ferita { color: var(--warn); }
+.pal-rie-riga.maturo, .pal-rie-riga.nota { color: var(--teal); }
+
+/* il menu a comparsa (popover): si apre sul bottone che l'ha chiamato, sopra anche alle finestre */
+.pal-menu { position: fixed; inset: auto; margin: 0; padding: 6px; width: max-content; min-width: 200px; max-width: min(320px, calc(100vw - 16px)); max-height: calc(100dvh - 16px); overflow-y: auto;
+            background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 32px rgba(0, 0, 0, .6); }
+.pal-menu-titolo { padding: 6px 10px 4px; font-size: 11px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); }
+.pal-menu button { display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left; padding: 8px 10px; border: none; border-radius: 8px; background: transparent; color: var(--text);
+                   font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.pal-menu button small { font-size: 12px; font-weight: 400; color: var(--muted); line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.pal-menu button:hover:not(:disabled), .pal-menu button:focus-visible { background: rgba(215, 255, 62, .1); outline: none; }
+.pal-menu button[aria-checked="true"] { color: var(--volt); }
+.pal-menu button:disabled { opacity: .45; cursor: not-allowed; }
+
+/* schermi stretti: la pagina torna a scorrere, la scheda diventa a tutta larghezza */
+@media (max-width: 980px) {
+  .pal-scena-wrap { flex: none; height: 240px; }
+  .pal-settimana { max-width: none; }
+  .pal-comandi { margin-left: 0; justify-content: flex-start; }
+  dialog.pal-drawer { width: 100vw; border-radius: 0; }
+}
+@media (max-width: 520px) {
+  .pal-scena-wrap { height: 200px; }
+  .pal-comandi .btn { flex: 1 1 auto; }
+  .pal-piano { grid-template-columns: repeat(4, 1fr); }
+}
+
+/* telefono e schermi stretti: la barra in alto va a capo, le schede non escono dallo schermo */
+@media (max-width: 900px) {
+  .topbar { flex-wrap: wrap; gap: 8px 12px; padding: 10px 14px; }
+  .wordmark { font-size: 22px; }
+  .nav { order: 3; flex: 1 1 100%; flex-wrap: wrap; gap: 2px; }
+  .nav a { padding: 6px 10px; font-size: 12px; }
+  .nav a.nav-debug { margin-left: 0; }
+  .nav a.nav-torneo { margin-left: 4px; }
+  .data-chip, .crediti-chip { padding: 6px 12px; font-size: 13px; }
+  .topbar .data-chip { margin-left: auto; }
+}
+@media (max-width: 520px) {
+  .page { padding: 20px 14px 60px; }
+  .legame-riga { grid-template-columns: 110px 1fr 70px; }
+  .loc-row { grid-template-columns: 110px 1fr 70px; }
+}
+
+/* Navigazione senza ricaricare (static/nav.js): un filo di luce in alto mentre arriva la pagina, se ci mette piu' di un attimo */
+body.nav-carico::before {
+  content: ""; position: fixed; top: 0; left: 0; height: 2px; width: 100%; z-index: 50;
+  background: var(--volt); transform-origin: left; transform: scaleX(0);
+  animation: nav-carico 1.2s ease-out 0.15s forwards;
+}
+body.nav-carico { cursor: progress; }
+@keyframes nav-carico { to { transform: scaleX(0.9); } }
+#nav-parcheggio[hidden] { display: none; }
+
+/* Le serate saltate: tre pallini (uno per giornata chiusa senza salire sul ring), pieni = saltate. Al terzo la giornata non si chiude piu'. */
+.serate { display: inline-flex; align-items: center; gap: 9px; padding: 5px 12px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--line);
+          font-size: 12px; font-weight: 700; color: var(--muted); }
+.serate.bloccato { border-color: var(--danger); color: var(--danger); }
+.pallini { display: inline-flex; gap: 5px; }
+.pallino { display: inline-block; width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--muted); background: transparent; }
+.pallino.on { background: var(--warn); border-color: var(--warn); }
+.serate.bloccato .pallino.on { background: var(--danger); border-color: var(--danger); }
+.serate-riga { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: -10px 0 22px; font-size: 13px; }
+
+/* ---------- azioni a pallini (duello) ----------
+   In cima al menu delle mosse, al centro: un pallino per azione del turno (pieno = disponibile) e un rombo per azione bonus.
+   Ogni mossa mostra con altrettanti pallini quante azioni costa. */
+.az-testa { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 10px; }
+.az-pallini { display: inline-flex; align-items: center; gap: 9px; justify-self: center; }
+.az-serie { display: inline-flex; align-items: center; gap: 5px; }
+.az-sep { width: 1px; height: 12px; background: var(--line); }
+.az-pallini i { display: inline-block; width: 11px; height: 11px; border: 1.5px solid var(--muted); background: transparent; box-sizing: border-box; border-radius: 50%; }
+.az-pallini i.az.on { background: var(--volt); border-color: var(--volt); box-shadow: 0 0 6px rgba(215, 255, 62, .45); }
+.az-pallini i.bonus { border-radius: 2px; transform: rotate(45deg); width: 9px; height: 9px; }
+.az-pallini i.bonus.on { background: var(--teal); border-color: var(--teal); box-shadow: 0 0 6px rgba(33, 208, 178, .45); }
+.costo-pal { display: inline-flex; align-items: center; gap: 3px; vertical-align: middle; }
+.costo-pal i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--volt); }
+.costo-pal.bonus i { border-radius: 1.5px; transform: rotate(45deg); width: 7px; height: 7px; background: var(--teal); }
+body.duello-mode .azioni .az-testa .titolo-menu { min-height: 0; font-size: 10.5px; letter-spacing: 1.5px; align-self: center; }
+@media (min-width: 981px) {
+  body.duello-mode .az-pallini i { width: clamp(8px, 1.4vh, 11px); height: clamp(8px, 1.4vh, 11px); }
+  body.duello-mode .az-pallini i.bonus { width: clamp(7px, 1.2vh, 9px); height: clamp(7px, 1.2vh, 9px); }
+}
+
+/* il menu Azzardo: qui il testo conta (cosa costa e cosa rende ogni scelta), quindi niente righe tagliate: le carte crescono e il menu scorre */
+body.duello-mode .azioni:has(.azz-carta) { display: flex; flex-direction: row; flex-wrap: wrap; align-content: flex-start; align-items: flex-start; overflow-y: auto; }
+body.duello-mode .azioni:has(.azz-carta) > .az-testa, body.duello-mode .azioni:has(.azz-carta) > .btn-ghost { flex: 1 1 100%; }
+body.duello-mode .azioni:has(.azz-carta) > .azz-carta { flex: 1 1 calc(50% - 5px); min-width: 0; }
+@media (max-width: 560px) { body.duello-mode .azioni:has(.azz-carta) > .azz-carta { flex-basis: 100%; } }
+.azz-carta { overflow: visible; }
+.azz-carta .opz-desc, body.duello-mode .azz-carta .opz-desc { display: block; -webkit-line-clamp: unset; overflow: visible; font-size: 12.5px; line-height: 1.4; color: var(--text); opacity: .85; }
+.azz-carta .opz-meta, body.duello-mode .azz-carta .opz-meta { font-size: 12px; white-space: normal; }
+body.duello-mode .azioni .azz-carta { overflow: visible; min-height: min-content; font-size: 14px; padding: 8px 10px; }
+
+/* il soprannome nella scheda dell'allievo, e il rivale nel duello */
+.cv-sopr { display: flex; flex-direction: column; gap: 4px; margin: 6px 0; font-size: 13px; }
+.cv-sopr select { padding: 6px 8px; font-size: 13px; }
+.rivale-box { margin-top: 8px; padding: 6px 8px; border: 1px solid var(--line); border-left: 3px solid var(--muted); border-radius: 8px; font-size: 11.5px; line-height: 1.4; background: var(--panel-2); }
+.rivale-box b { display: block; font-size: 10px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); margin-bottom: 2px; }
+.rivale-box.nemico, .rivale-box.ti_ha_battuto { border-left-color: var(--danger); }
+.rivale-box.battuto, .rivale-box.domato { border-left-color: var(--volt); }
+.rivale-box .taglia { color: var(--warn); font-weight: 800; }
+.scena-allarme.nemico, .scena-allarme.ti_ha_battuto { color: var(--danger); }
+.scena-allarme.battuto, .scena-allarme.domato { color: var(--volt); }
+.scena-allarme.nuovo { color: var(--muted); }
+body.duello-mode .scena-allarme { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* il registro dei rivali */
+.badge-taglia { background: rgba(255, 176, 32, .15); color: var(--warn); }
+.riv-bilancio { list-style: none; margin: 4px 0 0; padding: 6px 0 0; border-top: 1px dashed var(--line); font-size: 12.5px; display: flex; flex-direction: column; gap: 3px; }
+.riv-bilancio span { color: var(--muted); }
+.riv-nemico strong, .riv-ti_ha_battuto strong { color: var(--danger); }
+.riv-battuto strong, .riv-domato strong { color: var(--volt); }

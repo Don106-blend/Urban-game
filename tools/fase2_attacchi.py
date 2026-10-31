@@ -93,7 +93,7 @@ TABELLA = {
     48:  (1, 40, 0, "Spada (150¤): lama con sanguinamento, deve valere il prezzo senza essere un'arma da fuoco"),
     49:  (1, 50, 0, "affondo perforante senza sanguinamento: alternativa al colpo di lama"),
     50:  (3, 140, 3, "EMP: l'effetto (augment/protesi spenti) e' il valore, il danno e' accessorio"),
-    51: (0, 70, 0, "Colpo pesante: costa 2 azioni (35 per azione) e non e' parabile"),
+    51: (0, 70, 0, "Colpo pesante: costa 2 azioni (35 per azione) e non si evita (ne' parata ne' schivata)"),
     52:  (1, 55, 0, ""),
     53:  (3, 72, 1, ""),
     54: (1, 50, 0, ""),                      # Doppio pugno: 2 colpi x 50

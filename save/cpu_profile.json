@@ -1,7 +1,8 @@
 {
- "potere_subito": 0.72,
+ "potere_subito": 0.69,
  "mira": 0.35,
- "stance": 0.5,
- "aggressivita": 0.7,
+ "stance": 0.55,
+ "aggressivita": 0.73,
+ "azzardo": 0.5,
  "bias_matchmaking": 0
 }

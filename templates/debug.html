@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-head">
   <h1>DEBUG</h1>
-  <p class="muted">Strumenti da sviluppo: soldi infiniti, cura totale (resuscita anche i morti), eliminazione eroi.</p>
+  <p class="muted">Strumenti da sviluppo: soldi infiniti, cura totale (resuscita anche i morti), eliminazione eroi, partita nuova.</p>
 </div>
 
 <div class="card-grid">
@@ -12,6 +12,14 @@
     <p class="muted">Imposta i crediti a 999.999.</p>
     <form method="post" action="{{ url_for('debug_crediti') }}">
       <button class="btn btn-volt full">Soldi infiniti</button>
+    </form>
+  </div>
+
+  <div class="fighter-card">
+    <div class="fc-top"><span class="fc-nome">↺ Partita nuova</span></div>
+    <p class="muted">Cancella la partita: palestra vuota, lunedì della prima settimana, crediti di partenza. I dati di apprendimento della CPU restano.</p>
+    <form method="post" action="{{ url_for('debug_nuova_partita') }}" onsubmit="return confirm('Cancellare tutta la partita?');">
+      <button class="btn btn-ghost danger-btn full">Ricomincia</button>
     </form>
   </div>
 
@@ -25,7 +33,7 @@
 </div>
 
 {% if personaggi %}
-<h2 class="debug-sub">Eroi</h2>
+<h2 class="debug-sub">Allievi, istruttori e caduti</h2>
 <div class="card-grid">
   {% for p in personaggi %}
   {% set c = p.rec %}

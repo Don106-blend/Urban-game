@@ -8,6 +8,7 @@
 ## 0. Esito dell'implementazione (2026-10-28)
 
 > **Stato.** Fasi 0–4 applicate. `python balance.py tutto --n 10000 --seed 99` → **0 metriche fuori fascia** (con altri semi M8, M3 e un paio di poteri oscillano di ±1 punto e stanno sul bordo della loro fascia). Il progetto non è un repository git: l'originale è in `..\Urban-game-main_BACKUP_pre-overhaul` e **non ho fatto commit**. `save/` non è stato toccato da test né harness (confrontato byte per byte con il backup); l'unico intervento sui dati reali, su tua conferma, è l'azzeramento di `save/cpu_profile.json` (copia in `save/cpu_profile.json.bak`); l'app, al primo avvio, migra il salvataggio reale (§0.2).
+> **Nota (2026-10-31).** Le scommesse, gli sponsor e l'hype citati sotto (§2, §4, §9) sono stati riscritti come il Banco: puntate con margine, incasso, clausole, folla e azzardi simmetrici per i due lati. Il combattimento di base e M1–M10 non cambiano (l'arena si misura a parte): vedi `AZZARDO.md`.
 > Tutto ciò che segue è misurato col harness sul vero `DuelloWeb`; le sezioni 1–14 qui sotto restano il brief originale (descrivono lo stato *prima*).
 
 ### 0.1 Metriche, prima e dopo

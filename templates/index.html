@@ -3,13 +3,19 @@
 {% block content %}
 <section class="hero">
   <h1 class="hero-title">URBAN<span class="slash">/</span></h1>
-  <p class="hero-sub">Gestisci la tua scuderia di combattenti. Scegli la modalità.</p>
+  <p class="hero-sub">Allena combattenti con poteri che non dovrebbero esistere, in una città che finge di non saperlo.</p>
   <div class="mode-grid">
-    <a class="mode-card arena" href="{{ url_for('box') }}">
-      <div class="mode-kicker">Modalità</div>
-      <div class="mode-name">ARENA</div>
-      <p>Arruola combattenti, gestisci il box, vinci duelli e crediti. I danni sono permanenti — anche la morte.</p>
-      <span class="btn btn-volt">Entra nell'arena →</span>
+    <a class="mode-card arena" href="{{ url_for('palestra_pagina') }}">
+      <div class="mode-kicker">Modalità · la partita</div>
+      <div class="mode-name">LA PALESTRA</div>
+      <p>Sei l'allenatore. Ingaggia aspiranti, riempi la loro settimana di allenamenti, curane il carattere e mandali sul ring. Le ferite restano, i giorni passano, qualcuno non torna.</p>
+      <span class="btn btn-volt">Entra in palestra →</span>
+    </a>
+    <a class="mode-card torneo" href="{{ url_for('torneo') }}">
+      <div class="mode-kicker">Modalità a parte</div>
+      <div class="mode-name">TORNEO <span class="slash">EVO</span></div>
+      <p>Sedici eroi casuali, un potere a testa, eliminazione diretta e un'evoluzione a ogni turno. Una corsa a sé: non tocca la tua palestra e non dà premi.</p>
+      <span class="btn btn-ghost">Gioca un torneo →</span>
     </a>
     <a class="mode-card sandbox" href="{{ url_for('sandbox') }}">
       <div class="mode-kicker">Modalità</div>

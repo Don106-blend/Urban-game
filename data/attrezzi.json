@@ -1,0 +1,37 @@
+[
+  {"id": "sacco", "nome": "Sacco da boxe", "prezzo": 0, "iniziale": true, "regalabile": false,
+   "descrizione": "Il sacco appeso al soffitto, con una toppa di nastro adesivo. Dove si cominciano tutti i giorni.",
+   "effetto": "Base della palestra: allenamento dei riflessi e delle mani."},
+
+  {"id": "tatami", "nome": "Tatami", "prezzo": 0, "iniziale": true, "regalabile": false,
+   "descrizione": "Quattro materassini incastrati con lo scotch. Meglio di niente.",
+   "effetto": "Base della palestra: sparring."},
+
+  {"id": "pesi", "nome": "Panca e bilanciere", "prezzo": 180, "iniziale": false, "regalabile": false,
+   "descrizione": "Una panca che non balla e un bilanciere con i dischi giusti.",
+   "effetto": "Palestra (Fisico): +25% punti.", "bonus": {"sessione": "palestra", "voce": "stat:fisico", "punti": 1.25}},
+
+  {"id": "specchio", "nome": "Parete a specchi", "prezzo": 150, "iniziale": false, "regalabile": true,
+   "descrizione": "Per correggere un gancio che parte sempre mezzo secondo prima.",
+   "effetto": "Palestra (Riflessi): +25% punti.", "bonus": {"sessione": "palestra", "voce": "stat:riflessi", "punti": 1.25}},
+
+  {"id": "lavagna", "nome": "Lavagna tattica", "prezzo": 120, "iniziale": false, "regalabile": true,
+   "descrizione": "Frecce, cerchi e un ring disegnato col gesso: come si scardina una guardia.",
+   "effetto": "Studio: +25% punti.", "bonus": {"sessione": "studio", "punti": 1.25}},
+
+  {"id": "manichino", "nome": "Manichino da sparring", "prezzo": 200, "iniziale": false, "regalabile": false,
+   "descrizione": "Non para e non si lamenta. Chi si allena da solo smette di tirare a vuoto.",
+   "effetto": "Sparring senza compagno: 1 punto e nessun rischio (invece di 0,5).", "solo": true},
+
+  {"id": "infermeria", "nome": "Infermeria", "prezzo": 250, "iniziale": false, "regalabile": false,
+   "descrizione": "Una branda con le lenzuola pulite, una cassetta e un armadietto che chiude a chiave.",
+   "effetto": "Il riposo cura il 50% più in fretta.", "riposo": 1.5},
+
+  {"id": "dormitorio", "nome": "Dormitorio", "prezzo": 300, "iniziale": false, "regalabile": false,
+   "descrizione": "Quattro brande a castello nel retro. Per chi non ha un altro posto dove stare.",
+   "effetto": "+2 posti per gli allievi.", "capienza": 2},
+
+  {"id": "camera_controllo", "nome": "Camera di controllo", "prezzo": 400, "iniziale": false, "regalabile": false,
+   "descrizione": "Un cerchio di cemento rinforzato e un muro che regge quasi tutto.",
+   "effetto": "Controllo: +25% punti e nessuna scarica.", "bonus": {"sessione": "controllo", "punti": 1.25}, "sicuro": "controllo"}
+]

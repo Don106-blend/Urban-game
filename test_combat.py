@@ -398,12 +398,11 @@ def main():
     pal = Personaggio("Alato")
     pal.attiva_potere(pw_ali, [], [], [])
     assert pal.hp["ala_sx"] == 50 and pal.hp_max["ala_dx"] == 50
-    pal.applica_danno("ala_sx", 60)   # 50 diretti, poi 10: 5 all'ala e 5/7 alle altre
-    assert pal.hp["ala_sx"] == -5
-    pal.applica_danno("ala_sx", 100)  # sfonda -50 -> CRIPPLED
-    assert "ala_sx" in pal.crippled
+    pal.applica_danno("ala_sx", 60)   # 50 diretti, poi 10: 5 all'ala e 5/7 alle altre; l'ala e' distrutta: sparisce con il potere
+    assert "ala_sx" not in pal.hp and "ala_dx" not in pal.hp and not pw_ali["attivo"]
     # rango 3: ali da 100 hp
     pw_ali["rango"], pw_ali["attivo"] = 3, False
+    pw_ali.pop("spento_ora", None)                    # (lo slot e' nuovo per un altro personaggio: niente blocco del turno)
     pal3 = Personaggio("Alato3")
     pal3.attiva_potere(pw_ali, [], [], [])
     assert pal3.hp["ala_sx"] == 100
@@ -589,6 +588,16 @@ def main():
     pdis.disattiva_potere(pw2)
     assert not pdis.immune("fuoco") and not pdis.mira_bonus and pdis.n_azioni == AZIONI_BASE
     assert "coda" not in pdis.hp and all(a["id"] != 99 for a in pdis.attacchi)
+    # un potere spento non si riaccende nello stesso turno (rinnovava armatura e cure per un'azione): dal prossimo si'
+    assert not pdis.puo_attivare_potere(pw2) and "in questo turno" in pdis.motivo_blocco_potere(pw2)
+    riga_bl = pdis.attiva_potere(pw2, [att_x], [], [])
+    assert not pw2["attivo"] and "in questo turno" in riga_bl[0] and pdis.n_azioni == AZIONI_BASE and "coda" not in pdis.hp
+    assert not pdis.arto_potere_rotto(pw2)
+    pdis.tick_turno()
+    assert pdis.puo_attivare_potere(pw2) and not pdis.motivo_blocco_potere(pw2)
+    pdis.attiva_potere(pw2, [att_x], [], [])
+    assert pw2["attivo"] and pdis.n_azioni == AZIONI_BASE + 1
+    pdis.disattiva_potere(pw2)
 
     # effetti nel tempo persistenti: non scadono, spariscono con la disattivazione del potere
     pper = Personaggio("Persistente")
@@ -728,9 +737,10 @@ def main():
     t.risolvi_duello(False)
     assert t.fase == "eliminato" and t.campione and len(t.turni) == 4
 
-    # vittoria completa: 4 turni vinti, 4 poteri, il campione entra nel box a LIV 5
+    # vittoria completa: 4 turni vinti, 4 poteri. Il Torneo Evo e' a parte: il campione NON entra in palestra
     t2 = webapp.TorneoEvo()
     n_prima = len(webapp.STATO["personaggi"])
+    crediti_t2 = webapp.STATO["crediti"]
     for _ in range(4):
         t2.fase = "duello"
         t2.risolvi_duello(True)
@@ -740,12 +750,9 @@ def main():
     assert t2.fase == "vittoria" and t2.campione == t2.eroi[t2.io].nome
     assert len(t2.eroi[t2.io].poteri) == 4
     assert t2.eroi[t2.io].stats["controllo"] == 4
-    assert len(webapp.STATO["personaggi"]) == n_prima + 1
-    rec_c = webapp.STATO["personaggi"][-1]
-    assert rec_c["livello"] == 5 and len(rec_c["poteri"]) == 4
-    assert rec_c["bio"] == "Campione del Torneo Evo."
-    webapp.STATO["personaggi"].pop()  # il campione di test non resta nel box vero
-    webapp.salva_stato()
+    assert len(webapp.STATO["personaggi"]) == n_prima, "il campione del torneo non entra in palestra"
+    assert webapp.STATO["crediti"] == crediti_t2, "e il torneo non da' crediti"
+    assert t2.eroi[t2.io].hp == t2.eroi[t2.io].hp_max, "(a fine torneo l'eroe e' a posto, per la schermata finale)"
 
     # 5 poteri elementali completi (rango 1-4): sblocco attacchi + immunità permanente r4
     db5 = carica_db()
@@ -764,7 +771,7 @@ def main():
         p5.attiva_potere(slot5, db5["attacchi"], db5["stances"], db5["effetti"])
         assert p5.immune(tipo_danno)  # la stance_attivate di rango 4 scatta subito
 
-    # arto extra (Ali) a 0 hp: il potere si disattiva da solo e resta bloccato
+    # arto extra (Ali) a 0 hp: il potere si disattiva da solo, le ali spariscono (niente bersagli morti) e dal turno dopo si riaccende
     from engine import carica_db as _cdb2
     dbA = _cdb2()
     poteriA = {p["nome"]: p for p in dbA["poteri"]}
@@ -777,21 +784,50 @@ def main():
     assert pAli.puo_attivare_potere(slotAli)
     pAli.applica_danno("ala_sx", 999, "contundente")  # la spinge a 0 (o sotto)
     assert not slotAli["attivo"]  # si e' disattivato da solo
-    assert not pAli.puo_attivare_potere(slotAli)  # bloccato: l'ala e' ancora rotta
-    righe_blocco = pAli.attiva_potere(slotAli, dbA["attacchi"], dbA["stances"], dbA["effetti"])
-    assert not slotAli["attivo"]  # il tentativo di riattivazione viene rifiutato
-    assert "inutilizzabile" in righe_blocco[0]
-    # una cura esterna riporta le ali sopra 0: ora si puo' riattivare (e tornano a piena vita)
-    # (999 danni sfondano anche l'altra ala via splash: vanno guarite entrambe)
-    pAli.hp["ala_sx"] = 10
-    pAli.hp["ala_dx"] = 10
+    assert "ala_sx" not in pAli.hp and "ala_dx" not in pAli.hp and not pAli.locazione_potere   # niente locazioni rotte rimaste
+    assert not pAli.arto_potere_rotto(slotAli)
+    assert not pAli.puo_attivare_potere(slotAli)      # (spento in questo turno: si riaccende dal prossimo)
+    pAli.tick_turno()
     assert pAli.puo_attivare_potere(slotAli)
     pAli.attiva_potere(slotAli, dbA["attacchi"], dbA["stances"], dbA["effetti"])
-    assert slotAli["attivo"] and pAli.hp["ala_sx"] == pAli.hp_max["ala_sx"]
+    assert slotAli["attivo"] and pAli.hp["ala_sx"] == pAli.hp_max["ala_sx"]   # tornano a piena vita
 
     # una disattivazione MANUALE (non forzata da arto rotto) rimuove la locazione come prima
     pAli.disattiva_potere(slotAli)
     assert "ala_sx" not in pAli.hp and "ala_sx" not in pAli.locazione_potere
+
+    # dal duello web: spento nel turno, non si riaccende finche' non comincia il turno dopo (il menu lo dice)
+    pSp, aSp = Personaggio("Spegni"), Personaggio("Avv")
+    pSp.stats["controllo"] = pSp.stats["fisico"] = 4
+    slotSp = {"def": poteriA["Super Forza"], "rango": 1, "attivo": False}
+    pSp.poteri = [slotSp]
+    dSp = webapp.DuelloWeb(pg=pSp, avversario=aSp)
+    dSp.attivo, dSp.altro, dSp.fase = pSp, aSp, "player"          # (chi comincia lo decide la sorte)
+    pSp.azioni, pSp.bonus = 3, 1
+    idSp = poteriA["Super Forza"]["id"]
+    assert dSp.azione_player({"tipo": "potere", "id": idSp}) is None and slotSp["attivo"]
+    assert dSp.azione_player({"tipo": "disattiva_potere", "id": idSp}) is None and not slotSp["attivo"]
+    err_sp = dSp.azione_player({"tipo": "potere", "id": idSp})
+    assert err_sp and "spento in questo turno" in err_sp and not slotSp["attivo"]
+    voce_sp = next(x for x in dSp.azioni_player()["poteri"] if x["id"] == idSp)
+    assert voce_sp["spento_ora"] and not voce_sp["ok"] and not voce_sp["rotto"]
+    pSp.tick_turno()
+    assert next(x for x in dSp.azioni_player()["poteri"] if x["id"] == idSp)["ok"]
+
+    # la scena lo sa: Supervelocita' (animazioni +25% per rango) e Super Forza (braccia e busto +18,75% per rango) col rango del potere ATTIVO
+    pEx = Personaggio("Effetti")
+    pEx.init_stamina()
+    sl_v = {"def": poteriA["Supervelocità"], "rango": 3, "attivo": False}
+    sl_f = {"def": poteriA["Super Forza"], "rango": 4, "attivo": False}
+    pEx.poteri = [sl_v, sl_f]
+    assert webapp.pannello(pEx, True)["extra"]["velocita"] == 0 and webapp.pannello(pEx, True)["extra"]["forza"] == 0
+    pEx.attiva_potere(sl_v, dbA["attacchi"], dbA["stances"], dbA["effetti"])
+    pEx.attiva_potere(sl_f, dbA["attacchi"], dbA["stances"], dbA["effetti"])
+    ex_ = webapp.pannello(pEx, True)["extra"]
+    assert ex_["velocita"] == 3 and ex_["forza"] == 4
+    pEx.disattiva_potere(sl_v)
+    ex_ = webapp.pannello(pEx, True)["extra"]
+    assert ex_["velocita"] == 0 and ex_["forza"] == 4, "spento il potere la velocita' torna normale"
 
     # stessa meccanica per 2x2 (braccia extra)
     p2x2 = Personaggio("Quattrobraccia")
@@ -875,150 +911,7 @@ def main():
     webapp.STATO["crediti"] = _crediti
     webapp.DUELLO = None
 
-    # ---- arena: bookmaker live, sponsor, pubblico ----
-    rec_arena = {"id": 998, "nome": "Scommettitore", "stats": {s: 1 for s in
-                 ("fisico", "riflessi", "mente", "sociale", "controllo")},
-                 "skills": {}, "poteri": [], "hp": dict(LOCAZIONI), "crippled": [],
-                 "livello": 1, "xp": 0, "token": 0, "toughness": 0, "equip": [],
-                 "vittorie": 0, "sconfitte": 0, "morto": False}
-    _salva2 = webapp.salva_stato
-    webapp.salva_stato = lambda: None
-    webapp.STATO["crediti"] = 1000
-
-    d_ar = webapp.DuelloWeb(dict(rec_arena))
-    d_ar.fase = "player"
-    d_ar.attivo, d_ar.altro = d_ar.p, d_ar.cpu
-    assert d_ar.sponsor_offerte and len(d_ar.sponsor_offerte) == 2  # duello vero: offerte pronte
-
-    # quota: pari forze e pari vita -> vicino alla parità; perdere vita alza la quota (sfavorito)
-    q0 = d_ar.quota_attuale()
-    d_ar.p.hp["busto"] -= d_ar.p.hp_max["busto"] // 2
-    q1 = d_ar.quota_attuale()
-    assert q1 > q0  # meno vita = quota più alta (comeback mechanic)
-
-    # scommessa: piazzata in qualsiasi momento (qui è il turno del player, ma non richiesto)
-    assert d_ar.azione_player({"tipo": "scommetti", "importo": 99999}) == "crediti insufficienti"
-    prima_crediti = webapp.STATO["crediti"]
-    err = d_ar.azione_player({"tipo": "scommetti", "importo": 100})
-    assert err is None
-    assert d_ar.scommessa == {"importo": 100, "quota": q1}
-    assert webapp.STATO["crediti"] == prima_crediti - 100
-    assert d_ar.azione_player({"tipo": "scommetti", "importo": 50}) == "hai già scommesso su questo duello"
-
-    # sponsor: si sceglie tra le offerte, non due volte
-    scelto = d_ar.sponsor_offerte[0]
-    assert d_ar.azione_player({"tipo": "sponsor", "id": scelto["id"]}) is None
-    assert d_ar.sponsor is scelto
-    assert d_ar.azione_player({"tipo": "sponsor", "id": scelto["id"]}) == "hai già scelto uno sponsor"
-
-    # pubblico: hype clampato 0-100, testo e tifo presenti
-    d_ar._hype(1000)
-    assert d_ar.hype == 100
-    d_ar._hype(-1000)
-    assert d_ar.hype == 0
-    stato_pub = d_ar.pubblico_stato()
-    assert "testo" in stato_pub and "tifo" in stato_pub
-
-    # arena assente nel Torneo Evo (self.rec is None)
-    pT, cT = Personaggio("PT"), Personaggio("CT")
-    _dot(pT, webapp.DB["attacchi"], webapp.DB["stances"])
-    _dot(cT, webapp.DB["attacchi"], webapp.DB["stances"])
-    d_torneo2 = webapp.DuelloWeb(pg=pT, avversario=cT)
-    assert d_torneo2.sponsor_offerte is None
-    assert d_torneo2.info_arena() is None
-    assert d_torneo2.azione_player({"tipo": "scommetti", "importo": 10}) == "questa modalità non ha scommesse"
-
-    # sponsor "lampo": vince entro il round 3 -> condizione rispettata; oltre, fallita
-    d_lampo = webapp.DuelloWeb(dict(rec_arena, nome="Lampo"))
-    d_lampo.round = 2
-    assert d_lampo._sponsor_condizione({"id": "lampo"}) is True
-    assert not d_lampo._sponsor_fallito({"id": "lampo"})
-    d_lampo.round = 5
-    assert d_lampo._sponsor_condizione({"id": "lampo"}) is False
-    assert d_lampo._sponsor_fallito({"id": "lampo"})
-
-    # sponsor "bestia"/"stoico": mutuamente esclusivi sull'uso dei poteri
-    d_pot = webapp.DuelloWeb(dict(rec_arena, nome="Potente"))
-    assert d_pot._sponsor_condizione({"id": "bestia"}) is False
-    assert d_pot._sponsor_condizione({"id": "stoico"}) is True
-    d_pot.usato_potere = True
-    assert d_pot._sponsor_condizione({"id": "bestia"}) is True
-    assert d_pot._sponsor_condizione({"id": "stoico"}) is False
-    assert d_pot._sponsor_fallito({"id": "stoico"})  # ha già usato un potere: impossibile ormai
-
-    # sponsor "incassatore": bisogna essere scesi sotto il 30% degli hp totali
-    d_inc = webapp.DuelloWeb(dict(rec_arena, nome="Incassa"))
-    assert d_inc._sponsor_condizione({"id": "incassatore"}) is False
-    d_inc.min_hp_pct = 0.2
-    assert d_inc._sponsor_condizione({"id": "incassatore"}) is True
-
-    # payout a fine duello: scommessa vinta paga importo*quota, sponsor paga solo se la
-    # condizione (oltre alla vittoria) è rispettata
-    d_fin = webapp.DuelloWeb(dict(rec_arena, nome="Finale"))
-    d_fin.scommessa = {"importo": 100, "quota": 3.0}
-    d_fin.sponsor = {"id": "lampo", "nome": "Sponsor Lampo", "bonus": 150,
-                     "descrizione": "Paga se vinci entro il round 3."}
-    d_fin.round = 2  # entro il round 3: condizione rispettata
-    d_fin.finito = True
-    d_fin.vincitore = d_fin.p
-    prima = webapp.STATO["crediti"]
-    webapp.DUELLO = d_fin
-    webapp.chiudi_duello()
-    atteso = prima + webapp.RICOMPENSA_VITTORIA + 300 + 150  # vittoria + scommessa(100*3) + sponsor
-    assert webapp.STATO["crediti"] == atteso, (webapp.STATO["crediti"], atteso)
-
-    webapp.salva_stato = _salva2
-    webapp.DUELLO = None
-
-    # ---- arena nel Torneo Evo: montepremi accumulato, riscattato solo da campioni ----
-    _salva3 = webapp.salva_stato
-    webapp.salva_stato = lambda: None
-    webapp.STATO["crediti"] = 500
-
-    t3 = webapp.TorneoEvo()
-    t3.fase = "pronto"
-    avv3 = t3.eroi[t3.avversario_idx()]
-    d_t3 = webapp.DuelloWeb(pg=t3.eroi[t3.io], avversario=avv3, torneo=t3)
-    d_t3.fase = "player"
-    d_t3.attivo, d_t3.altro = d_t3.p, d_t3.cpu
-    assert d_t3.arena_attiva and d_t3.sponsor_offerte  # arena attiva anche nel torneo
-    assert d_t3.info_arena()["torneo_pot"] == 0
-
-    # la puntata nel torneo NON tocca i crediti reali (è virtuale finché non vinci tutto)
-    crediti_prima3 = webapp.STATO["crediti"]
-    assert d_t3.azione_player({"tipo": "scommetti", "importo": 999999}) == \
-        f"puntata massima nel torneo: {webapp.MAX_SCOMMESSA_TORNEO}¤"
-    err3 = d_t3.azione_player({"tipo": "scommetti", "importo": 100})
-    assert err3 is None
-    assert webapp.STATO["crediti"] == crediti_prima3  # invariati: è virtuale
-
-    # una vittoria di round accumula la vincita nel montepremi del torneo, non nei crediti
-    d_t3.vincitore = d_t3.p
-    t3.risolvi_duello(True, d_t3)
-    assert t3.bonus_accumulato == int(100 * d_t3.scommessa["quota"])
-    assert webapp.STATO["crediti"] == crediti_prima3  # ancora invariati
-
-    # eliminazione: il montepremi accumulato va perso (mai accreditato)
-    pot_prima_eliminazione = t3.bonus_accumulato
-    assert pot_prima_eliminazione > 0
-    t4 = webapp.TorneoEvo()
-    t4.bonus_accumulato = 777
-    t4.fase = "pronto"
-    t4.risolvi_duello(False)  # sconfitta: nessun duello arena da risolvere qui, solo il forfeit del pot
-    assert t4.fase == "eliminato"
-    assert any("perso" in r for r in t4.log_arena)
-    assert webapp.STATO["crediti"] == crediti_prima3  # il pot perso non è mai finito nei crediti
-
-    # vittoria del torneo: _premia() riscatta l'intero montepremi accumulato in crediti veri
-    t5 = webapp.TorneoEvo()
-    t5.bonus_accumulato = 321
-    crediti_prima5 = webapp.STATO["crediti"]
-    t5._premia()
-    assert webapp.STATO["crediti"] == crediti_prima5 + 321
-    assert any("Campione" in r for r in t5.log_arena)
-    webapp.STATO["personaggi"].pop()  # pulizia del campione fittizio di test
-
-    webapp.salva_stato = _salva3
+    # ---- arena: puntate, clausole, folla e azzardi (il Banco) -> test_azzardo.py ----
 
     # ================= umanità, armatura, protesi, augment, EMP, colpi multipli =================
     from engine import umanita_max, dotazione_base
@@ -1494,18 +1387,19 @@ def overhaul(webapp):
     esito = subprocess.run([sys.executable, os.path.join("tools", "fase2_attacchi.py")],
                            capture_output=True, text=True, cwd=os.path.dirname(os.path.abspath(__file__)))
     assert esito.returncode == 0, esito.stdout[-400:] + esito.stderr[-400:]
-    # 3A kit base: Pugno (1 azione) + Colpo pesante (2 azioni, non parabile)
+    # 3A kit base: Pugno (1 azione) + Colpo pesante (2 azioni, non si evita: ne' parata ne' schivata)
     pk = Personaggio("Kit")
     dotazione_base(pk, db["attacchi"], db["stances"])
     nomi_kit = {a["nome"]: a for a in pk.attacchi}
     assert set(nomi_kit) == {"Pugno", "Colpo pesante"}
     assert costo_azioni(nomi_kit["Pugno"]) == 1 and costo_azioni(nomi_kit["Colpo pesante"]) == 2
-    assert nomi_kit["Colpo pesante"]["parabile"] is False
+    assert nomi_kit["Colpo pesante"]["parabile"] is False and nomi_kit["Colpo pesante"]["can_dodge"] is False
     pk.azioni = 1                                             # con 1 sola azione il pesante non si paga
     assert [a["nome"] for a in pk.attacchi_giocabili()] == ["Pugno"]
     pk.azioni = 2
     assert {a["nome"] for a in pk.attacchi_giocabili()} == {"Pugno", "Colpo pesante"}
-    # usa_attacco toglie il costo in azioni; il pesante non offre la parata, la schivata si'
+    # usa_attacco toglie il costo in azioni; il pesante non offre ne' la parata ne' la schivata: si risolve sui riflessi, e la risposta
+    # del round resta a chi difende (era la schivata, che riesce sempre, a rendere il pesante inutile: balance.py decisioni)
     ka, kd = Personaggio("KitA"), Personaggio("KitD")
     for q in (ka, kd):
         dotazione_base(q, db["attacchi"], db["stances"])
@@ -1514,9 +1408,7 @@ def overhaul(webapp):
     ka.azioni, kd.risposte = 3, 1
     dk.usa_attacco(nomi_kit["Colpo pesante"])
     assert ka.azioni == 1
-    assert dk.pending is not None and "parata" not in dk.pending["opzioni"]
-    assert "schivata" in dk.pending["opzioni"]
-    dk.risolvi_risposta("nessuna risposta")
+    assert dk.pending is None and kd.risposte == 1, "niente scelta di difesa: il colpo e' gia' risolto"
     kd.risposte = 1                                           # il Paladino para anche cio' che non e' parabile
     kd.stance_attive.append({"def": {"id": 1, "modificatori": [{"tipo": "parata_sempre"}]}, "turni": -1})
     ka.azioni = 3
@@ -1553,8 +1445,9 @@ def overhaul(webapp):
         dm2.risolvi_risposta("nessuna risposta")
     ma.azioni, mb.risposte = 2, 1                        # il pesante: ne' mirato ne' consuma la mira
     dm2.usa_attacco(pw_m)
-    assert dm2.pending["pen_mira"] == 0 and not dm2.pending["mirata"] and ma.mira == "testa"
-    dm2.risolvi_risposta("nessuna risposta")
+    assert dm2.pending is None and ma.mira == "testa"      # (non si evita: si risolve da solo, sui riflessi)
+    ev_pes = [e for e in dm2.eventi if e["tipo"] == "colpo"][-1]
+    assert ev_pes["pen_mira"] == 0 and not ev_pes["mirata"]
     dm2.fine_turno()                                     # la mira non si porta nel turno dopo
     assert ma.mira is None
 
@@ -1670,9 +1563,10 @@ def overhaul(webapp):
     assert rec_s["bias"] == webapp.BIAS_MAX - 1
     assert "bias" not in webapp.PROFILO or webapp.PROFILO.get("bias_matchmaking", 0) == salvato_prof.get("bias_matchmaking", 0)
     # un profilo saturo (come nel save dell'utente) viene riportato nei limiti in lettura
-    saturo = webapp._limita({"potere_subito": 0.95, "mira": 0.95, "stance": 0.95, "aggressivita": 0.95})
+    saturo = webapp._limita({"potere_subito": 0.95, "mira": 0.95, "stance": 0.95, "aggressivita": 0.95, "azzardo": 0.95})
     for k, (lo, hi) in webapp.LIMITI_PROFILO.items():
         assert lo <= saturo[k] <= hi
+    assert "azzardo" not in webapp._limita({"mira": 0.2})      # un profilo di prima dell'azzardo non si rompe
     webapp.PROFILO.clear()
     webapp.PROFILO.update(salvato_prof)
 
@@ -1700,9 +1594,9 @@ def overhaul(webapp):
     for q in (qa, qb):
         dotazione_base(q, db["attacchi"], db["stances"])
     dq = webapp.DuelloWeb(pg=qa, avversario=qb)
-    assert abs(dq.prob_vittoria() - 0.5) < 1e-9 and dq.quota_attuale() == 2.2   # pari: 50%, 2.2x
+    assert abs(dq.prob_vittoria() - 0.5) < 1e-9 and dq.quota_attuale() == 1.8   # pari: 50%, 1,8x (la casa trattiene il 10%)
     qa.stats["fisico"] = 4                                                      # il player e' piu' forte
-    assert dq.prob_vittoria() > 0.5 and dq.quota_attuale() < 2.2
+    assert dq.prob_vittoria() > 0.5 and dq.quota_attuale() < 1.8
     qa.stats["fisico"] = 1
     q_pari = dq.quota_attuale()
     qa.hp["busto"] -= 100                                                       # perde vita: sfavorito
@@ -1711,7 +1605,7 @@ def overhaul(webapp):
         qb.stats[tipo] = 4
     qb.skills = {k: 4 for k in qb.skills}
     qa.hp = {l: 1 for l in qa.hp}
-    assert 1.1 <= dq.quota_attuale() <= 6.0
+    assert 1.1 <= dq.quota_attuale() <= 10.0
     qa.hp = dict(qa.hp_max)
     assert webapp.valuta(qb) > webapp.valuta(qa)
     # lo scontro tra CPU del torneo segue la stessa logistica: +30 di valuta = ~75-80%
@@ -1919,6 +1813,54 @@ def overhaul(webapp):
     assert len({asp.combinazione(e.aspetto) for e in tasp.eroi}) == 16
     assert all(asp.valido(e.aspetto) and tag[e.aspetto["capelli"]] == asp.sesso_da_nome(e.nome) for e in tasp.eroi)
     assert webapp.nuovo_record(tasp.eroi[0])["aspetto"] == tasp.eroi[0].aspetto
+
+    # ---- texture delle ferite (tipo di danno per locazione) e extra (ali, braccia, volo) nel pannello ----
+    from engine import Personaggio as _P
+    pf = _P("Fiammetta")
+    assert pf.danni_tipo == {}
+    pf.applica_danno("busto", 20, "fuoco")
+    pf.applica_danno("busto", 10, "acido")
+    pf.applica_danno("busto", 5, "fuoco")
+    pf.applica_danno("braccio_dx", 15, "elettrico")
+    assert pf.danni_tipo["busto"] == {"fuoco": 25, "acido": 10} and pf.danni_tipo["braccio_dx"] == {"elettrico": 15}
+    pf.applica_danno("testa", 60, "acido", split=True)                 # i danni diffusi contano su ogni locazione
+    assert all(pf.danni_tipo[l]["acido"] == 60 // 6 for l in ("testa", "gamba_sx")) and pf.danni_tipo["busto"]["acido"] == 20
+    pan = webapp.pannello(pf, False)
+    assert pan["hp"]["busto"]["tipi"] == pf.danni_tipo["busto"] and pan["hp"]["gamba_dx"]["tipi"] == {"acido": 10}
+    assert pan["extra"] == {"ali": False, "braccia": False, "volo": False, "velocita": 0, "forza": 0}
+    pf.poteri.append({"def": next(x for x in webapp.DB["poteri"] if x["nome"] == "Ali"), "rango": 1, "attivo": False})
+    pf.poteri.append({"def": next(x for x in webapp.DB["poteri"] if x["nome"] == "2x2"), "rango": 1, "attivo": True})
+    pf.stance_attive.append({"def": next(x for x in webapp.DB["stances"] if x["nome"] == "Volo"), "turni": 3})
+    assert webapp.pannello(pf, False)["extra"] == {"ali": False, "braccia": True, "volo": True, "velocita": 0, "forza": 0}   # solo cio' che e' ATTIVO
+    pf.poteri[0]["attivo"] = True
+    assert webapp.pannello(pf, False)["extra"]["ali"] is True
+    # il torneo cura tutto (anche la memoria dei tipi di danno)
+    tcura = webapp.TorneoEvo()
+    tcura.eroi[0].applica_danno("busto", 30, "fuoco")
+    tcura._cura_totale(tcura.eroi[0])
+    assert tcura.eroi[0].danni_tipo == {}
+    # i vestiti nuovi: 33 maglie (10 cyberpunk) e 23 pantaloni, e un aspetto puo' sceglierli
+    assert len(man_asp["maglie"]) == 44 and len(man_asp["pantaloni"]) == 23 and "ali" in man_asp
+    cyber = {"led", "tattico", "impermeabile", "circuiti", "spallacci", "cromato", "rete", "tuta", "borchie", "olo"}
+    assert cyber <= {x["id"] for x in man_asp["maglie"]}, "le dieci maglie cyberpunk"
+    assert all(len(x["colore"]) == 3 for x in man_asp["maglie"] if "colore" in x) and any("colore" in x for x in man_asp["maglie"] if x["id"] in cyber)
+    scelti = {(a["maglia"], a["pantaloni"]) for a in (asp.genera("Teo Costa") for _ in range(1500))}
+    assert {m for m, _ in scelti} == {x["id"] for x in man_asp["maglie"]} and {p_ for _, p_ in scelti} == {x["id"] for x in man_asp["pantaloni"]}
+
+    # ---- copricapo: 5 cappelli e 10 maschere (5 cyberpunk), alcuni (non tutti) li portano, sempre compatibili con i capelli ----
+    cop = {c["id"]: c for c in man_asp["copricapo"]}
+    assert len(cop) == 15 and sum(c["tipo"] == "cappello" for c in cop.values()) == 5 and sum(c["tipo"] == "maschera" for c in cop.values()) == 10
+    assert {"visore", "respiratore", "oculare", "casco", "cyborg"} <= set(cop) and cop["casco"]["nascondi_capelli"]
+    random.seed(9)
+    gen = [asp.genera("Teo Costa" if k % 2 else "Luna Costa") for k in range(1500)]
+    con = [a for a in gen if a["copricapo"]]
+    assert 0.3 < len(con) / len(gen) < 0.5 and {a["copricapo"] for a in con} == set(cop), "circa il 40% porta un copricapo, di tutti i tipi"
+    assert all(a["capelli"] not in cop[a["copricapo"]]["non_con"] for a in con), "mai un cappello con una capigliatura che ne esce"
+    assert all(asp.valido(a) for a in gen) and not asp.valido(dict(gen[0], copricapo="zz"))
+    # i salvataggi di prima dei copricapo ricevono la chiave una volta sola (anche None), senza cambiare il resto
+    vecchio_a = {k: v for k, v in gen[0].items() if k != "copricapo"}
+    assert asp.valido(vecchio_a) and asp.completa(vecchio_a) is True and "copricapo" in vecchio_a and asp.completa(vecchio_a) is False
+    assert webapp.assegna_aspetti({"personaggi": [{"nome": "Teo Costa", "aspetto": {k: v for k, v in gen[1].items() if k != "copricapo"}}], "contratti": []}) is True
 
 
 if __name__ == "__main__":

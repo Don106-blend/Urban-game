@@ -1,12 +1,24 @@
 {% extends "base.html" %}
 {% block title %}{{ c.nome }} — Urban{% endblock %}
 {% block content %}
+{% set indietro = url_for('personaggio', pid=c.id) %}
 <div class="cv">
   <aside class="cv-side">
-    <div class="cv-avatar">{{ c.nome[:1] }}</div>
-    <h1 class="cv-nome">{{ c.nome }}</h1>
+    <div class="fc-preview cv-preview {{ 'stato-morto' if stato == 'morto' }}"><canvas class="anteprima" data-aspetto='{{ c.aspetto|tojson|forceescape }}' aria-label="Anteprima di {{ c.nome }}"></canvas></div>
+    <h1 class="cv-nome">{{ nome_completo }}</h1>
     <span class="badge badge-{{ stato }}">{{ stato|upper }}</span>
-    <div class="cv-liv">LIVELLO {{ c.livello }}</div>
+    <div class="cv-liv">LIVELLO {{ c.livello }}{% if istruttore %} · ISTRUTTORE{% endif %}</div>
+    {% if not istruttore and stato != 'morto' %}
+    <form class="cv-sopr" method="post" action="{{ url_for('personaggio_soprannome', pid=c.id) }}">
+      {% if c.livello >= sopr_livello %}
+      <label class="muted" for="sopr" title="I soprannomi vengono dai suoi poteri: cambiali quando vuoi">Soprannome</label>
+      <select id="sopr" name="soprannome" onchange="this.form.submit()">
+        <option value="">— nessuno —</option>
+        {% for s in sopr_pool %}<option value="{{ s }}" {{ 'selected' if s == c.soprannome }}>{{ s }}</option>{% endfor %}
+      </select>
+      {% else %}<span class="muted">Soprannome: dal livello {{ sopr_livello }}</span>{% endif %}
+    </form>
+    {% endif %}
 
     <div class="cv-xp">
       <div class="xp-label">XP {{ c.xp or 0 }} / {{ soglia }}</div>
@@ -21,17 +33,38 @@
       <span>⚕ Umanità: <b>{{ umanita_max - umanita_usata }}</b> / {{ umanita_max }}</span>
     </div>
 
+    {% if not istruttore and stato != 'morto' %}
+    <div class="barre-fs cv-fs">
+      <div title="Con poca fiducia ({{ soglia_rifiuto }} o meno) rifiuta i duelli e salta gli allenamenti">
+        <span class="muted">Fiducia {{ c.fiducia }}</span>
+        <div class="hpbar"><div class="hpbar-fill {{ 'pct-hi' if c.fiducia >= 50 else ('pct-mid' if c.fiducia >= 25 else 'pct-low') }}" style="width: {{ c.fiducia }}%"></div></div>
+      </div>
+      <div title="Lo stress alto fa aumentare gli infortuni; a 100 si crolla">
+        <span class="muted">Stress {{ c.stress }}</span>
+        <div class="hpbar"><div class="hpbar-fill {{ 'pct-hi' if c.stress < 50 else ('pct-mid' if c.stress < 80 else 'pct-low') }}" style="width: {{ c.stress }}%"></div></div>
+      </div>
+    </div>
+    {% endif %}
+
     <dl class="cv-anagrafica">
-      <dt>Data di nascita</dt><dd>{{ c.data_nascita or "—" }}</dd>
-      <dt>Bio</dt><dd>{{ c.bio or "—" }}</dd>
-      <dt>Movimento</dt><dd>standard</dd>
+      <dt>Età</dt><dd>{{ eta }} anni <span class="muted">(nato il {{ c.data_nascita or "—" }})</span></dd>
+      <dt>Storia</dt><dd>{{ bio or "—" }}</dd>
       <dt>Record</dt><dd>{{ c.vittorie }}V — {{ c.sconfitte }}S</dd>
       <dt>Toughness</dt><dd>{{ c.toughness or 0 }}</dd>
       {% if recupero %}
-      <dt>Recupero stimato</dt><dd>~{{ recupero // 60 }}h {{ recupero % 60 }}m</dd>
+      <dt>Per guarire</dt><dd>~{{ recupero }} giorni di riposo</dd>
+      {% endif %}
+      {% if istruttore %}
+      <dt>Insegna</dt><dd>{{ voce_istruttore }}</dd>
       {% endif %}
     </dl>
-    <a class="btn btn-ghost" href="{{ url_for('box') }}">← Torna al box</a>
+    <a class="btn btn-ghost" href="{{ url_for('palestra_pagina') }}">← Torna alla palestra</a>
+    {% if stato != 'morto' %}
+    <form method="post" action="{{ url_for('personaggio_congeda', pid=c.id) }}"
+          onsubmit="return confirm('Congedare {{ c.nome }}? Lascia la palestra per sempre (armi e armatura restano in magazzino).');">
+      <button class="btn btn-ghost danger-btn">Congeda</button>
+    </form>
+    {% endif %}
   </aside>
 
   <section class="cv-main">
@@ -53,6 +86,32 @@
       </div>
       {% endfor %}
     </div>
+
+    {% if not istruttore and stato != 'morto' %}
+    <h2>Carattere</h2>
+    <div class="tratti-elenco">
+      {% for t in tratti %}
+      <div class="tratto-card">
+        <b>{{ t.nome }}</b> <span class="muted">— {{ t.descrizione }}</span>
+        <div class="tratto-effetto">{{ t.effetto }}</div>
+      </div>
+      {% endfor %}
+      {% for _ in range(nascosti) %}
+      <div class="tratto-card nascosto"><b>?</b> <span class="muted">Un altro tratto non ancora scoperto: lo capirai dopo una settimana di convivenza, o parlandoci.</span></div>
+      {% endfor %}
+    </div>
+    <div class="colloquio">
+      <span class="muted">Parlare con {{ c.nome.split(' ')[0] }} (una volta a settimana):</span>
+      {% for a in approcci %}
+      <form method="post" action="{{ url_for('personaggio_colloquio', pid=c.id) }}">
+        <input type="hidden" name="approccio" value="{{ a }}">
+        <button class="btn btn-ghost" {{ '' if puo_parlare else 'disabled' }}
+                title="{{ {'incoraggia': 'Fargli coraggio, dirgli che ce la farà.', 'rimprovera': 'Essere duro: pretendere di più.', 'ascolta': 'Lasciarlo parlare, senza giudicare.'}[a] }}">{{ a|capitalize }}</button>
+      </form>
+      {% endfor %}
+      {% if not puo_parlare %}<span class="muted">già fatto questa settimana</span>{% endif %}
+    </div>
+    {% endif %}
 
     <h2>Statistiche</h2>
     <div class="stat-grid">
@@ -108,6 +167,7 @@
           <p class="muted">{{ e.descrizione }}</p>
           <form method="post" action="{{ url_for('negozio_disequip') }}">
             <input type="hidden" name="pid" value="{{ c.id }}">
+            <input type="hidden" name="indietro" value="{{ indietro }}">
             <input type="hidden" name="categoria" value="arma">
             <input type="hidden" name="iid" value="{{ e.id }}">
             <button class="btn btn-ghost danger-btn">✕ Rimuovi</button>
@@ -129,6 +189,7 @@
           <p class="muted">{{ armatura.descrizione }}</p>
           <form method="post" action="{{ url_for('negozio_disequip') }}">
             <input type="hidden" name="pid" value="{{ c.id }}">
+            <input type="hidden" name="indietro" value="{{ indietro }}">
             <input type="hidden" name="categoria" value="armatura">
             <button class="btn btn-ghost danger-btn">✕ Rimuovi</button>
           </form>
@@ -148,6 +209,7 @@
           <p class="muted">{{ pr.def.descrizione }}</p>
           <form method="post" action="{{ url_for('negozio_disequip') }}">
             <input type="hidden" name="pid" value="{{ c.id }}">
+            <input type="hidden" name="indietro" value="{{ indietro }}">
             <input type="hidden" name="categoria" value="protesi">
             <input type="hidden" name="iid" value="{{ pr.def.id }}">
             <button class="btn btn-ghost danger-btn">✕ Rimuovi</button>
@@ -170,6 +232,7 @@
           <p class="muted">{{ ag.descrizione }}</p>
           <form method="post" action="{{ url_for('negozio_disequip') }}">
             <input type="hidden" name="pid" value="{{ c.id }}">
+            <input type="hidden" name="indietro" value="{{ indietro }}">
             <input type="hidden" name="categoria" value="augment">
             <input type="hidden" name="iid" value="{{ ag.id }}">
             <button class="btn btn-ghost danger-btn">✕ Rimuovi</button>
@@ -180,17 +243,23 @@
     {% endif %}
 
     <h2>Level up</h2>
+    <p class="muted">Salire di rango costa un Token 🧬 (lo danno i livelli, cioè i duelli) <b>e</b> richiede che la voce sia
+      <b>matura</b>: {{ punti_rango }} punti per il rango 2, il doppio per il 3, il quadruplo per il 4. I punti si guadagnano
+      allenandosi. Il costo in Token raddoppia a ogni grado (1, 2, 4). Il rango di un potere non può superare quello di Controllo.</p>
     {% if not (c.token or 0) %}
-      <p class="muted">Nessun Token 🧬 disponibile: vinci combattimenti per guadagnare XP e salire di livello.</p>
+      <p class="muted">Nessun Token disponibile: vinci combattimenti per guadagnare XP e salire di livello.</p>
     {% endif %}
-    <p class="muted">Un Token 🧬 per level up. Il costo raddoppia a ogni grado (1, 2, 4).
-      Il rango di un potere non può superare il rango di controllo.</p>
-    <div class="upgrade-grid">
+    <div class="upgrade-grid maturo-grid">
       {% for u in upgrades %}
-      <form method="post" action="{{ url_for('personaggio_upgrade', pid=c.id) }}" class="upgrade-row">
+      <form method="post" action="{{ url_for('personaggio_upgrade', pid=c.id) }}" class="upgrade-row {{ 'maturo' if u.maturo }}">
         <input type="hidden" name="tipo" value="{{ u.tipo }}">
         <input type="hidden" name="nome" value="{{ u.nome }}">
-        <span class="upg-label">{{ u.label }} <span class="muted">r{{ u.rango }} → r{{ u.rango + 1 }}</span></span>
+        <span class="upg-label">{{ u.label }} <span class="muted">r{{ u.rango }} → r{{ u.rango + 1 }}</span>
+          <span class="maturazione" title="Maturazione: {{ u.punti }} / {{ u.richiesti }}">
+            <span class="maturazione-fill" style="width: {{ [100, (u.punti * 100 / u.richiesti)|round|int]|min }}%"></span>
+          </span>
+          <span class="muted maturazione-txt">{{ u.punti|string|replace('.', ',') }}/{{ u.richiesti }}{% if u.maturo %} · matura{% endif %}</span>
+        </span>
         <button class="btn btn-ghost upg-btn" {{ '' if u.ok and (c.token or 0) >= u.costo else 'disabled' }}
                 title="{{ u.motivo }}">
           {{ u.costo }} 🧬{% if u.motivo %} — {{ u.motivo }}{% endif %}
@@ -198,6 +267,62 @@
       </form>
       {% endfor %}
     </div>
+
+    {% if not istruttore and stato != 'morto' %}
+    <h2>Programma della settimana</h2>
+    <p class="muted">Cosa fa ogni giorno quando non ha un duello. Il programma si ripete da solo ogni settimana. Con il riposo
+      automatico, se è troppo malconcio per la sessione di quel giorno riposa (tranne chi è Cocciuto).</p>
+    <form method="post" action="{{ url_for('personaggio_programma', pid=c.id) }}" class="programma">
+      <div class="prog-giorni">
+        {% for g in giorni %}
+        {% set gi = loop.index0 %}
+        <label><span class="muted">{{ g[:3] }}</span>
+          <select name="giorno{{ gi }}" class="select">
+            {% for sid in sessioni_piano %}
+            <option value="{{ sid }}" {{ 'selected' if c.piano[gi] == sid }}>{{ sessioni[sid].nome }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        {% endfor %}
+      </div>
+      <h3 class="prog-sub">Cosa allena in ciascuna sessione</h3>
+      <div class="prog-focus">
+        {% for sid, f in focus.items() %}
+        <label><span class="muted">{{ sessioni[sid].nome }}</span>
+          <select name="focus_{{ sid }}" class="select">
+            {% for v in f.voci %}
+            <option value="{{ v.chiave }}" {{ 'selected' if v.chiave == f.scelta }} {{ 'disabled' if v.pieno }}>{{ v.nome }} r{{ v.rango }}{% if v.pieno %} (al massimo){% elif v.maturo %} · matura{% else %} · {{ v.punti|string|replace('.', ',') }}/{{ v.richiesti }}{% endif %}</option>
+            {% endfor %}
+          </select>
+        </label>
+        {% endfor %}
+        <label class="prog-auto"><input type="checkbox" name="auto_riposo" {{ 'checked' if c.auto_riposo is not defined or c.auto_riposo }}> Riposo automatico se è troppo ferito</label>
+      </div>
+      <button class="btn btn-volt">Salva il programma</button>
+    </form>
+
+    {% if legami %}
+    <h2>Legami</h2>
+    <div class="legami">
+      {% for altro, l in legami %}
+      <a class="legame-riga" href="{{ url_for('personaggio', pid=altro.id) }}">
+        <span>{{ altro.nome }}</span>
+        <span class="legame-barra"><span class="legame-fill {{ 'neg' if l < 0 else 'pos' }}" style="width: {{ (l|abs) / 2 }}%;{% if l < 0 %} right: 50%;{% else %} left: 50%;{% endif %}"></span></span>
+        <span class="muted">{{ 'amici' if l >= 40 else ('rivali' if l <= -30 else ('affiatati' if l >= 15 else ('freddi' if l <= -10 else 'conoscenti'))) }}</span>
+      </a>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% endif %}
+
+    {% if registro %}
+    <h2>Registro</h2>
+    <ul class="registro-lista">
+      {% for r in registro %}<li><span class="muted">giorno {{ r.g + 1 }}</span> {{ r.t }}</li>{% endfor %}
+    </ul>
+    {% endif %}
   </section>
 </div>
+<script src="{{ url_for('static', filename='arena.js') }}"></script>
+<script src="{{ url_for('static', filename='anteprima.js') }}" data-ripeti></script>
 {% endblock %}

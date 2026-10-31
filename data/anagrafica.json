@@ -1,0 +1,149 @@
+{
+  "descrizione": "Da dove vengono i combattenti: mestieri e quartieri. I quartieri sono anche i distretti dell'Opzione B (OPZIONE_B_CIRCUITO.md): `origine` di un combattente e' l'id del distretto.",
+  "mestieri": [
+    {
+      "m": "Ex scaricatore di porto",
+      "f": "Ex scaricatrice di porto"
+    },
+    {
+      "m": "Corriere in bici",
+      "f": "Corriera in bici"
+    },
+    {
+      "m": "Ex militare",
+      "f": "Ex militare"
+    },
+    {
+      "m": "Pugile dilettante",
+      "f": "Pugile dilettante"
+    },
+    {
+      "m": "Barista del turno di notte",
+      "f": "Barista del turno di notte"
+    },
+    {
+      "m": "Meccanico",
+      "f": "Meccanica"
+    },
+    {
+      "m": "Muratore",
+      "f": "Muratrice"
+    },
+    {
+      "m": "Infermiere",
+      "f": "Infermiera"
+    },
+    {
+      "m": "Buttafuori",
+      "f": "Buttafuori"
+    },
+    {
+      "m": "Elettricista",
+      "f": "Elettricista"
+    },
+    {
+      "m": "Fattorino",
+      "f": "Fattorina"
+    },
+    {
+      "m": "Cuoco di una mensa",
+      "f": "Cuoca di una mensa"
+    },
+    {
+      "m": "Saldatore",
+      "f": "Saldatrice"
+    },
+    {
+      "m": "Smanettone di quartiere",
+      "f": "Smanettona di quartiere"
+    },
+    {
+      "m": "Ex detenuto",
+      "f": "Ex detenuta"
+    },
+    {
+      "m": "Autista di notte",
+      "f": "Autista di notte"
+    },
+    {
+      "m": "Magazziniere",
+      "f": "Magazziniera"
+    },
+    {
+      "m": "Tatuatore",
+      "f": "Tatuatrice"
+    },
+    {
+      "m": "Ambulante",
+      "f": "Ambulante"
+    },
+    {
+      "m": "Guardia giurata",
+      "f": "Guardia giurata"
+    },
+    {
+      "m": "Pescatore",
+      "f": "Pescatrice"
+    },
+    {
+      "m": "Studente di medicina fuori corso",
+      "f": "Studentessa di medicina fuori corso"
+    },
+    {
+      "m": "Imbianchino",
+      "f": "Imbianchina"
+    },
+    {
+      "m": "Lottatore di strada",
+      "f": "Lottatrice di strada"
+    },
+    {
+      "m": "Ex poliziotto",
+      "f": "Ex poliziotta"
+    },
+    {
+      "m": "Cameriere",
+      "f": "Cameriera"
+    },
+    {
+      "m": "Portiere d'albergo",
+      "f": "Portiera d'albergo"
+    },
+    {
+      "m": "Operaio di una fonderia",
+      "f": "Operaia di una fonderia"
+    }
+  ],
+  "quartieri": [
+    {
+      "id": "porto",
+      "nome": "il Porto",
+      "di": "del Porto"
+    },
+    {
+      "id": "fonderie",
+      "nome": "le Fonderie",
+      "di": "delle Fonderie"
+    },
+    {
+      "id": "scalo",
+      "nome": "lo Scalo Nord",
+      "di": "dello Scalo Nord"
+    },
+    {
+      "id": "periferia",
+      "nome": "la Periferia Est",
+      "di": "della Periferia Est"
+    },
+    {
+      "id": "centro",
+      "nome": "il Centro Vecchio",
+      "di": "del Centro Vecchio"
+    },
+    {
+      "id": "sotterranei",
+      "nome": "i Sotterranei",
+      "di": "dei Sotterranei"
+    }
+  ]
+}

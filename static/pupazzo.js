@@ -89,6 +89,8 @@ const Pupazzo = (() => {
     passoSogliaCalmo: 3.0,   // da calmo si rifinisce di piu'
     passoMax: 26, passoAlt: 4.5, passoDur: 0.15, passoPausa: 0.02,
     calma: 0.35,             // secondi senza colpi prima di tornare a casa
+    quotaVolo: 15,           // stance Volo: di quanto sale il bacino (px)
+    piediVolo: 21,           // ...e di quanto si raccolgono i piedi (px)
     pesoMolla: 0.6,          // quota del peso (di cio' che sta sopra il bacino) che regge la molla; il resto lo portano le gambe
     muPiede: 2,              // attrito dei piedi col pavimento (alto: carichi poco, la molla regge parte del peso)
     hzSostegno: 6,           // frequenza della molla che regge il bacino in verticale
@@ -98,6 +100,9 @@ const Pupazzo = (() => {
     frena: 700,              // px/s^2: con quanta forza si frena una scivolata (distanza = v^2 / (2 frena))
     muScivola: 0.003,        // attrito dei piedi mentre si scivola (quasi nullo: a frenare ci pensa lo stesso campo per tutto il corpo)
     velCasa: 60,             // px/s: a che velocita' il centro d'appoggio torna a casa
+    festaSale: 0.5,          // vittoria: secondi che ci mettono le braccia ad alzarsi
+    saltoPer: 0.6,           // ...e il tempo tra un saltello e l'altro
+    saltoV: 190,             // ...e la spinta del saltello (px/s: circa 10 px di quota)
   };
 
   const cinema = (H, Tp, l1, l2, s) => {
@@ -317,6 +322,44 @@ const Pupazzo = (() => {
     }
   }
 
+  /* un gesto che si ripete finche' non lo si ferma (la palestra): "pesi" = un bilanciere dal petto sopra la testa, con le
+     ginocchia che lavorano; "corda" = saltelli a ritmo, con le mani che girano la corda. Non muovono niente da soli: come
+     tutte le azioni ritoccano la posa voluta, il resto lo fa il motore fisico. */
+  class Ciclo {
+    constructor(pup, tipo, o = {}) {
+      this.pup = pup; this.tipo = tipo; this.o = o; this.t = o.fase ?? 0; this.fine = false; this.rep = -1;
+      this.periodo = o.periodo ?? (tipo === "pesi" ? 2.6 : 0.62);
+    }
+    /* 0..1: a che punto del giro siamo */
+    get u() { return (this.t / this.periodo) % 1; }
+    passo(dt, p) {
+      if (this.fine) return false;
+      const pup = this.pup, u = this.u, n = Math.floor(this.t / this.periodo), s = u * this.periodo;
+      this.t += dt;
+      if (this.tipo === "pesi") {
+        const s = 0.5 - 0.5 * Math.cos(2 * PI * u);                     // 0 = in basso (bilanciere al petto, ginocchia piegate), 1 = in alto (braccia tese)
+        const lun = pup.L.braccio_dx[0] + pup.L.braccio_dx[1];
+        for (const l of LATI) {
+          p.mani[l] = [lerp(10, 2, s) + (l === "sx" ? -1.5 : 0), lerp(7, -lun * 0.92, s)];
+          p.scalaBraccio[l] = 1.7;
+        }
+        p.sprofonda += 6.5 * (1 - s) * (1 - s); p.busto += 0.1 * (1 - s) - 0.05 * s;
+      } else {                                                           // corda
+        // come i saltelli di chi festeggia: si accovaccia, parte (una spinta sola), in aria la molla non regge e le gambe si raccolgono
+        const acc = 0.12, aria = 1.7 * T.saltoV / pup.mondo.g;
+        if (s < acc) { p.sprofonda += 3 * easeOut(s / acc); }
+        else {
+          if (n !== this.rep) { this.rep = n; pup.spingiTutto(0, -T.saltoV); }      // un saltello ogni giro
+          if (s < acc + aria) { p.sostegno = 0; p.alzaPiedi += 8 * bump((s - acc) / aria); }
+          else { const k = (s - acc - aria) / 0.2; p.sostegno *= liscio(k * 3); p.sprofonda += 5 * (1 - liscio(k)); }   // atterra con le ginocchia che cedono
+        }
+        const ang = 2 * PI * u;
+        for (const l of LATI) { p.mani[l] = [8 + 3 * Math.cos(ang), 21 + 3 * Math.sin(ang)]; p.scalaBraccio[l] = 1.3; }
+      }
+      return true;
+    }
+  }
+
   class Pupazzo {
     /* man = parti.json; o.casa = x del bacino a riposo (default: quello dello sprite) */
     constructor(man, o = {}) {
@@ -386,6 +429,9 @@ const Pupazzo = (() => {
       const B0 = this.corpi.busto_inf;
       this.inerziaSu = su.reduce((s, n) => { const b = this.corpi[n]; return s + b.I + b.m * ((b.x - B0.x) ** 2 + (b.y - B0.y) ** 2); }, 0);
       this.sostegno = 1;                            // 0..1: quanto la molla regge il bacino in verticale (0 in volo)
+      this.vola = false; this.voloK = 0;            // stance Volo: il corpo fluttua (voloK 0..1 = quanto e' in aria, con dolcezza)
+      this.festa = null;                            // vittoria in corso: {tipo, t, hop} (v. esulta)
+      this.rilassato = false; this.rilK = 0;        // posa rilassata (riposo, pausa): 0..1, con dolcezza (v. rilassa)
       // si assesta nella posa di guardia prima di mostrarsi (coi piedi scivolosi: raggiungono subito il loro posto)
       for (const l of LATI) this.corpi["piede_" + l].mu = 0.1;
       this.assesta(70);
@@ -436,7 +482,7 @@ const Pupazzo = (() => {
     muori(forza = 0.5, dir = [-1, -0.1]) {
       this.morto = true; this.mondo.sonno = true;
       for (const l of Object.keys(this.gain)) { this.gainT[l] = 0; this.gain[l] = 0; }
-      this.tono = 0; this.scivola = false;
+      this.tono = 0; this.scivola = false; this.festa = null;
       for (const l of LATI) this.corpi["piede_" + l].mu = 0.8;
       const v = lim(45 + 75 * forza, 45, 150);
       for (const b of Object.values(this.corpi)) { b.vx += dir[0] * v; b.vy += -25; }
@@ -497,9 +543,24 @@ const Pupazzo = (() => {
         scalaBraccio: {dx: 1, sx: 1},                           // forza dei muscoli delle braccia
       };
       p.mani.dx[1] += 0.9 * Math.sin(t * 2.1 + 0.4); p.mani.sx[1] += 0.9 * Math.sin(t * 2.1 + 1.2);
+      if (this.voloK > 0.001) {                                // fluttua: bacino piu' in alto che ondeggia piano, gambe raccolte
+        const k = this.voloK;
+        p.sprofonda -= (T.quotaVolo + 1.1 * Math.sin(t * 2.3)) * k; p.alzaPiedi += T.piediVolo * k;
+        p.busto += 0.04 * k; p.mani.dx[1] -= 2 * k; p.mani.sx[1] -= 2 * k;
+      }
       p.mani.dx[0] += 0.7 * Math.sin(t * 1.4);
+      if (this.rilK > 0.001) {                                 // rilassato: braccia lungo i fianchi, spalle e testa che cedono, respiro lento
+        const k = this.rilK;
+        for (const l of LATI) {
+          const lun = this.L["braccio_" + l][0] + this.L["braccio_" + l][1];
+          p.mani[l] = [lerp(p.mani[l][0], l === "dx" ? 4 : 1, k), lerp(p.mani[l][1], lun * 0.82 + 0.8 * Math.sin(t * 1.3 + (l === "dx" ? 0 : 1)), k)];
+          p.scalaBraccio[l] = lerp(p.scalaBraccio[l], 0.55, k);
+        }
+        p.busto = lerp(p.busto, 0.02, k); p.testa += 0.1 * k;
+        p.sprofonda = lerp(p.sprofonda, T.sprofonda - 0.6 + 0.35 * Math.sin(t * 1.3), k);
+      }
       this.seduto = !this.morto && this.gain.gamba_dx < 0.5 && this.gain.gamba_sx < 0.5;
-      this.mondo.sonno = this.morto || this.seduto;
+      this.mondo.sonno = this.morto || (this.seduto && !this.festa);     // chi festeggia da seduto non dorme: alza le braccia
       if (this.seduto) {
         // senza gambe: il bacino sta a terra, il busto resta dritto e le braccia sane si puntellano davanti
         this.cedimento = Math.min(1, this.cedimento + dt / 0.7);               // ci si abbassa piano, non di colpo
@@ -512,9 +573,60 @@ const Pupazzo = (() => {
           p.scalaBraccio[l] = 0.12;                                                      // puntelli molli: il bacino arriva a terra
         }
       } else { this.appoggio = null; this.sedutoX = null; this.cedimento = 0; }
+      if (this.festa) this._festa(p, dt);
       if (this.azioni.length) this.azioni = this.azioni.filter(a => a.passo(dt, p));
       this.avanza = p.avanza; this.velXs = p.velXs; this.sostegno = p.sostegno; this.passoVeloce = p.passoVeloce;
       return p;
+    }
+
+    /* ---- vittoria ----
+       `esulta("salti")`: braccia al cielo e saltelli (chi vince in salute). `esulta("braccio")`: un braccio solo al cielo, poi la
+       testa si china (chi vince a pezzi). Dura finche' dura la scena, e finisce solo con la morte. Un braccio storpio non si alza;
+       senza gambe (o in volo) non si salta. */
+    esulta(tipo) {
+      if (this.morto) return;
+      this.festa = {tipo, t: 0, hop: -1};
+      this.calma = 0; this.mondo.sveglia();
+    }
+    _festa(p, dt) {
+      const f = this.festa, sana = l => this.gain["braccio_" + l] > 0.5;
+      f.t += dt;
+      // la mano va verso il cielo (un po' in avanti: la spalla non porta il braccio dietro la verticale); da seduti non si puntella piu'
+      const alza = (l, k, avanti) => {
+        const lun = this.L["braccio_" + l][0] + this.L["braccio_" + l][1];
+        p.mani[l] = [lerp(p.mani[l][0], avanti, k), lerp(p.mani[l][1], -lun * 0.93, k)];
+        if (this.seduto) { p.manoMondo[l] = null; p.scalaBraccio[l] = 1; }
+      };
+      if (f.tipo === "salti") {
+        const k = liscio(f.t / T.festaSale);
+        for (const l of LATI) if (sana(l)) { alza(l, k, l === "dx" ? 9 : 6); p.mani[l][1] += 2.5 * k * Math.sin(f.t * 11 + (l === "dx" ? 0 : 1.7)); }
+        const tau = f.t - T.festaSale;
+        if (tau < 0 || this.seduto || this.voloK > 0.3 || LATI.some(l => !(this.gain["gamba_" + l] > 0.5) || !this.piede[l].vivo)) return;
+        // un saltello: si accovaccia, parte (una spinta sola), in aria la molla non regge e le gambe si raccolgono, poi atterra
+        const acc = 0.12, aria = 1.7 * T.saltoV / this.mondo.g, atterra = 0.28;       // (in aria meno del volo ideale: le gambe non spingono tutto)
+        const n = Math.floor(tau / T.saltoPer), s = tau - n * T.saltoPer;
+        if (s < acc) { p.sprofonda += 4 * easeOut(s / acc); p.busto += 0.05 * (s / acc); }
+        else {
+          if (n > f.hop) { f.hop = n; this.spingiTutto(0, -T.saltoV); }
+          if (s < acc + aria) { p.sostegno = 0; p.alzaPiedi += 8 * bump((s - acc) / aria); }
+          else if (s < acc + aria + atterra) {          // l'atterraggio: la molla riprende subito e il bacino parte basso (ginocchia che cedono), poi risale
+            const u = (s - acc - aria) / atterra;
+            p.sostegno *= liscio(u * 3); p.sprofonda += 7 * (1 - liscio(u));
+          }
+        }
+      } else {
+        const k1 = liscio(f.t / 0.7), k2 = liscio((f.t - 1.2) / 1.0);
+        const su = sana("dx") ? "dx" : sana("sx") ? "sx" : null, giu = su === "dx" ? "sx" : "dx";
+        if (su) {
+          alza(su, k1, 9);
+          if (sana(giu)) {                                         // l'altro braccio pende lungo il fianco
+            const lun = this.L["braccio_" + giu][0] + this.L["braccio_" + giu][1];
+            p.mani[giu] = [lerp(p.mani[giu][0], 2, k1), lerp(p.mani[giu][1], lun * 0.9, k1)];
+            p.scalaBraccio[giu] = lerp(1, 0.4, k1);
+          }
+        }
+        p.testa += 0.7 * k2; p.busto += 0.16 * k2; p.sprofonda += 2.5 * k2;      // la testa si china, le spalle cedono
+      }
     }
 
     /* ---- azioni ---- */
@@ -544,6 +656,12 @@ const Pupazzo = (() => {
     schiva(tipo, o) { this.azioni.push(new Schivata(this, tipo, o)); this.calma = 0; }
     para(o) { this.azioni.push(new Parata(this, o)); this.calma = 0; }
     occupato() { return this.azioni.length > 0; }
+    /* un gesto che si ripete ("pesi", "corda") finche' non si chiama fermaCicli(); `fase` = secondi da cui parte il giro */
+    ciclo(tipo, o) { const a = new Ciclo(this, tipo, o); this.azioni.push(a); this.calma = 0; return a; }
+    fermaCicli() { for (const a of this.azioni) if (a instanceof Ciclo) a.fine = true; }
+    inCiclo() { return this.azioni.some(a => a instanceof Ciclo && !a.fine); }
+    /* la posa di chi non sta combattendo: braccia sciolte, spalle giu' (riposo, pausa, attesa) */
+    rilassa(on) { this.rilassato = !!on; this.calma = 0; }
 
     /* macchina dei passi: ogni piede e' piantato in un punto o e' in volo verso un altro. Si fa un passo (uno per
        volta) quando il corpo e' scappato dall'appoggio (spinta, affondo) e, da calmi, per tornare a casa. */
@@ -574,9 +692,11 @@ const Pupazzo = (() => {
           // mai in tensione per recuperare qualche pixel
           f.x = this.scivola ? this.corpi.busto_inf.x + f.rel : this._caviglia(l)[0];
           f.px = f.x; f.alt = 0; f.peso = 1;
+          // in volo non si cammina: i piedi penzolano appena dietro le anche (e non c'e' un punto d'appoggio da recuperare)
+          if (this.voloK > 0.02) f.px = lerp(f.x, this._anca(l)[0] - 2.5, liscio(this.voloK));
         }
       }
-      if (this.morto || this.pausa > 0 || ferma || this.scivola) return;
+      if (this.morto || this.pausa > 0 || ferma || this.scivola || this.vola || this.voloK > 0.02) return;
       if (LATI.some(l => F_[l].stato === "v" || !F_[l].vivo)) return;
       const calmo = this.calma >= T.calma;
       // ogni piede vuole stare a `xs + offset`. Si muove per primo quello piu' lontano dal suo posto; il piede
@@ -732,8 +852,13 @@ const Pupazzo = (() => {
       const carico = (this.corpi.piede_dx.terra + this.corpi.piede_sx.terra) / (this.mondo.dt || (1 / 240));
       const fMax = Math.max(0.3 * M * g, Math.min(T.forzaMax * M * g, 0.75 * 2 * carico));
       if (!this.scivola) fx = lim(M * (wx * wx * (xn - B.x) - 2 * wx * B.vx), -fMax, fMax);
-      const fy = this.sostegno * (-T.pesoMolla * M * g + M * (w * w * (yn - B.y) - 2 * w * B.vy));
+      const peso = lerp(T.pesoMolla, 1, this.voloK);            // in volo la molla regge tutto il peso: le gambe penzolano
+      const fy = this.sostegno * (-peso * M * g + M * (w * w * (yn - B.y) - 2 * w * B.vy));
       B.fx += fx; B.fy += fy;
+      if (this.voloK > 0.02) {                                   // in volo i piedi non tengono dritto il bacino: lo fa una coppia
+        const wt = 2 * PI * 4.5;
+        B.tau += this.voloK * (B.I + 0.12 * this.inerziaSu) * (wt * wt * (p.bacino - B.a) - 2 * wt * B.w);
+      }
       this.vento.x += fx / M;
       // solo uno smorzatore sulla rotazione del bacino (non cambia dov'e' l'equilibrio, quindi non litiga con le anche):
       // frena le oscillazioni lente del busto dopo uno slancio
@@ -743,6 +868,9 @@ const Pupazzo = (() => {
     /* un passo di simulazione (dt in secondi, di solito 1/60) */
     passo(dt) {
       this.t += dt;
+      if (!this.morto) this.voloK += ((this.vola ? 1 : 0) - this.voloK) * (1 - Math.exp(-dt * 2.2));
+      else this.voloK = 0;
+      this.rilK += ((this.rilassato && !this.morto ? 1 : 0) - this.rilK) * (1 - Math.exp(-dt * 3));
       // i muscoli tornano a regime dopo un colpo
       if (!this.morto) this.tono += (1 - this.tono) * (1 - Math.exp(-dt * 3.2));
       for (const l in this.gain) {
@@ -756,9 +884,12 @@ const Pupazzo = (() => {
       this.mondo.passo(dt);
     }
 
+    /* stance Volo: `volo(true)` fa salire il corpo di T.quotaVolo px, con le gambe raccolte; `volo(false)` lo rimette a terra */
+    volo(on) { this.vola = !!on; }
+
     assesta(n, dt = 1 / 60) { for (let i = 0; i < n; i++) this.passo(dt); }
   }
 
-  return {Pupazzo, CORPI, GIUNTI, LOC, T, PIEDE, LATI, MUSCOLI};
+  return {Pupazzo, Ciclo, CORPI, GIUNTI, LOC, T, PIEDE, LATI, MUSCOLI};
 })();
 if (typeof module !== "undefined") module.exports = Pupazzo;

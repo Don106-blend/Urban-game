@@ -1,22 +1,39 @@
 {% extends "base.html" %}
-{% block title %}Contratti — Urban{% endblock %}
+{% block title %}Aspiranti — Urban{% endblock %}
 {% block content %}
 <div class="page-head">
-  <h1>CONTRATTI</h1>
-  <p class="muted">Combattenti liberi in cerca di ingaggio. Scegli con cura: il talento costa.</p>
-  <form method="post" action="{{ url_for('contratti_rinnova') }}">
-    <button class="btn btn-ghost">↻ Nuovi contratti</button>
-  </form>
+  <h1>ASPIRANTI</h1>
+  <p class="muted">Si presentano alla porta della palestra. Quelli che non ingaggi entro domenica se ne vanno a bussare altrove.
+     Del carattere se ne vede una parte: il resto si capisce vivendoci.</p>
+  <div class="asp-barra">
+    <span class="chip-info">Settimana {{ settimana }} · {{ data }}</span>
+    <span class="chip-info {{ 'chip-pieno' if posti <= 0 }}">Posti in palestra: {{ capienza - posti }}/{{ capienza }}</span>
+    <form method="post" action="{{ url_for('contratti_cerca') }}">
+      <button class="btn btn-ghost" {{ 'disabled' if contratti|length >= max_aspiranti or crediti < prezzo_altri }}
+              title="Un aspirante in più, a pagamento">Passaparola · ¤{{ prezzo_altri }}</button>
+    </form>
+  </div>
 </div>
+
+{% if posti <= 0 %}
+<div class="avviso-pieno">La palestra è piena. Congeda qualcuno dalla sua scheda, o monta un <a href="{{ url_for('negozio') }}#attrezzi">dormitorio</a>.</div>
+{% endif %}
 
 <div class="card-grid">
   {% for c in contratti %}
+  {% set vis = c.tratti[:c.tratti_noti] %}
   <div class="fighter-card contract">
+    <div class="fc-preview"><canvas class="anteprima" data-aspetto='{{ c.aspetto|tojson|forceescape }}' aria-label="Anteprima di {{ c.nome }}"></canvas></div>
     <div class="fc-top">
       <span class="fc-nome">{{ c.nome }}</span>
       <span class="costo">¤ {{ c.costo }}</span>
     </div>
-    <div class="fc-liv">Nato/a: {{ c.data_nascita }}</div>
+    <div class="fc-liv">{{ eta_di[c.nome] }} anni</div>
+    <p class="muted asp-bio">{{ c.bio }}</p>
+    <div class="tratti-riga">
+      {% for t in vis %}<span class="tratto" title="{{ TRATTI[t].descrizione }} — {{ TRATTI[t].effetto }}">{{ TRATTI[t].nome }}</span>{% endfor %}
+      {% for _ in range(c.tratti|length - vis|length) %}<span class="tratto nascosto" title="Lo capirai dopo una settimana, o parlandoci">?</span>{% endfor %}
+    </div>
     <div class="mini-stats">
       {% for s in STATS %}
       <div class="mini-stat">
@@ -38,11 +55,16 @@
       {% endif %}
     </div>
     <form method="post" action="{{ url_for('contratti_ingaggia', idx=loop.index0) }}">
-      <button class="btn btn-volt full" {{ 'disabled' if crediti < c.costo }}>
-        {{ 'Ingaggia' if crediti >= c.costo else 'Crediti insufficienti' }}
+      <button class="btn btn-volt full" {{ 'disabled' if crediti < c.costo or posti <= 0 }}>
+        {{ 'La palestra è piena' if posti <= 0 else ('Ingaggia' if crediti >= c.costo else 'Crediti insufficienti') }}
       </button>
     </form>
   </div>
   {% endfor %}
 </div>
+{% if not contratti %}
+<div class="empty"><p>Per oggi non si è presentato nessuno. Torna lunedì, o prova col passaparola.</p></div>
+{% endif %}
+<script src="{{ url_for('static', filename='arena.js') }}"></script>
+<script src="{{ url_for('static', filename='anteprima.js') }}" data-ripeti></script>
 {% endblock %}

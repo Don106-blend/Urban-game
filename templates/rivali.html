@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}I rivali — Urban{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>I RIVALI</h1>
+  <p class="muted">Chi hai incontrato sul ring e chi si ricorda di te: ricordano le sconfitte, crescono piano e tornano, fino a {{ max_rivali }} in giro.
+     Chi ha battuto i tuoi allievi porta una taglia: vale di più batterlo.</p>
+</div>
+
+{% if not schede %}
+  <div class="empty">
+    <p>Nessun rivale ancora: il primo nasce al tuo prossimo duello.</p>
+    <a class="btn btn-volt" href="{{ url_for('duelli') }}">Vai alla serata →</a>
+  </div>
+{% else %}
+<div class="card-grid">
+  {% for s in schede %}
+  {% set r = s.rec %}
+  <div class="fighter-card">
+    <div class="fc-preview"><canvas class="anteprima" data-aspetto='{{ r.aspetto|tojson|forceescape }}' aria-label="Anteprima di {{ s.nome }}"></canvas></div>
+    <div class="fc-top">
+      <span class="fc-nome">{{ s.nome }}</span>
+      {% if s.taglia %}<span class="badge badge-taglia" title="Alla vittoria su di lui">TAGLIA ¤ {{ s.taglia }}</span>{% endif %}
+    </div>
+    <div class="fc-liv">LIV {{ r.livello }} · {{ r.get('vittorie', 0) }}V / {{ r.get('sconfitte', 0) }}S · {{ r.get('incontri', 0) }} incontri</div>
+    <div class="muted oggi-riga">{{ s.poteri|join(', ') if s.poteri else 'Nessun potere' }}</div>
+    {% if s.rapporti %}
+    <ul class="riv-bilancio">
+      {% for b in s.rapporti %}
+      <li class="riv-{{ b.stato }}"><strong>{{ b.nome }}</strong> <span>{{ b.breve }}</span></li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="muted oggi-riga">Mai affrontato dai tuoi allievi.</div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+<script src="{{ url_for('static', filename='arena.js') }}"></script>
+<script src="{{ url_for('static', filename='anteprima.js') }}" data-ripeti></script>
+{% endblock %}

@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Palestra — Urban{% endblock %}
+{% block body_class %}palestra-mode{% endblock %}
+{% block content %}
+<div id="pal-app" data-viva="palestra"><p class="muted">Apro la palestra…</p></div>
+<script src="{{ url_for('static', filename='fisica.js') }}?v={{ asset_v }}"></script>
+<script src="{{ url_for('static', filename='pupazzo.js') }}?v={{ asset_v }}"></script>
+<script src="{{ url_for('static', filename='arena.js') }}?v={{ asset_v }}"></script>
+<script src="{{ url_for('static', filename='scena_palestra.js') }}?v={{ asset_v }}"></script>
+<script src="{{ url_for('static', filename='palestra.js') }}?v={{ asset_v }}"></script>
+{% endblock %}

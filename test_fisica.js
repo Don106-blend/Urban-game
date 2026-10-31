@@ -355,6 +355,136 @@ for (const forza of [0.1, 0.7, 1.6]) {
   ok(aCasa(p, x0, 2.5), "dopo la raffica torna a casa");
 }
 
+// 2.9 stance Volo: il corpo fluttua (bacino piu' in alto, piedi in aria), ondeggia piano, e torna a terra
+{
+  const p = nuovo(); p.assesta(60);
+  const C = p.corpi, y0 = C.busto_inf.y;
+  p.volo(true); p.assesta(240);
+  let mn = 1e9, mx = -1e9, pmin = 1e9;
+  for (let i = 0; i < 300; i++) { p.passo(DT); mn = Math.min(mn, C.busto_inf.y); mx = Math.max(mx, C.busto_inf.y); pmin = Math.min(pmin, 108.5 - Math.max(C.piede_dx.y, C.piede_sx.y)); }
+  const sale = y0 - (mn + mx) / 2;
+  log("volo: sale", f2(sale), "ondeggia", f2(mx - mn), "piedi da terra", f2(pmin));
+  ok(finiti(p) && sale > 9 && sale < 22, `in volo il bacino sale (${f2(sale)} px)`);
+  ok(mx - mn < 5, `in volo ondeggia piano (${f2(mx - mn)} px)`);
+  ok(pmin > 2, `in volo i piedi non toccano terra (${f2(pmin)} px)`);
+  const n0 = p.nPassi;                                   // in volo le gambe non camminano: ne' da fermo, ne' se spinto o se attacca
+  p.colpisci("busto", 0.8); p.assesta(240);
+  p.attacca({stile: "affondo", bersaglio: () => [C.busto_inf.x + 54, 30], insegui: true}); p.assesta(120);
+  p.colpisci("busto", 1.2); p.assesta(240);
+  ok(p.nPassi === n0, `in volo non si fanno passi (${p.nPassi - n0})`);
+  ok(finiti(p) && C.busto_inf.y < y0 - 5, "un colpo in volo non lo fa cadere");
+  p.volo(false); p.assesta(420);
+  ok(finiti(p) && Math.abs(C.busto_inf.y - y0) < 2 && C.piede_dx.terra + C.piede_sx.terra > 0, "finito il volo torna a terra");
+}
+
+// 2.10 vittoria: "salti" = braccia al cielo e saltelli, "braccio" = un braccio solo al cielo e la testa che si china.
+// Un braccio storpio non si alza, senza gambe (o in volo) non si salta, la morte ferma la festa.
+{
+  const prova = (tipo, prep, sec = 5) => {
+    const p = nuovo(); p.assesta(60); if (prep) { prep(p); p.assesta(200); }
+    const C = p.corpi, y0 = C.busto_inf.y;
+    p.esulta(tipo);
+    let su = 0, giu = 0, partenze = 0, inAria = false, tocca = false;
+    for (let i = 0; i < sec * 60; i++) {
+      p.passo(DT);
+      const y = C.busto_inf.y; su = Math.min(su, y - y0); giu = Math.max(giu, y - y0);
+      const aria = C.piede_dx.terra + C.piede_sx.terra === 0 && y - y0 < -3;
+      if (aria && !inAria) partenze++; inAria = aria;
+    }
+    const alta = l => C.testa.y - p._polso(l)[1];                // > 0: la mano e' sopra il centro della testa
+    return {p, C, su, giu, partenze, alta, dx: alta("dx"), sx: alta("sx"), chino: C.testa.a - C.busto_sup.a};
+  };
+  const s1 = prova("salti");
+  log("vittoria salti: mani", f2(s1.dx), f2(s1.sx), "saltelli", s1.partenze, "sale", f2(-s1.su), "scende", f2(s1.giu));
+  ok(finiti(s1.p) && s1.dx > 12 && s1.sx > 12, `salti: tutte e due le mani sopra la testa (${f2(s1.dx)}, ${f2(s1.sx)})`);
+  ok(s1.partenze >= 6 && -s1.su > 8 && -s1.su < 20, `salti: saltella (${s1.partenze} saltelli, ${f2(-s1.su)} px di quota)`);
+  ok(s1.giu < 9, `salti: atterra morbido senza crollare (${f2(s1.giu)} px)`);
+  const s2 = prova("braccio");
+  log("vittoria braccio: mani", f2(s2.dx), f2(s2.sx), "testa chinata", f2(s2.chino));
+  ok(finiti(s2.p) && Math.max(s2.dx, s2.sx) > 12 && Math.min(s2.dx, s2.sx) < -20, `braccio: uno solo al cielo, l'altro lungo il fianco (${f2(s2.dx)}, ${f2(s2.sx)})`);
+  ok(s2.chino > 0.35, `braccio: la testa si china (${f2(s2.chino)} rad)`);
+  ok(s2.partenze === 0 && -s2.su < 2.5, "braccio: non salta");
+  const s3 = prova("salti", p => p.storpia("braccio_dx", true, true));
+  ok(s3.dx < 0 && s3.sx > 12, `salti: il braccio storpio resta giu' (${f2(s3.dx)}) e l'altro sale (${f2(s3.sx)})`);
+  const s4 = prova("braccio", p => p.storpia("braccio_dx", true, true));
+  ok(s4.dx < 0 && s4.sx > 12, "braccio: se il destro e' storpio alza il sinistro");
+  const s5 = prova("salti", p => p.storpia("gamba_dx", true, true));
+  ok(finiti(s5.p) && s5.partenze === 0 && s5.dx > 12 && s5.sx > 12, "salti: con una gamba storpia alza le braccia ma non salta");
+  const s6 = prova("salti", p => { p.storpia("gamba_dx", true, true); p.storpia("gamba_sx", true, true); });
+  ok(finiti(s6.p) && s6.partenze === 0 && s6.dx > 12 && s6.sx > 12, "salti: da seduto alza le braccia (e non salta)");
+  const s7 = prova("salti", p => p.volo(true), 4);
+  ok(finiti(s7.p) && s7.partenze === 0 && s7.dx > 12, "salti: in volo alza le braccia ma non saltella");
+  const s8 = prova("braccio", p => { p.storpia("braccio_dx", true, true); p.storpia("braccio_sx", true, true); });
+  ok(finiti(s8.p) && s8.chino > 0.35, "braccio: senza braccia sane china comunque la testa");
+  s1.p.muori(0.5); s1.p.assesta(120);
+  ok(s1.p.festa === null && s1.p.morto && finiti(s1.p), "la morte ferma la festa");
+  const m = nuovo(); m.muori(0.5); m.esulta("salti");
+  ok(m.festa === null, "un morto non festeggia");
+}
+
+// 2.11 la palestra: posa rilassata, pesi, corda (cicli che si ripetono finche' non si fermano), seduti che si rialzano
+{
+  // rilassato: le braccia scendono lungo i fianchi senza far cadere nessuno; si torna in guardia quando si smette
+  const p = nuovo(); p.assesta(60);
+  const guardia = p._polso("dx")[1];
+  p.rilassa(true); p.assesta(150);
+  log("rilassato: mano dx y", f2(p._polso("dx")[1]), "guardia", f2(guardia));
+  ok(finiti(p) && inPiedi(p), "rilassato: sta in piedi");
+  ok(p._polso("dx")[1] > guardia + 25 && p._polso("sx")[1] > guardia + 25, "rilassato: le mani scendono lungo i fianchi");
+  p.rilassa(false); p.assesta(150);
+  ok(Math.abs(p._polso("dx")[1] - guardia) < 2, "e si torna in guardia");
+}
+{
+  // pesi: dal petto sopra la testa, a ripetizione, senza cadere
+  const p = nuovo(); p.assesta(60);
+  const C = p.corpi, x0 = C.busto_inf.x;
+  const c = p.ciclo("pesi");
+  ok(p.inCiclo() && p.occupato(), "il ciclo e' in corso");
+  let mano = 1e9, basso = 1e9, sempre = true, salita = 0, prima = 1e9;
+  for (let i = 0; i < 60 * 12; i++) {
+    p.passo(DT);
+    const y = p._polso("dx")[1];
+    mano = Math.min(mano, y); basso = Math.min(basso, 0);
+    if (!inPiedi(p) || !finiti(p)) sempre = false;
+    if (y < prima - 0.01) salita++; prima = y;
+  }
+  log("pesi: mano piu' alta y", f2(mano), "testa", f2(C.testa.y), "deriva", f2(C.busto_inf.x - x0));
+  ok(sempre, "pesi: resta in piedi per tutte le ripetizioni");
+  ok(mano < C.testa.y - 15, `pesi: a ogni ripetizione le mani passano sopra la testa (${f2(mano)} contro ${f2(C.testa.y)})`);
+  ok(Math.abs(C.busto_inf.x - x0) < 4, "pesi: non si sposta");
+  p.fermaCicli(); p.assesta(150);
+  ok(!p.inCiclo() && !p.occupato() && inPiedi(p), "pesi: fermato il ciclo, la fatica finisce");
+}
+{
+  // corda: saltelli a ritmo, resta dov'e'
+  const p = nuovo(); p.assesta(60);
+  const C = p.corpi, x0 = C.busto_inf.x, y0 = C.busto_inf.y;
+  p.ciclo("corda", {periodo: 0.62});
+  let quota = 0, sempre = true, atterrati = 0, inAria = false;
+  for (let i = 0; i < 60 * 12; i++) {
+    p.passo(DT);
+    quota = Math.max(quota, y0 - C.busto_inf.y);
+    const aria = C.piede_dx.terra + C.piede_sx.terra === 0 && y0 - C.busto_inf.y > 3;
+    if (inAria && !aria) atterrati++; inAria = aria;
+    if (!inPiedi(p) || !finiti(p)) sempre = false;
+  }
+  log("corda: quota", f2(quota), "atterraggi", atterrati, "deriva", f2(C.busto_inf.x - x0));
+  ok(sempre, "corda: non crolla mai, nemmeno all'atterraggio");
+  ok(quota > 8 && quota < 22, `corda: salta (${f2(quota)} px)`);
+  ok(atterrati >= 12 && atterrati <= 24, `corda: un saltello a giro (${atterrati} in 12 s)`);
+  ok(Math.abs(C.busto_inf.x - x0) < 6, "corda: resta nello stesso punto");
+  p.fermaCicli(); p.assesta(120);
+  ok(inPiedi(p) && !p.occupato(), "corda: poi si ferma");
+}
+{
+  // due gambe spente = seduto per terra; guarite, si rialza
+  const p = nuovo(); p.assesta(60);
+  p.storpia("gamba_dx", true); p.storpia("gamba_sx", true); p.assesta(240);
+  ok(p.seduto && p.corpi.busto_inf.y > 70 && finiti(p), "seduto: il bacino e' a terra");
+  p.storpia("gamba_dx", false); p.storpia("gamba_sx", false); p.assesta(240);
+  ok(!p.seduto && inPiedi(p) && finiti(p), "guarito: si rialza");
+}
+
 /* ====================================================================================================================
    3. L'INTERNO DEGLI SPRITE (scheletro e carne sotto la pelle: static/sprites/maschio/{scheletro,carne}_*.png)
    ==================================================================================================================== */
@@ -435,8 +565,8 @@ for (const forza of [0.1, 0.7, 1.6]) {
     ok(sul === 0, `${c.id}: i capelli non toccano il bordo della tela`);
     ok(img.rosso.some((v, i) => img.alfa[i] && v === 38) && img.rosso.some((v, i) => img.alfa[i] && v >= 142), `${c.id}: ha contorno e toni di capello`);
   }
-  for (const [tipo, lista] of [["maglie", asp.maglie], ["pantaloni", asp.pantaloni]]) {
-    ok(lista.length === 3, `3 ${tipo}`);
+  for (const [tipo, lista, n] of [["maglie", asp.maglie, 44], ["pantaloni", asp.pantaloni, 23]]) {
+    ok(lista.length === n && new Set(lista.map((g) => g.id)).size === n, `${n} ${tipo} (3 base + 10 + 10, le maglie anche 10 cyberpunk)`);
     for (const g of lista) for (const [parte, file] of Object.entries(g.pezzi)) {
       const img = png(file), dx = png(`${parte}${parte.startsWith("busto") ? "" : "_dx"}.png`), sx = man.parti[`${parte}_sx`] ? png(`${parte}_sx.png`) : dx;
       ok(img.w === dx.w && img.h === dx.h && img.w === sx.w && img.h === sx.h, `${file}: stessa dimensione del pezzo (il lato dx e sx usano lo stesso PNG)`);
@@ -446,12 +576,51 @@ for (const forza of [0.1, 0.7, 1.6]) {
       ok(dentro && pieni > 15, `${file}: sta dentro la sagoma del pezzo (${pieni} px)`);
     }
   }
+  // le falde dei cappotti (trench e 10 cyberpunk): un pezzo staccato, a indici, appeso al busto basso; il perno sta nella tela e sulla riga di cima
+  const conFalda = asp.maglie.filter((g) => g.falda);
+  ok(conFalda.length === 11, `11 cappotti con la falda (${conFalda.length})`);
+  for (const g of conFalda) {
+    const f = g.falda, img = png(f.file);
+    soloIndici(img, f.file);
+    ok(f.pezzo === "busto_inf" && man.parti[f.pezzo] && f.offset.length === 2 && f.offset[1] === 13, `${g.id}: la falda e' appesa al busto basso`);
+    ok(f.perno[0] >= 0 && f.perno[0] < img.w && f.perno[1] === 0, `${g.id}: il perno della falda sta nella tela, in cima`);
+    let nelBordo = 0; for (let y = 0; y < img.h; y++) if (img.alfa[y * img.w + img.w - 1]) nelBordo++;
+    for (let x = 0; x < img.w; x++) if (img.alfa[(img.h - 1) * img.w + x]) nelBordo++;
+    ok(nelBordo === 0, `${g.id}: la falda non esce dalla tela a destra e in basso (${nelBordo} px sul bordo)`);
+    ok(img.alfa.reduce((n, v) => n + (v ? 1 : 0), 0) > 60, `${g.id}: la falda ha una sagoma`);
+  }
+  // copricapo: 5 cappelli e 10 maschere (5 cyberpunk), sulla tela dei capelli, a indici (il colore fisso e' nel manifest)
+  ok(asp.copricapo.length === 15 && asp.copricapo.filter((c) => c.tipo === "cappello").length === 5, "5 cappelli e 10 maschere");
+  for (const c of asp.copricapo) {
+    const img = png(c.file);
+    soloIndici(img, c.file);
+    ok(img.w === 32 && img.h === 50 && c.offset[0] === -10 && c.offset[1] === -10, `${c.id}: stessa tela e stesso offset dei capelli`);
+    ok(img.alfa.reduce((n, v) => n + (v ? 1 : 0), 0) > 40, `${c.id}: ha una sagoma`);
+    ok((c.non_con || []).every((id) => asp.capelli.some((h) => h.id === id)), `${c.id}: le capigliature incompatibili esistono`);
+    ok(!c.colore || (c.colore.length === 3 && c.colore.every((v) => v >= 0 && v <= 255)), `${c.id}: colore fisso valido`);
+  }
+  // le ali (potere Ali): un'ala sola, a indici, con il perno dentro la tela e l'attacco su un pezzo del corpo
+  const ala = png(asp.ali.file);
+  soloIndici(ala, asp.ali.file);
+  ok(asp.ali.perno[0] < ala.w && asp.ali.perno[1] < ala.h && man.parti[asp.ali.attacco.pezzo], "il perno dell'ala sta nella tela e l'attacco e' un pezzo del corpo");
+  ok(ala.alfa.reduce((n, v) => n + (v ? 1 : 0), 0) > 400, "l'ala ha una sagoma piena");
+  // le fasciature (palestra): un overlay per pezzo, a indici, dentro la sagoma, con un colore crema; coprono solo una parte del pezzo
+  const fa = asp.fasciature;
+  ok(fa && fa.colore.length === 3 && fa.colore.every((v) => v >= 150 && v <= 255), "le fasciature hanno un colore chiaro");
+  ok(JSON.stringify(Object.keys(fa.pezzi).sort()) === JSON.stringify(["avambraccio", "braccio_sup", "busto_inf", "busto_sup", "coscia", "stinco", "testa"]), "una fasciatura per ogni pezzo (i lati dx e sx usano lo stesso PNG)");
+  for (const [parte, file] of Object.entries(fa.pezzi)) {
+    const img = png(file), dx = png(`${parte}${parte.startsWith("busto") || parte === "testa" ? "" : "_dx"}.png`);
+    soloIndici(img, file);
+    let dentro = true, pieni = 0, base = 0;
+    for (let i = 0; i < img.w * img.h; i++) { if (dx.alfa[i]) base++; if (img.alfa[i]) { pieni++; if (!dx.alfa[i]) dentro = false; } }
+    ok(img.w === dx.w && img.h === dx.h && dentro && pieni > 30 && pieni < base, `${file}: dentro la sagoma, e lascia scoperto qualcosa (${pieni}/${base} px)`);
+  }
   // le texture: una striscia di colori; nei vestiti il bianco e' la sezione piu' stretta
   const tv = png(asp.texture.vestiti), tc = png(asp.texture.capelli);
   ok(tv.w >= 100 && tc.w >= 100, "le texture sono abbastanza larghe da campionare");
   const bianchi = []; for (let x = 0; x < tv.w; x++) if (Math.min(...tv.rgb(x)) > 225 && tv.alfa[x]) bianchi.push(x);
   ok(bianchi.length >= 1 && bianchi.length <= 0.04 * tv.w, `nei vestiti il bianco e' una sezione stretta (${bianchi.length}/${tv.w})`);
-  log("aspetto: 16 capigliature, 3 maglie, 3 pantaloni; texture", tv.w, "e", tc.w);
+  log("aspetto: 16 capigliature, 44 maglie, 23 pantaloni, 15 copricapo; texture", tv.w, "e", tc.w);
 }
 
 console.log(`OK - ${n} check passati`);

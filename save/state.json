@@ -1,114 +1,11 @@
 {
- "crediti": 991710,
+ "crediti": 355,
  "personaggi": [
   {
-   "id": 7,
-   "nome": "Elia Nakamura",
-   "data_nascita": "25/12/1983",
-   "bio": "",
-   "stats": {
-    "fisico": 1,
-    "riflessi": 2,
-    "mente": 1,
-    "sociale": 1,
-    "controllo": 2
-   },
-   "skills": {
-    "armi_distanza": 1,
-    "armi_corpo_a_corpo": 2,
-    "acrobatica": 1,
-    "tattica": 1
-   },
-   "poteri": [
-    {
-     "id": 8,
-     "rango": 1
-    }
-   ],
-   "hp": {
-    "testa": 80,
-    "busto": 120,
-    "braccio_sx": 100,
-    "braccio_dx": 100,
-    "gamba_sx": 100,
-    "gamba_dx": 100
-   },
-   "crippled": [],
-   "livello": 3,
-   "xp": 225,
-   "token": 0,
-   "toughness": 20,
-   "equip": [
-    1
-   ],
-   "vittorie": 3,
-   "sconfitte": 11,
-   "morto": false,
-   "last_heal": 1793274028.2962768,
-   "armi": [
-    2
-   ],
-   "augments": [
-    4,
-    1
-   ],
-   "protesi": [
-    3
-   ],
-   "armatura_equip": 1
-  },
-  {
-   "id": 9,
-   "nome": "Iris Duarte",
-   "data_nascita": "03/06/1980",
-   "bio": "",
-   "stats": {
-    "fisico": 2,
-    "riflessi": 1,
-    "mente": 1,
-    "sociale": 1,
-    "controllo": 2
-   },
-   "skills": {
-    "armi_distanza": 1,
-    "armi_corpo_a_corpo": 1,
-    "acrobatica": 1,
-    "tattica": 1
-   },
-   "poteri": [
-    {
-     "id": 10,
-     "rango": 1
-    }
-   ],
-   "hp": {
-    "testa": 80,
-    "busto": 120,
-    "braccio_sx": 100,
-    "braccio_dx": 100,
-    "gamba_sx": 100,
-    "gamba_dx": 100
-   },
-   "crippled": [],
-   "livello": 2,
-   "xp": 1025,
-   "token": 0,
-   "toughness": 18,
-   "equip": [],
-   "vittorie": 2,
-   "sconfitte": 11,
-   "morto": false,
-   "last_heal": 1793274028.2962768,
-   "armatura_equip": 2,
-   "protesi": [
-    1
-   ]
-  },
-  {
-   "id": 17,
-   "nome": "Gaia Vance",
-   "data_nascita": "12/09/1997",
-   "bio": "",
+   "id": 1,
+   "nome": "Lino Draven",
+   "data_nascita": "20/08/1995",
+   "bio": "Fattorino del Centro Vecchio.",
    "stats": {
     "fisico": 2,
     "riflessi": 1,
@@ -124,7 +21,178 @@
    },
    "poteri": [
     {
-     "id": 5,
+     "id": 11,
+     "rango": 1
+    }
+   ],
+   "hp": {
+    "testa": 80,
+    "busto": 61,
+    "braccio_sx": 100,
+    "braccio_dx": 100,
+    "gamba_sx": 100,
+    "gamba_dx": 100
+   },
+   "crippled": [],
+   "livello": 2,
+   "xp": 825,
+   "token": 1,
+   "toughness": 21,
+   "armi": [],
+   "armatura_equip": null,
+   "protesi": [],
+   "augments": [
+    1
+   ],
+   "vittorie": 5,
+   "sconfitte": 2,
+   "morto": false,
+   "aspetto": {
+    "sesso": "M",
+    "capelli": "m6",
+    "maglia": "manica34",
+    "pantaloni": "leggings",
+    "copricapo": null,
+    "seed": 3617746052
+   },
+   "ruolo": "combattente",
+   "tratti": [
+    "veterano",
+    "ambizioso"
+   ],
+   "tratti_noti": 2,
+   "tempra": true,
+   "fiducia": 91,
+   "stress": 12,
+   "piano": [
+    "palestra",
+    "sparring",
+    "duro",
+    "palestra",
+    "controllo",
+    "controllo",
+    "riposo"
+   ],
+   "focus": {
+    "palestra": "stat:riflessi",
+    "studio": "stat:mente",
+    "sparring": "skill:armi_distanza",
+    "controllo": "stat:controllo",
+    "duro": "stat:controllo",
+    "strada": "stat:sociale"
+   },
+   "allenamento": {
+    "stat:mente": 3.85,
+    "skill:armi_corpo_a_corpo": 5.59,
+    "stat:controllo": 3.19,
+    "stat:fisico": 3.08,
+    "skill:armi_distanza": 0.5,
+    "stat:riflessi": 0.77,
+    "skill:acrobatica": 2.0
+   },
+   "legami": {
+    "2": -14,
+    "3": 18
+   },
+   "registro": [
+    {
+     "g": 0,
+     "t": "Lino Draven entra in palestra."
+    },
+    {
+     "g": 0,
+     "t": "Lino batte Kai Ferri.",
+     "tipo": "duello",
+     "esito": "v",
+     "avv": "Kai Ferri"
+    },
+    {
+     "g": 3,
+     "t": "Lino batte Hugo Falk.",
+     "tipo": "duello",
+     "esito": "v",
+     "avv": "Hugo Falk"
+    },
+    {
+     "g": 4,
+     "t": "Hai parlato con Lino (ascolta)."
+    },
+    {
+     "g": 9,
+     "t": "Hai parlato con Lino (incoraggia)."
+    },
+    {
+     "g": 9,
+     "t": "Lino perde con Maya Fontaine.",
+     "tipo": "duello",
+     "esito": "s",
+     "avv": "Maya Fontaine"
+    },
+    {
+     "g": 17,
+     "t": "Lino perde con Aida Sokolova.",
+     "tipo": "duello",
+     "esito": "s",
+     "avv": "Aida Sokolova"
+    },
+    {
+     "g": 25,
+     "t": "Lino batte Olga Draven.",
+     "tipo": "duello",
+     "esito": "v",
+     "avv": "Olga Draven"
+    },
+    {
+     "g": 30,
+     "t": "Hai parlato con Lino (rimprovera)."
+    },
+    {
+     "g": 30,
+     "t": "Lino batte Ruben Moreau.",
+     "tipo": "duello",
+     "esito": "v",
+     "avv": "Ruben Moreau"
+    },
+    {
+     "g": 33,
+     "t": "Lino batte Kira Okafor.",
+     "tipo": "duello",
+     "esito": "v",
+     "avv": "Kira Okafor"
+    }
+   ],
+   "auto_riposo": true,
+   "riposo_giorni": 0,
+   "ultimo_duello": 33,
+   "duelli_sett": 2,
+   "colloquio_sett": 5,
+   "settimane_sfiducia": 0,
+   "ingaggio": 0,
+   "nemici": [],
+   "origine": "centro",
+   "bias_duelli": 0
+  },
+  {
+   "id": 2,
+   "nome": "Maya Kessler",
+   "data_nascita": "05/01/1994",
+   "bio": "Ex poliziotta delle Fonderie.",
+   "stats": {
+    "fisico": 2,
+    "riflessi": 1,
+    "mente": 1,
+    "sociale": 1,
+    "controllo": 1
+   },
+   "skills": {
+    "armi_distanza": 1,
+    "armi_corpo_a_corpo": 1,
+    "acrobatica": 1,
+    "tattica": 1
+   },
+   "poteri": [
+    {
+     "id": 1,
      "rango": 1
     }
    ],
@@ -134,24 +202,157 @@
     "braccio_sx": 100,
     "braccio_dx": 100,
     "gamba_sx": 100,
-    "gamba_dx": 100
+    "gamba_dx": 99
    },
    "crippled": [],
-   "livello": 1,
-   "xp": 100,
-   "token": 0,
-   "toughness": 1,
-   "equip": [],
-   "vittorie": 0,
-   "sconfitte": 2,
+   "livello": 2,
+   "xp": 675,
+   "token": 1,
+   "toughness": 19,
+   "armi": [],
+   "armatura_equip": null,
+   "protesi": [],
+   "augments": [],
+   "vittorie": 5,
+   "sconfitte": 1,
    "morto": false,
-   "last_heal": 1793274028.2962768
+   "aspetto": {
+    "sesso": "F",
+    "capelli": "f4",
+    "maglia": "cromato",
+    "pantaloni": "gessato",
+    "copricapo": null,
+    "seed": 718302345
+   },
+   "ruolo": "combattente",
+   "tratti": [
+    "veterano",
+    "disciplinato"
+   ],
+   "tratti_noti": 2,
+   "tempra": true,
+   "fiducia": 72,
+   "stress": 4,
+   "piano": [
+    "palestra",
+    "controllo",
+    "controllo",
+    "palestra",
+    "duro",
+    "strada",
+    "riposo"
+   ],
+   "focus": {
+    "palestra": "stat:fisico",
+    "studio": "stat:mente",
+    "sparring": "skill:armi_corpo_a_corpo",
+    "controllo": "stat:controllo",
+    "duro": "stat:controllo",
+    "strada": "stat:sociale"
+   },
+   "allenamento": {
+    "stat:mente": 2.21,
+    "skill:armi_corpo_a_corpo": 4.7,
+    "stat:controllo": 5.81,
+    "stat:fisico": 2.21,
+    "stat:sociale": 0.4
+   },
+   "legami": {
+    "1": -14,
+    "3": 18
+   },
+   "registro": [
+    {
+     "g": 1,
+     "t": "Maya Kessler entra in palestra."
+    },
+    {
+     "g": 2,
+     "t": "Maya si fa male in allenamento (braccio sx −24)."
+    },
+    {
+     "g": 3,
+     "t": "Maya batte Nico Fontaine.",
+     "tipo": "duello",
+     "esito": "v",
+     "avv": "Nico Fontaine"
+    },
+    {
+     "g": 4,
+     "t": "Hai parlato con Maya (rimprovera)."
+    },
+    {
+     "g": 7,
+     "t": "Maya perde con Kira Halloran.",
+     "tipo": "duello",
+     "esito": "s",
+     "avv": "Kira Halloran"
+    },
+    {
+     "g": 13,
+     "t": "Maya batte Ruben Reyes.",
+     "tipo": "duello",
+     "esito": "v",
+     "avv": "Ruben Reyes"
+    },
+    {
+     "g": 17,
+     "t": "Maya batte Kai Reyes.",
+     "tipo": "duello",
+     "esito": "v",
+     "avv": "Kai Reyes"
+    },
+    {
+     "g": 18,
+     "t": "Hai parlato con Maya (incoraggia)."
+    },
+    {
+     "g": 21,
+     "t": "Maya batte Kai Esposito.",
+     "tipo": "duello",
+     "esito": "v",
+     "avv": "Kai Esposito"
+    },
+    {
+     "g": 21,
+     "t": "Hai parlato con Maya (ascolta)."
+    },
+    {
+     "g": 24,
+     "t": "Maya si fa male in allenamento (braccio sx −17)."
+    },
+    {
+     "g": 28,
+     "t": "Maya batte Rita Reyes.",
+     "tipo": "duello",
+     "esito": "v",
+     "avv": "Rita Reyes"
+    },
+    {
+     "g": 28,
+     "t": "Hai parlato con Maya (incoraggia)."
+    },
+    {
+     "g": 32,
+     "t": "Maya si fa male in allenamento (gamba dx −25)."
+    }
+   ],
+   "auto_riposo": true,
+   "riposo_giorni": 0,
+   "ultimo_duello": 28,
+   "duelli_sett": 1,
+   "colloquio_sett": 5,
+   "settimane_sfiducia": 0,
+   "ingaggio": 1,
+   "nemici": [],
+   "origine": "fonderie",
+   "bias_duelli": 0
   },
   {
-   "id": 21,
-   "nome": "Iris Sokolova",
-   "data_nascita": "23/04/1985",
-   "bio": "",
+   "id": 3,
+   "nome": "Ruben Anand",
+   "data_nascita": "03/06/2005",
+   "bio": "Ex militare dello Scalo Nord.",
    "stats": {
     "fisico": 1,
     "riflessi": 2,
@@ -175,26 +376,153 @@
     "testa": 80,
     "busto": 120,
     "braccio_sx": 100,
-    "braccio_dx": 100,
+    "braccio_dx": 95,
     "gamba_sx": 100,
     "gamba_dx": 100
    },
    "crippled": [],
    "livello": 1,
-   "xp": 125,
+   "xp": 925,
    "token": 0,
-   "toughness": 1,
-   "equip": [],
-   "vittorie": 0,
-   "sconfitte": 1,
+   "toughness": 8,
+   "armi": [],
+   "armatura_equip": null,
+   "protesi": [],
+   "augments": [],
+   "vittorie": 2,
+   "sconfitte": 3,
    "morto": false,
-   "last_heal": 1793274028.2962768
+   "aspetto": {
+    "sesso": "M",
+    "capelli": "m2",
+    "maglia": "hawaiana",
+    "pantaloni": "imbottiti",
+    "copricapo": null,
+    "seed": 1362193757
+   },
+   "ruolo": "combattente",
+   "tratti": [
+    "ambizioso",
+    "avido"
+   ],
+   "tratti_noti": 2,
+   "tempra": true,
+   "fiducia": 79,
+   "stress": 7,
+   "piano": [
+    "palestra",
+    "studio",
+    "sparring",
+    "palestra",
+    "sparring",
+    "controllo",
+    "riposo"
+   ],
+   "focus": {
+    "palestra": "stat:fisico",
+    "studio": "skill:tattica",
+    "sparring": "skill:armi_corpo_a_corpo",
+    "controllo": "stat:controllo",
+    "duro": "stat:controllo",
+    "strada": "stat:sociale"
+   },
+   "allenamento": {
+    "stat:fisico": 6.18,
+    "skill:armi_corpo_a_corpo": 8.0,
+    "stat:controllo": 2.4,
+    "stat:mente": 3.6,
+    "skill:tattica": 1.2
+   },
+   "legami": {
+    "2": 18,
+    "1": 18,
+    "4": 6
+   },
+   "registro": [
+    {
+     "g": 3,
+     "t": "Ruben Anand entra in palestra."
+    },
+    {
+     "g": 3,
+     "t": "Hai parlato con Ruben (incoraggia)."
+    },
+    {
+     "g": 4,
+     "t": "Ruben si fa male in allenamento (gamba dx −29)."
+    },
+    {
+     "g": 7,
+     "t": "Ruben batte Vera Marek.",
+     "tipo": "duello",
+     "esito": "v",
+     "avv": "Vera Marek"
+    },
+    {
+     "g": 13,
+     "t": "Ruben perde con Lino Riva.",
+     "tipo": "duello",
+     "esito": "s",
+     "avv": "Lino Riva"
+    },
+    {
+     "g": 17,
+     "t": "Ruben batte Irene Anand.",
+     "tipo": "duello",
+     "esito": "v",
+     "avv": "Irene Anand"
+    },
+    {
+     "g": 18,
+     "t": "Ruben perde con Dario Colombo.",
+     "tipo": "duello",
+     "esito": "s",
+     "avv": "Dario Colombo"
+    },
+    {
+     "g": 25,
+     "t": "Hai parlato con Ruben (incoraggia)."
+    },
+    {
+     "g": 25,
+     "t": "Ruben perde con Kai Barros.",
+     "tipo": "duello",
+     "esito": "s",
+     "avv": "Kai Barros"
+    },
+    {
+     "g": 30,
+     "t": "Ruben ha maturato Armi corpo a corpo."
+    },
+    {
+     "g": 30,
+     "t": "Ruben si fa male in allenamento (gamba dx −17)."
+    },
+    {
+     "g": 31,
+     "t": "Ruben si fa male in allenamento (gamba sx −10)."
+    },
+    {
+     "g": 32,
+     "t": "Ruben si fa male in allenamento (braccio dx −27)."
+    }
+   ],
+   "auto_riposo": true,
+   "riposo_giorni": 0,
+   "ultimo_duello": 25,
+   "duelli_sett": 0,
+   "colloquio_sett": 4,
+   "settimane_sfiducia": 0,
+   "ingaggio": 3,
+   "nemici": [],
+   "origine": "scalo",
+   "bias_duelli": 0
   },
   {
-   "id": 34,
-   "nome": "Irene Iwata",
-   "data_nascita": "18/07/1998",
-   "bio": "",
+   "id": 4,
+   "nome": "Ivan Rasmussen",
+   "data_nascita": "21/10/1994",
+   "bio": "Muratore del Porto.",
    "stats": {
     "fisico": 1,
     "riflessi": 1,
@@ -210,23 +538,23 @@
    },
    "poteri": [
     {
-     "id": 9,
+     "id": 16,
      "rango": 1
     }
    ],
    "hp": {
-    "testa": 80,
-    "busto": -50,
-    "braccio_sx": 100,
-    "braccio_dx": 100,
-    "gamba_sx": 100,
-    "gamba_dx": 100
+    "testa": -8,
+    "busto": 116,
+    "braccio_sx": -23,
+    "braccio_dx": 96,
+    "gamba_sx": 24,
+    "gamba_dx": -5
    },
    "crippled": [],
    "livello": 1,
-   "xp": 225,
+   "xp": 200,
    "token": 0,
-   "toughness": 3,
+   "toughness": 6,
    "armi": [],
    "armatura_equip": null,
    "protesi": [],
@@ -234,83 +562,87 @@
    "vittorie": 0,
    "sconfitte": 2,
    "morto": false,
-   "last_heal": 1793274028.2962768,
+   "aspetto": {
+    "sesso": "M",
+    "capelli": "m6",
+    "maglia": "trench_piastre",
+    "pantaloni": "eleganti",
+    "copricapo": null,
+    "seed": 1955690180
+   },
+   "ruolo": "combattente",
+   "tratti": [
+    "fragile",
+    "disciplinato"
+   ],
+   "tratti_noti": 1,
+   "tempra": true,
+   "fiducia": 42,
+   "stress": 25,
+   "piano": [
+    "palestra",
+    "studio",
+    "sparring",
+    "palestra",
+    "sparring",
+    "controllo",
+    "riposo"
+   ],
+   "focus": {},
+   "allenamento": {
+    "stat:mente": 1.66,
+    "skill:armi_corpo_a_corpo": 4.13,
+    "stat:fisico": 2.49
+   },
+   "legami": {
+    "3": 6
+   },
+   "registro": [
+    {
+     "g": 22,
+     "t": "Ivan Rasmussen entra in palestra."
+    },
+    {
+     "g": 25,
+     "t": "Ivan perde con Nina Novak.",
+     "tipo": "duello",
+     "esito": "s",
+     "avv": "Nina Novak"
+    },
+    {
+     "g": 28,
+     "t": "Ivan si fa male in allenamento (gamba sx −14)."
+    },
+    {
+     "g": 33,
+     "t": "Ivan perde con Ivan Kessler.",
+     "tipo": "duello",
+     "esito": "s",
+     "avv": "Ivan Kessler"
+    }
+   ],
+   "auto_riposo": true,
+   "riposo_giorni": 0,
+   "ultimo_duello": 33,
+   "duelli_sett": 1,
+   "colloquio_sett": 0,
+   "settimane_sfiducia": 0,
+   "ingaggio": 22,
+   "nemici": [],
+   "origine": "porto",
    "bias_duelli": 0
   },
   {
-   "id": 35,
-   "nome": "Bruno Riva",
-   "data_nascita": "24/09/1971",
-   "bio": "Campione del Torneo Evo.",
-   "stats": {
-    "fisico": 3,
-    "riflessi": 1,
-    "mente": 3,
-    "sociale": 1,
-    "controllo": 4
-   },
-   "skills": {
-    "armi_distanza": 1,
-    "armi_corpo_a_corpo": 1,
-    "acrobatica": 1,
-    "tattica": 1
-   },
-   "poteri": [
-    {
-     "id": 3,
-     "rango": 1
-    },
-    {
-     "id": 1,
-     "rango": 2
-    },
-    {
-     "id": 20,
-     "rango": 3
-    },
-    {
-     "id": 6,
-     "rango": 4
-    }
-   ],
-   "hp": {
-    "testa": 80,
-    "busto": 120,
-    "braccio_sx": 100,
-    "braccio_dx": 100,
-    "gamba_sx": 100,
-    "gamba_dx": 100
-   },
-   "crippled": [],
-   "livello": 5,
-   "xp": 1050,
-   "token": 0,
-   "toughness": 4,
-   "armi": [
-    1
-   ],
-   "armatura_equip": 2,
-   "protesi": [],
-   "augments": [
-    1,
-    6
-   ],
-   "vittorie": 2,
-   "sconfitte": 1,
-   "morto": false,
-   "last_heal": 1793274028.2962768
-  },
-  {
-   "id": 36,
-   "nome": "Greta Serra",
-   "data_nascita": "01/05/1997",
-   "bio": "Campione del Torneo Evo.",
+   "id": 5,
+   "nome": "Irene Moretti",
+   "data_nascita": "15/01/2008",
+   "bio": "Ex militare delle Fonderie.",
    "stats": {
     "fisico": 2,
-    "riflessi": 2,
-    "mente": 3,
+    "riflessi": 1,
+    "mente": 1,
     "sociale": 1,
-    "controllo": 4
+    "controllo": 1
    },
    "skills": {
     "armi_distanza": 1,
@@ -320,220 +652,184 @@
    },
    "poteri": [
     {
-     "id": 13,
+     "id": 11,
      "rango": 1
-    },
-    {
-     "id": 17,
-     "rango": 2
-    },
-    {
-     "id": 1,
-     "rango": 3
-    },
-    {
-     "id": 14,
-     "rango": 4
-    }
-   ],
-   "hp": {
-    "testa": 95,
-    "busto": -53,
-    "braccio_sx": 100,
-    "braccio_dx": 100,
-    "gamba_sx": 100,
-    "gamba_dx": 9
-   },
-   "crippled": [],
-   "livello": 5,
-   "xp": 650,
-   "token": 0,
-   "toughness": 3,
-   "armi": [],
-   "armatura_equip": 2,
-   "protesi": [
-    3
-   ],
-   "augments": [
-    6,
-    3
-   ],
-   "vittorie": 1,
-   "sconfitte": 1,
-   "morto": false,
-   "last_heal": 1793274300.8950143,
-   "bias_duelli": 0
-  },
-  {
-   "id": 37,
-   "nome": "Aris Voss",
-   "data_nascita": "04/06/1978",
-   "bio": "Campione del Torneo Evo.",
-   "stats": {
-    "fisico": 1,
-    "riflessi": 4,
-    "mente": 2,
-    "sociale": 1,
-    "controllo": 4
-   },
-   "skills": {
-    "armi_distanza": 1,
-    "armi_corpo_a_corpo": 1,
-    "acrobatica": 1,
-    "tattica": 1
-   },
-   "poteri": [
-    {
-     "id": 3,
-     "rango": 1
-    },
-    {
-     "id": 14,
-     "rango": 2
-    },
-    {
-     "id": 1,
-     "rango": 3
-    },
-    {
-     "id": 6,
-     "rango": 4
     }
    ],
    "hp": {
     "testa": 80,
     "busto": 120,
     "braccio_sx": 100,
-    "braccio_dx": 100,
+    "braccio_dx": 18,
     "gamba_sx": 100,
-    "gamba_dx": 100
+    "gamba_dx": 56
    },
    "crippled": [],
-   "livello": 5,
-   "xp": 975,
+   "livello": 1,
+   "xp": 375,
    "token": 0,
-   "toughness": 5,
-   "armi": [
-    1
-   ],
-   "armatura_equip": 1,
+   "toughness": 1,
+   "armi": [],
+   "armatura_equip": null,
    "protesi": [],
-   "augments": [
-    6
-   ],
-   "vittorie": 3,
-   "sconfitte": 1,
+   "augments": [],
+   "vittorie": 1,
+   "sconfitte": 0,
    "morto": false,
-   "last_heal": 1793274028.2962768,
-   "bias_duelli": 1,
-   "bias": 1
+   "aspetto": {
+    "sesso": "F",
+    "capelli": "f2",
+    "maglia": "gilet",
+    "pantaloni": "lunghi",
+    "copricapo": "chirurgica",
+    "seed": 4064632407
+   },
+   "ruolo": "combattente",
+   "tratti": [
+    "cocciuto",
+    "fragile"
+   ],
+   "tratti_noti": 1,
+   "tempra": true,
+   "fiducia": 65,
+   "stress": 11,
+   "piano": [
+    "palestra",
+    "studio",
+    "sparring",
+    "palestra",
+    "sparring",
+    "controllo",
+    "riposo"
+   ],
+   "focus": {},
+   "allenamento": {},
+   "legami": {},
+   "registro": [
+    {
+     "g": 33,
+     "t": "Irene Moretti entra in palestra."
+    },
+    {
+     "g": 33,
+     "t": "Hai parlato con Irene (incoraggia)."
+    },
+    {
+     "g": 33,
+     "t": "Irene batte Greta Marchetti.",
+     "tipo": "duello",
+     "esito": "v",
+     "avv": "Greta Marchetti"
+    }
+   ],
+   "auto_riposo": true,
+   "riposo_giorni": 0,
+   "ultimo_duello": 33,
+   "duelli_sett": 1,
+   "colloquio_sett": 5,
+   "settimane_sfiducia": 0,
+   "ingaggio": 33,
+   "nemici": [],
+   "origine": "fonderie",
+   "bias_duelli": 0
   }
  ],
- "prossimo_id": 38,
+ "prossimo_id": 6,
  "contratti": [
   {
    "id": null,
-   "nome": "Jonas Esposito",
-   "data_nascita": "01/06/2002",
-   "bio": "",
-   "stats": {
-    "fisico": 1,
-    "riflessi": 2,
-    "mente": 1,
-    "sociale": 1,
-    "controllo": 1
-   },
-   "skills": {
-    "armi_distanza": 1,
-    "armi_corpo_a_corpo": 1,
-    "acrobatica": 1,
-    "tattica": 1
-   },
-   "poteri": [
-    {
-     "id": 13,
-     "rango": 1
-    }
-   ],
-   "hp": {
-    "testa": 80,
-    "busto": 120,
-    "braccio_sx": 100,
-    "braccio_dx": 100,
-    "gamba_sx": 100,
-    "gamba_dx": 100
-   },
-   "crippled": [],
-   "livello": 1,
-   "xp": 0,
-   "token": 0,
-   "toughness": 0,
-   "armi": [],
-   "armatura_equip": null,
-   "protesi": [],
-   "augments": [],
-   "vittorie": 0,
-   "sconfitte": 0,
-   "morto": false,
-   "last_heal": 1793222833.2231975,
-   "costo": 200
-  },
-  {
-   "id": null,
-   "nome": "Emma Vance",
-   "data_nascita": "11/04/1985",
-   "bio": "",
-   "stats": {
-    "fisico": 2,
-    "riflessi": 1,
-    "mente": 1,
-    "sociale": 1,
-    "controllo": 1
-   },
-   "skills": {
-    "armi_distanza": 1,
-    "armi_corpo_a_corpo": 1,
-    "acrobatica": 1,
-    "tattica": 1
-   },
-   "poteri": [
-    {
-     "id": 4,
-     "rango": 1
-    }
-   ],
-   "hp": {
-    "testa": 80,
-    "busto": 120,
-    "braccio_sx": 100,
-    "braccio_dx": 100,
-    "gamba_sx": 100,
-    "gamba_dx": 100
-   },
-   "crippled": [],
-   "livello": 1,
-   "xp": 0,
-   "token": 0,
-   "toughness": 0,
-   "armi": [],
-   "armatura_equip": null,
-   "protesi": [],
-   "augments": [],
-   "vittorie": 0,
-   "sconfitte": 0,
-   "morto": false,
-   "last_heal": 1793222833.2231975,
-   "costo": 200
-  },
-  {
-   "id": null,
-   "nome": "Sasha Silva",
-   "data_nascita": "14/08/1971",
-   "bio": "",
+   "nome": "Luna Marchetti",
+   "data_nascita": "21/09/1997",
+   "bio": "Pescatrice dello Scalo Nord.",
    "stats": {
     "fisico": 1,
     "riflessi": 1,
     "mente": 2,
+    "sociale": 1,
+    "controllo": 1
+   },
+   "skills": {
+    "armi_distanza": 1,
+    "armi_corpo_a_corpo": 1,
+    "acrobatica": 1,
+    "tattica": 1
+   },
+   "poteri": [
+    {
+     "id": 10,
+     "rango": 1
+    }
+   ],
+   "hp": {
+    "testa": 80,
+    "busto": 120,
+    "braccio_sx": 100,
+    "braccio_dx": 100,
+    "gamba_sx": 100,
+    "gamba_dx": 100
+   },
+   "crippled": [],
+   "livello": 1,
+   "xp": 0,
+   "token": 0,
+   "toughness": 0,
+   "armi": [],
+   "armatura_equip": null,
+   "protesi": [],
+   "augments": [],
+   "vittorie": 0,
+   "sconfitte": 0,
+   "morto": false,
+   "aspetto": {
+    "sesso": "F",
+    "capelli": "f3",
+    "maglia": "trench_neon",
+    "pantaloni": "lunghi",
+    "copricapo": null,
+    "seed": 2798789857
+   },
+   "costo": 180,
+   "ruolo": "combattente",
+   "tratti": [
+    "orgoglioso",
+    "paranoico"
+   ],
+   "tratti_noti": 1,
+   "tempra": true,
+   "fiducia": 55,
+   "stress": 0,
+   "piano": [
+    "palestra",
+    "studio",
+    "sparring",
+    "palestra",
+    "sparring",
+    "controllo",
+    "riposo"
+   ],
+   "focus": {},
+   "allenamento": {},
+   "legami": {},
+   "registro": [],
+   "auto_riposo": true,
+   "riposo_giorni": 0,
+   "ultimo_duello": null,
+   "duelli_sett": 0,
+   "colloquio_sett": 0,
+   "settimane_sfiducia": 0,
+   "ingaggio": 28,
+   "nemici": [],
+   "origine": "scalo"
+  },
+  {
+   "id": null,
+   "nome": "Ciro Leone",
+   "data_nascita": "09/10/2006",
+   "bio": "Buttafuori dei Sotterranei.",
+   "stats": {
+    "fisico": 2,
+    "riflessi": 1,
+    "mente": 1,
     "sociale": 1,
     "controllo": 1
    },
@@ -569,9 +865,422 @@
    "vittorie": 0,
    "sconfitte": 0,
    "morto": false,
-   "last_heal": 1793222833.2231975,
-   "costo": 200
+   "aspetto": {
+    "sesso": "M",
+    "capelli": "m2",
+    "maglia": "tuta",
+    "pantaloni": "gonna",
+    "copricapo": null,
+    "seed": 1412923974
+   },
+   "costo": 220,
+   "ruolo": "combattente",
+   "tratti": [
+    "orgoglioso",
+    "leale"
+   ],
+   "tratti_noti": 1,
+   "tempra": true,
+   "fiducia": 58,
+   "stress": 0,
+   "piano": [
+    "palestra",
+    "studio",
+    "sparring",
+    "palestra",
+    "sparring",
+    "controllo",
+    "riposo"
+   ],
+   "focus": {},
+   "allenamento": {},
+   "legami": {},
+   "registro": [],
+   "auto_riposo": true,
+   "riposo_giorni": 0,
+   "ultimo_duello": null,
+   "duelli_sett": 0,
+   "colloquio_sett": 0,
+   "settimane_sfiducia": 0,
+   "ingaggio": 28,
+   "nemici": [],
+   "origine": "sotterranei"
   }
  ],
- "hp_versione": 2
+ "hp_versione": 2,
+ "giorno": 33,
+ "mondo": {},
+ "palestra": {
+  "attrezzi": [
+   "sacco",
+   "tatami",
+   "manichino",
+   "dormitorio"
+  ],
+  "magazzino": [],
+  "eventi": [],
+  "prossimo_evento": 9,
+  "registro": [
+   {
+    "g": 0,
+    "t": "Lino Draven entra in palestra.",
+    "pid": 1
+   },
+   {
+    "g": 0,
+    "t": "Lino batte Kai Ferri.",
+    "pid": 1,
+    "tipo": "duello",
+    "esito": "v",
+    "avv": "Kai Ferri"
+   },
+   {
+    "g": 1,
+    "t": "Maya Kessler entra in palestra.",
+    "pid": 2
+   },
+   {
+    "g": 1,
+    "t": "Arriva in palestra: Manichino da sparring.",
+    "pid": null
+   },
+   {
+    "g": 2,
+    "t": "Maya si fa male in allenamento (braccio sx −24).",
+    "pid": 2
+   },
+   {
+    "g": 3,
+    "t": "Lino batte Hugo Falk.",
+    "pid": 1,
+    "tipo": "duello",
+    "esito": "v",
+    "avv": "Hugo Falk"
+   },
+   {
+    "g": 3,
+    "t": "Maya batte Nico Fontaine.",
+    "pid": 2,
+    "tipo": "duello",
+    "esito": "v",
+    "avv": "Nico Fontaine"
+   },
+   {
+    "g": 3,
+    "t": "Ruben Anand entra in palestra.",
+    "pid": 3
+   },
+   {
+    "g": 3,
+    "t": "Hai parlato con Ruben (incoraggia).",
+    "pid": 3
+   },
+   {
+    "g": 4,
+    "t": "Hai parlato con Lino (ascolta).",
+    "pid": 1
+   },
+   {
+    "g": 4,
+    "t": "Hai parlato con Maya (rimprovera).",
+    "pid": 2
+   },
+   {
+    "g": 4,
+    "t": "Ruben si fa male in allenamento (gamba dx −29).",
+    "pid": 3
+   },
+   {
+    "g": 7,
+    "t": "Ruben batte Vera Marek.",
+    "pid": 3,
+    "tipo": "duello",
+    "esito": "v",
+    "avv": "Vera Marek"
+   },
+   {
+    "g": 7,
+    "t": "Maya perde con Kira Halloran.",
+    "pid": 2,
+    "tipo": "duello",
+    "esito": "s",
+    "avv": "Kira Halloran"
+   },
+   {
+    "g": 8,
+    "t": "Un ispettore alla porta: Gli mostri tutto, sperando bene",
+    "pid": null
+   },
+   {
+    "g": 9,
+    "t": "Un ragazzo chiede un posto: Lo accogli",
+    "pid": 1
+   },
+   {
+    "g": 9,
+    "t": "Hai parlato con Lino (incoraggia).",
+    "pid": 1
+   },
+   {
+    "g": 9,
+    "t": "Lino perde con Maya Fontaine.",
+    "pid": 1,
+    "tipo": "duello",
+    "esito": "s",
+    "avv": "Maya Fontaine"
+   },
+   {
+    "g": 11,
+    "t": "Qualcuno aspetta all'uscita: Lasci che Lino si fermi a parlare",
+    "pid": 1
+   },
+   {
+    "g": 13,
+    "t": "Ruben perde con Lino Riva.",
+    "pid": 3,
+    "tipo": "duello",
+    "esito": "s",
+    "avv": "Lino Riva"
+   },
+   {
+    "g": 13,
+    "t": "Maya batte Ruben Reyes.",
+    "pid": 2,
+    "tipo": "duello",
+    "esito": "v",
+    "avv": "Ruben Reyes"
+   },
+   {
+    "g": 17,
+    "t": "Maya batte Kai Reyes.",
+    "pid": 2,
+    "tipo": "duello",
+    "esito": "v",
+    "avv": "Kai Reyes"
+   },
+   {
+    "g": 17,
+    "t": "Lino perde con Aida Sokolova.",
+    "pid": 1,
+    "tipo": "duello",
+    "esito": "s",
+    "avv": "Aida Sokolova"
+   },
+   {
+    "g": 17,
+    "t": "Ruben batte Irene Anand.",
+    "pid": 3,
+    "tipo": "duello",
+    "esito": "v",
+    "avv": "Irene Anand"
+   },
+   {
+    "g": 18,
+    "t": "Un'amicizia: Bene così",
+    "pid": 3
+   },
+   {
+    "g": 18,
+    "t": "Hai parlato con Maya (incoraggia).",
+    "pid": 2
+   },
+   {
+    "g": 18,
+    "t": "Ruben perde con Dario Colombo.",
+    "pid": 3,
+    "tipo": "duello",
+    "esito": "s",
+    "avv": "Dario Colombo"
+   },
+   {
+    "g": 21,
+    "t": "Una rivalità: Alimenti la rivalità: sul tatami ognuno farà meglio dell'altro",
+    "pid": 1
+   },
+   {
+    "g": 21,
+    "t": "Maya batte Kai Esposito.",
+    "pid": 2,
+    "tipo": "duello",
+    "esito": "v",
+    "avv": "Kai Esposito"
+   },
+   {
+    "g": 21,
+    "t": "Hai parlato con Maya (ascolta).",
+    "pid": 2
+   },
+   {
+    "g": 22,
+    "t": "Ivan Rasmussen entra in palestra.",
+    "pid": 4
+   },
+   {
+    "g": 24,
+    "t": "Maya si fa male in allenamento (braccio sx −17).",
+    "pid": 2
+   },
+   {
+    "g": 25,
+    "t": "Hai parlato con Ruben (incoraggia).",
+    "pid": 3
+   },
+   {
+    "g": 25,
+    "t": "Lino batte Olga Draven.",
+    "pid": 1,
+    "tipo": "duello",
+    "esito": "v",
+    "avv": "Olga Draven"
+   },
+   {
+    "g": 25,
+    "t": "Ruben perde con Kai Barros.",
+    "pid": 3,
+    "tipo": "duello",
+    "esito": "s",
+    "avv": "Kai Barros"
+   },
+   {
+    "g": 25,
+    "t": "Ivan perde con Nina Novak.",
+    "pid": 4,
+    "tipo": "duello",
+    "esito": "s",
+    "avv": "Nina Novak"
+   },
+   {
+    "g": 28,
+    "t": "Maya batte Rita Reyes.",
+    "pid": 2,
+    "tipo": "duello",
+    "esito": "v",
+    "avv": "Rita Reyes"
+   },
+   {
+    "g": 28,
+    "t": "Hai parlato con Maya (incoraggia).",
+    "pid": 2
+   },
+   {
+    "g": 28,
+    "t": "Ivan si fa male in allenamento (gamba sx −14).",
+    "pid": 4
+   },
+   {
+    "g": 30,
+    "t": "Una richiesta di soldi: Gli dai i soldi (80¤)",
+    "pid": 3
+   },
+   {
+    "g": 30,
+    "t": "Hai parlato con Lino (rimprovera).",
+    "pid": 1
+   },
+   {
+    "g": 30,
+    "t": "Lino batte Ruben Moreau.",
+    "pid": 1,
+    "tipo": "duello",
+    "esito": "v",
+    "avv": "Ruben Moreau"
+   },
+   {
+    "g": 30,
+    "t": "Ruben ha maturato Armi corpo a corpo.",
+    "pid": 3
+   },
+   {
+    "g": 30,
+    "t": "Ruben si fa male in allenamento (gamba dx −17).",
+    "pid": 3
+   },
+   {
+    "g": 31,
+    "t": "Ruben si fa male in allenamento (gamba sx −10).",
+    "pid": 3
+   },
+   {
+    "g": 32,
+    "t": "Un'amicizia: Bene così",
+    "pid": 3
+   },
+   {
+    "g": 32,
+    "t": "Maya si fa male in allenamento (gamba dx −25).",
+    "pid": 2
+   },
+   {
+    "g": 32,
+    "t": "Ruben si fa male in allenamento (braccio dx −27).",
+    "pid": 3
+   },
+   {
+    "g": 33,
+    "t": "Un vecchio maestro: Paghi la lezione (60¤)",
+    "pid": 1
+   },
+   {
+    "g": 33,
+    "t": "Lino batte Kira Okafor.",
+    "pid": 1,
+    "tipo": "duello",
+    "esito": "v",
+    "avv": "Kira Okafor"
+   },
+   {
+    "g": 33,
+    "t": "Arriva in palestra: Dormitorio.",
+    "pid": null
+   },
+   {
+    "g": 33,
+    "t": "Irene Moretti entra in palestra.",
+    "pid": 5
+   },
+   {
+    "g": 33,
+    "t": "Hai parlato con Irene (incoraggia).",
+    "pid": 5
+   },
+   {
+    "g": 33,
+    "t": "Irene batte Greta Marchetti.",
+    "pid": 5,
+    "tipo": "duello",
+    "esito": "v",
+    "avv": "Greta Marchetti"
+   },
+   {
+    "g": 33,
+    "t": "Ivan perde con Ivan Kessler.",
+    "pid": 4,
+    "tipo": "duello",
+    "esito": "s",
+    "avv": "Ivan Kessler"
+   }
+  ],
+  "ultimo_evento": {
+   "ispezione": 8,
+   "sparring_partner": 9,
+   "fan": 11,
+   "amicizia": 32,
+   "rivalita": 21,
+   "anticipo": 30,
+   "maestro": 33
+  },
+  "oggi": {
+   "giorno": 33,
+   "tiri": {
+    "1": 0.7881837098667926,
+    "2": 0.3275628972208591,
+    "3": 0.19334778004258035,
+    "4": 0.27098340042839686,
+    "5": 0.22910993388149958
+   }
+  },
+  "ex": [],
+  "saltate": 0,
+  "serata_giorno": 33
+ }
 }

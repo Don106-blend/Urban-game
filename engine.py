@@ -54,17 +54,34 @@ ARTI = ("braccio_sx", "braccio_dx", "gamba_sx", "gamba_dx")
 # piu' grosso, un colpo non mirato lo prende il doppio delle volte (la testa resta 1 su 7)
 PESO_LOCAZIONE = {"busto": 2}
 STATS = ["fisico", "riflessi", "mente", "sociale", "controllo"]
-NOMI_PROPRI = ["Aris", "Luna", "Marco", "Sasha", "Ivan", "Nadia", "Teo", "Zoe",
-               "Dario", "Mira", "Elia", "Vera", "Kai", "Nina", "Ruben", "Alba",
-               "Ciro", "Greta", "Milo", "Irene", "Yuri", "Petra", "Leo", "Aida",
-               "Bruno", "Cleo", "Dante", "Emma", "Furio", "Gaia", "Hugo", "Iris",
-               "Jonas", "Kira", "Lino", "Maya", "Nico", "Olga", "Pablo", "Rita"]
-COGNOMI = ["Kade", "Voss", "Ferri", "Reyes", "Petrov", "Kessler", "Marchetti",
-           "Halloran", "Colombo", "Sokolova", "Marek", "Lindt", "Draven", "Costa",
-           "Weiss", "Moreau", "Falk", "Serra", "Novak", "Quinn", "Rasmussen",
-           "Bianchi", "Okafor", "Silva", "Katz", "Duarte", "Lindqvist", "Moretti",
-           "Vance", "Iwata", "Krüger", "Esposito", "Nakamura", "Riva", "Volkov",
-           "Greco", "Anand", "Leone", "Fontaine", "Barros"]
+NOMI_PROPRI = ["Aris", "Luna", "Marco", "Sasha", "Ivan", "Nadia", "Teo", "Zoe", "Dario", "Mira", "Elia", "Vera", "Kai",
+               "Nina", "Ruben", "Alba", "Ciro", "Greta", "Milo", "Irene", "Yuri", "Petra", "Leo", "Aida", "Bruno", "Cleo",
+               "Dante", "Emma", "Furio", "Gaia", "Hugo", "Iris", "Jonas", "Kira", "Lino", "Maya", "Nico", "Olga", "Pablo",
+               "Rita", "Aldo", "Brando", "Carlo", "Damiano", "Enzo", "Fabio", "Gianni", "Ivo", "Jacopo", "Luca", "Mattia",
+               "Nando", "Orlando", "Pino", "Remo", "Saverio", "Tullio", "Ugo", "Valerio", "Zeno", "Adriano", "Bastiano",
+               "Cesare", "Davide", "Edoardo", "Flavio", "Giorgio", "Heitor", "Ilario", "Joel", "Kevin", "Lorenzo", "Marcello",
+               "Nicola", "Oscar", "Paolo", "Raul", "Stefano", "Tommaso", "Umberto", "Viktor", "Walter", "Xavier", "Yago",
+               "Ahmed", "Boris", "Dmitri", "Emil", "Felix", "Goran", "Hakim", "Igor", "Jorge", "Karim", "Lars", "Mateo",
+               "Nikolai", "Omar", "Pavel", "Rafa", "Sven", "Tariq", "Uri", "Vasco", "Alessia", "Bianca", "Chiara", "Diana",
+               "Elena", "Fabiola", "Giulia", "Helena", "Ilaria", "Jessica", "Katia", "Lidia", "Martina", "Noemi", "Ornella",
+               "Paola", "Raffaella", "Silvia", "Teresa", "Ursula", "Valentina", "Wanda", "Ximena", "Yasmin", "Zora", "Agnese",
+               "Beatrice", "Camilla", "Dalia", "Eleonora", "Francesca", "Gemma", "Hana", "Ines", "Jana", "Laila", "Marta",
+               "Nora", "Ofelia", "Priya", "Rosa", "Selene", "Tamara", "Uma", "Viola", "Amira", "Brigitte", "Carmen", "Dasha",
+               "Esther", "Fatima", "Galina", "Hilda", "Ingrid", "Jolanda", "Karin", "Leila", "Mei", "Nikita", "Oksana",
+               "Paloma", "Renata", "Sonia"]
+COGNOMI = ["Kade", "Voss", "Ferri", "Reyes", "Petrov", "Kessler", "Marchetti", "Halloran", "Colombo", "Sokolova", "Marek",
+           "Lindt", "Draven", "Costa", "Weiss", "Moreau", "Falk", "Serra", "Novak", "Quinn", "Rasmussen", "Bianchi",
+           "Okafor", "Silva", "Katz", "Duarte", "Lindqvist", "Moretti", "Vance", "Iwata", "Krüger", "Esposito",
+           "Nakamura", "Riva", "Volkov", "Greco", "Anand", "Leone", "Fontaine", "Barros", "Rossi", "Ferrari", "Russo",
+           "Bruno", "Gallo", "Conti", "Mancini", "Rizzo", "Lombardi", "Barbieri", "Fontana", "Santoro", "Mariani",
+           "Rinaldi", "Caruso", "Ferraro", "Gatti", "Pellegrini", "Palumbo", "Sanna", "Farina", "Parisi", "Villa",
+           "Vitale", "Martini", "Longo", "Gentile", "Monti", "Cattaneo", "Morelli", "Amato", "Silvestri", "Fabbri",
+           "Testa", "Grasso", "Pagano", "Rota", "Orlando", "Bellini", "Piras", "Basile", "Messina", "Cosentino",
+           "Valentini", "Sala", "Donati", "Ricci", "Carbone", "Guerra", "Marino", "Coppola", "Neri", "Zanetti", "Baldi",
+           "Fiore", "Serafini", "Cipriani", "Ortiz", "Duran", "Navarro", "Castillo", "Romero", "Ivanov", "Smirnov",
+           "Kowalski", "Nowak", "Haddad", "Mansour", "Yilmaz", "Demir", "Kim", "Park", "Tanaka", "Sato", "Chen", "Wong",
+           "Singh", "Kapoor", "Mbeki", "Diallo", "Adeyemi", "Hansen", "Berg", "Larsen", "Meyer", "Fischer", "Wagner",
+           "Hoffmann", "Dubois", "Lambert", "Girard", "Rousseau", "Pereira", "Santos"]
 
 
 def nome_casuale(usati=()):
@@ -182,6 +199,7 @@ class Personaggio:
         self.debolezze = set()      # tipi di danno subiti al +50% (permanente, dai poteri)
         self.armatura = {loc: 0 for loc in LOCAZIONI}
         self.crippled = set()
+        self.danni_tipo = {}        # locazione -> {tipo_danno: danni subiti nel duello}: per le texture delle ferite
         self.locazione_potere = {}  # nome_loc -> slot potere che l'ha creata (Ali, 2x2...)
         # risorse del round corrente
         self.azioni = self.bonus = self.risposte = 0
@@ -260,6 +278,11 @@ class Personaggio:
 
     def potere_attivo(self, nome):
         return any(s["attivo"] and s["def"]["nome"] == nome for s in self.poteri)
+
+    def rango_potere_attivo(self, nome):
+        """Il rango del potere `nome` se e' attivo, 0 se no: la scena lo usa per gli effetti che crescono col rango
+        (Supervelocita': animazioni piu' veloci; Super Forza: braccia e busto piu' grandi)."""
+        return max((s["rango"] for s in self.poteri if s["attivo"] and s["def"]["nome"] == nome), default=0)
 
     def malus_bracci(self):
         """-1 a colpire per ogni braccio con hp in negativo (cumulativo)."""
@@ -347,6 +370,12 @@ class Personaggio:
             return danno - ass, [f"L'armatura assorbe {ass} danni su {loc}."]
         return danno, []
 
+    def _nota_tipo(self, loc, tipo_danno, danno):
+        """Ricorda di che tipo sono i danni subiti da una locazione (fuoco, acido, elettrico...): il client ne ricava la
+        texture delle ferite (v. static/arena.js). Non influisce sul gioco."""
+        d = self.danni_tipo.setdefault(loc, {})
+        d[tipo_danno] = d.get(tipo_danno, 0) + danno
+
     def applica_danno(self, loc, danno, tipo_danno="contundente", split=False):
         """Applica danno a una locazione (o a tutte, se split), ritorna le righe di log."""
         if self.immune(tipo_danno):
@@ -376,22 +405,26 @@ class Personaggio:
                 righe += r2
                 if dmg > 0:
                     self.hp[l] -= dmg
+                    self._nota_tipo(l, tipo_danno, dmg)
         else:
             danno, r2 = self._assorbi(loc, danno)
             righe += r2
             if danno > 0 and loc in ("testa", "busto"):
                 self.hp[loc] -= danno
+                self._nota_tipo(loc, tipo_danno, danno)
                 righe.append(f"{loc}: -{danno} ({self.hp[loc]} hp)")
             elif danno > 0:
                 # arto: danno pieno finché è sopra 0, poi metà all'arto e metà alle altre parti
                 if self.hp[loc] > 0:
                     diretto = min(self.hp[loc], danno)
                     self.hp[loc] -= diretto
+                    self._nota_tipo(loc, tipo_danno, diretto)
                     danno -= diretto
                     righe.append(f"{loc}: -{diretto} ({self.hp[loc]} hp)")
                 if danno > 0:
                     meta = danno // 2
                     self.hp[loc] -= meta
+                    self._nota_tipo(loc, tipo_danno, meta)
                     altre = [l for l in self.hp if l != loc]
                     quota = (danno - meta) // len(altre)  # ponytail: resti persi
                     for l in altre:
@@ -407,8 +440,11 @@ class Personaggio:
         # un arto extra (Ali, 2x2...) a 0 hp o meno disattiva il potere che l'ha creato
         for nome_loc, slot in list(self.locazione_potere.items()):
             if slot.get("attivo") and self.hp.get(nome_loc, 1) <= 0:
+                # l'arto e' distrutto: il potere si spegne e le locazioni extra spariscono con lui (altrimenti restavano a hp <= 0,
+                # bersagli morti che passavano il danno al resto del corpo e il potere restava bloccato per sempre: in duello non si guarisce).
+                # Riaccenderlo (dal turno dopo, v. spento_ora) le ricrea a piena vita: costa un'azione e la stamina.
                 righe.append(f"{nome_loc} è a 0 hp: {slot['def']['nome']} si disattiva!")
-                righe += self.disattiva_potere(slot, preserva_locazioni=True)
+                righe += self.disattiva_potere(slot)
         return righe
 
     # ---------- effetti nel tempo e stance ----------
@@ -440,6 +476,8 @@ class Personaggio:
         mod_rango/flat_risultato/colpire sono controllati live (come le stance), non qui:
         solo "azioni" va applicato esplicitamente perché le risorse del turno sono un pool."""
         righe = []
+        for slot in self.poteri + self.augments:   # un potere spento nel turno scorso si puo' riaccendere da adesso
+            slot.pop("spento_ora", None)
         if self.emp_turni > 0:
             self.emp_turni -= 1
         for stato in list(self.stance_stato.values()) + list(self.attacco_stato.values()):
@@ -804,20 +842,32 @@ class Personaggio:
         return righe
 
     # ---------- poteri ----------
+    def arto_potere_rotto(self, slot):
+        """Un arto extra di questo potere (Ali, 2x2...) è a 0 hp o meno (non succede piu' da una disattivazione forzata: l'arto
+        sparisce con il potere, v. applica_danno): resta per i salvataggi e i dati che lo forzassero."""
+        return any(eff["tipo"] == "locazione_extra" and self.hp.get(eff.get("nome", "extra"), 1) <= 0
+                   for eff in per_rango(slot["def"].get("effetti", {}), slot["rango"]))
+
     def puo_attivare_potere(self, slot):
-        """False se un arto extra di questo potere (Ali, 2x2...) è rimasto a 0 hp
-        o meno da una disattivazione forzata: resta bloccato finché non guarisce."""
-        for eff in per_rango(slot["def"].get("effetti", {}), slot["rango"]):
-            if eff["tipo"] == "locazione_extra" and self.hp.get(eff.get("nome", "extra"), 1) <= 0:
-                return False
-        return True
+        """False se il potere è stato spento in questo stesso turno (si riaccende dal prossimo: spegnere
+        e riaccendere nello stesso turno rinnovava armatura e cure per un'azione) o se un suo arto extra
+        è a 0 hp (v. arto_potere_rotto)."""
+        return not slot.get("spento_ora") and not self.arto_potere_rotto(slot)
+
+    def motivo_blocco_potere(self, slot):
+        """Perche' un potere non si puo' attivare ora (per i messaggi), "" se si puo'."""
+        if self.arto_potere_rotto(slot):
+            return "è ancora inutilizzabile: un arto è a 0 hp"
+        if slot.get("spento_ora"):
+            return "è stato spento in questo turno: si riaccende dal prossimo"
+        return ""
 
     def attiva_potere(self, slot, db_attacchi, db_stances, db_effetti):
         """Attiva un potere: effetti istantanei, effetti nel tempo,
         attacchi e stance sbloccati fino al rango posseduto.
         Registra in slot["revert"] cosa annullare alla disattivazione."""
         if not self.puo_attivare_potere(slot):
-            return [f"{slot['def']['nome']} è ancora inutilizzabile: un arto è a 0 hp."]
+            return [f"{slot['def']['nome']} {self.motivo_blocco_potere(slot)}."]
         slot["attivo"] = True
         rango = slot["rango"]
         revert = slot["revert"] = []
@@ -935,6 +985,7 @@ class Personaggio:
         if not slot.get("attivo"):
             return [f"{slot['def']['nome']} non è attivo."]
         slot["attivo"] = False
+        slot["spento_ora"] = True         # niente riattivazione nello stesso turno (v. puo_attivare_potere)
         righe = [f"{self.nome} disattiva {slot['def']['nome']}."]
         for azione in reversed(slot.pop("revert", [])):
             tipo = azione[0]
