@@ -40,7 +40,7 @@ def main():
         editor.FILES = {k: os.path.join(editor.DATA, os.path.basename(v))
                         for k, v in editor.FILES.items()}
         for cls in (editor.TabAttacchi, editor.TabPoteri, editor.TabSkill, editor.TabStance,
-                    editor.TabEffetti, editor.TabEquip, editor.TabArmatura, editor.TabProtesi,
+                    editor.TabEffetti, editor.TabProtesi,
                     editor.TabAugment):
             nome = cls.file and os.path.basename(cls.file)
             cls.file = os.path.join(editor.DATA, nome)
@@ -55,9 +55,6 @@ def main():
         tpot = editor.TabPoteri(nb, get_tipi=get_tipi, get_effetti=get_effetti,
                                 get_attacchi=lambda: tatt.etichette(),
                                 get_stances=lambda: tstance.etichette())
-        tequip = editor.TabEquip(nb, get_attacchi=lambda: tatt.etichette())
-        tarm = editor.TabArmatura(nb, get_stances=lambda: tstance.etichette(),
-                                  get_effetti=get_effetti)
         tprot = editor.TabProtesi(nb, get_attacchi=lambda: tatt.etichette(),
                                   get_stances=lambda: tstance.etichette(),
                                   get_effetti=get_effetti)
@@ -66,7 +63,7 @@ def main():
                                  get_stances=lambda: tstance.etichette())
 
         tot = 0
-        for tab in (tatt, tpot, tskill, tstance, teff, tequip, tarm, tprot, taug):
+        for tab in (tatt, tpot, tskill, tstance, teff, tprot, taug):
             for item in tab.items:
                 tab.edit_id = item["id"]
                 tab.form_da_item(item)

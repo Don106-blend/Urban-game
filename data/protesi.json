@@ -43,5 +43,35 @@
     ],
     "effetti_nel_tempo": [],
     "id": 3
+  },
+  {
+    "id": 4,
+    "nome": "Braccio-cannone",
+    "descrizione": "Sostituisce il braccio sinistro con una canna integrata (120 hp, mai CRIPPLED): spara colpi a distanza (non si parano), 7 colpi per duello.",
+    "valore": 500,
+    "locazione": "braccio_sx",
+    "hp": 120,
+    "costo_umanita": 2,
+    "attacchi": [
+      2
+    ],
+    "stance": [],
+    "stance_attivate": [],
+    "effetti_nel_tempo": []
+  },
+  {
+    "id": 5,
+    "nome": "Gamba corazzata",
+    "descrizione": "Sostituisce la gamba destra con una struttura rinforzata (250 hp, mai CRIPPLED): la stance Barriera sempre attiva: -20% a tutti i danni subiti.",
+    "valore": 300,
+    "locazione": "gamba_dx",
+    "hp": 250,
+    "costo_umanita": 1,
+    "attacchi": [],
+    "stance": [],
+    "stance_attivate": [
+      32
+    ],
+    "effetti_nel_tempo": []
   }
 ]

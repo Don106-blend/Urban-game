@@ -61,7 +61,7 @@
     <a class="btn btn-ghost" href="{{ url_for('palestra_pagina') }}">← Torna alla palestra</a>
     {% if stato != 'morto' %}
     <form method="post" action="{{ url_for('personaggio_congeda', pid=c.id) }}"
-          onsubmit="return confirm('Congedare {{ c.nome }}? Lascia la palestra per sempre (armi e armatura restano in magazzino).');">
+          onsubmit="return confirm('Congedare {{ c.nome }}? Lascia la palestra per sempre (il cyberware resta in magazzino).');">
       <button class="btn btn-ghost danger-btn">Congeda</button>
     </form>
     {% endif %}
@@ -156,46 +156,9 @@
       </div>
     {% endif %}
 
-    <h2>Armi <span class="muted">({{ armi|length }}/{{ MAX_ARMI }} slot)</span></h2>
-    {% if not armi %}
-      <p class="muted">Nessuna arma. Passa dal <a href="{{ url_for('negozio') }}">negozio</a>.</p>
-    {% else %}
-      <div class="poteri-list">
-        {% for e in armi %}
-        <div class="potere-row">
-          <span class="potere-nome">{{ e.nome }}</span>
-          <p class="muted">{{ e.descrizione }}</p>
-          <form method="post" action="{{ url_for('negozio_disequip') }}">
-            <input type="hidden" name="pid" value="{{ c.id }}">
-            <input type="hidden" name="indietro" value="{{ indietro }}">
-            <input type="hidden" name="categoria" value="arma">
-            <input type="hidden" name="iid" value="{{ e.id }}">
-            <button class="btn btn-ghost danger-btn">✕ Rimuovi</button>
-          </form>
-        </div>
-        {% endfor %}
-      </div>
-    {% endif %}
-
-    <h2>Armatura</h2>
-    {% if not armatura %}
-      <p class="muted">Nessuna armatura indossata.</p>
-    {% else %}
-      <div class="poteri-list">
-        <div class="potere-row">
-          <span class="potere-nome">{{ armatura.nome }}</span>
-          <span class="badge badge-rango">+{{ armatura.armatura_hp }} hp su {{ armatura.locazioni|join(', ') }}</span>
-          {% for r in armatura.resistenze %}<span class="badge">-{{ r.valore }}% {{ r.tipo_danno }}</span>{% endfor %}
-          <p class="muted">{{ armatura.descrizione }}</p>
-          <form method="post" action="{{ url_for('negozio_disequip') }}">
-            <input type="hidden" name="pid" value="{{ c.id }}">
-            <input type="hidden" name="indietro" value="{{ indietro }}">
-            <input type="hidden" name="categoria" value="armatura">
-            <button class="btn btn-ghost danger-btn">✕ Rimuovi</button>
-          </form>
-        </div>
-      </div>
-    {% endif %}
+    <h2>Cyberware <a class="btn btn-ghost btn-sm" href="{{ url_for('negozio', pid=c.id) }}">Potenzia nel negozio →</a></h2>
+    <p class="muted">Protesi e augment sono tutto l'equipaggiamento: ognuno occupa un posto nel corpo e costa Umanità
+      ({{ umanita_usata }}/{{ umanita_max }} usata).</p>
 
     <h2>Protesi</h2>
     {% if not protesi %}

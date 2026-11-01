@@ -81,8 +81,7 @@ function eroeCard() {
   const poteri = e.poteri.map(p => `<div>⚡ ${p.nome} <b>r${p.rango}</b></div>`).join("")
     || '<div class="muted">nessun potere</div>';
   const equip = [
-    ...e.armi.map(n => `<div>🗡 ${n}</div>`),
-    ...(e.armatura_hp ? [`<div>🛡 +${e.armatura_hp} hp armatura</div>`] : []),
+    ...e.protesi.map(n => `<div>⚙ ${n}</div>`),
     ...e.augments.map(n => `<div>🔩 ${n}</div>`),
   ].join("");
   return `<div class="evo-eroe">
@@ -229,7 +228,7 @@ function confermaScelta() {
   azione({tipo: "scegli", potere: sceltaPotere, stat: sceltaStat});
 }
 
-const ICONA_ITEM = {arma: "🗡", armatura: "🛡", augment: "🔩"};
+const ICONA_ITEM = {protesi: "⚙", augment: "🔩"};
 
 function renderOggetto() {
   sceltaItem = null;

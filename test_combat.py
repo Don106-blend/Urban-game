@@ -796,6 +796,19 @@ def main():
     pAli.disattiva_potere(slotAli)
     assert "ala_sx" not in pAli.hp and "ala_sx" not in pAli.locazione_potere
 
+    # un attacco a piu' colpi non si incaglia se la locazione colpita (un'ala) sparisce a meta': i colpi che restano vanno al busto
+    pMc, aMc = Personaggio("Colpitore"), Personaggio("Alato2")
+    aMc.stats["controllo"] = 4
+    slotMc = {"def": poteriA["Ali"], "rango": 1, "attivo": False}
+    aMc.poteri = [slotMc]
+    aMc.attiva_potere(slotMc, dbA["attacchi"], dbA["stances"], dbA["effetti"])
+    dMc = webapp.DuelloWeb(pg=pMc, avversario=aMc)
+    dMc.attivo, dMc.altro, dMc.fase = pMc, aMc, "player"
+    aMc.applica_danno("ala_sx", 999, "contundente")                   # la prima raffica la distrugge: l'ala se ne va
+    assert "ala_sx" not in aMc.hp
+    att_multi = next(a for a in dbA["attacchi"] if a.get("colpi", 1) > 1)
+    dMc._continua_o_fine(att_multi, False, "ala_sx", 2)               # prima del fix: KeyError 'ala_sx'
+
     # dal duello web: spento nel turno, non si riaccende finche' non comincia il turno dopo (il menu lo dice)
     pSp, aSp = Personaggio("Spegni"), Personaggio("Avv")
     pSp.stats["controllo"] = pSp.stats["fisico"] = 4
@@ -916,8 +929,12 @@ def main():
     # ================= umanità, armatura, protesi, augment, EMP, colpi multipli =================
     from engine import umanita_max, dotazione_base
     db_e = webapp.DB
-    armor_gilet = next(a for a in db_e["armor"] if a["nome"] == "Giubbotto antiproiettile")
-    armor_combat = next(a for a in db_e["armor"] if a["nome"] == "Armatura da combattimento")
+    aug_sotto = next(a for a in db_e["augments"] if a["nome"] == "Sottopelle balistico")      # ex Giubbotto antiproiettile
+    aug_eso = next(a for a in db_e["augments"] if a["nome"] == "Esoscheletro da combattimento")  # ex Armatura da combattimento
+    aug_calotta = next(a for a in db_e["augments"] if a["nome"] == "Calotta in titanio")      # ex Casco da lotta
+    aug_lama = next(a for a in db_e["augments"] if a["nome"] == "Lama monomolecolare")         # ex Spada
+    protesi_cannone = next(p for p in db_e["protesi"] if p["nome"] == "Braccio-cannone")       # ex Pistola
+    assert "equip" not in db_e and "armor" not in db_e, "dalla Fase 7 niente armi e armature: solo cyberware"
     protesi_braccio = next(p for p in db_e["protesi"] if p["nome"] == "Braccio prostetico")
     protesi_gamba = next(p for p in db_e["protesi"] if p["nome"] == "Gamba prostetica")
     aug_attivo = next(a for a in db_e["augments"] if a["nome"] == "Iniettore di Adrenalina")
@@ -928,15 +945,28 @@ def main():
     pu.stats["mente"], pu.stats["sociale"] = 3, 2
     assert umanita_max(pu) == 10
 
-    # armatura: hp extra sulle locazioni coperte, resistenze, stance sbloccate
+    # armatura (impianti passivi dalla Fase 7): hp extra sulle locazioni coperte, resistenze, stance sbloccate
     pa = Personaggio("Corazzato")
-    pa.equipaggia_armatura(armor_gilet, db_e["stances"], db_e["effetti"])
-    assert pa.armatura["busto"] == armor_gilet["armatura_hp"] and pa.armatura["testa"] == 0
-    assert pa.resistenza_tot("perforante") == armor_gilet["resistenze"][0]["valore"]  # in %
+    webapp._applica_item_a(pa, "augment", aug_sotto)
+    assert pa.armatura["busto"] == 50 and pa.armatura["testa"] == 0, "il sottopelle copre solo il busto"
+    assert pa.resistenza_tot("perforante") == 20  # in %
+    pa.disattiva_potere(pa.augments[0])           # (un EMP lo spegne) l'armatura concessa se ne va, e solo dal busto
+    assert pa.armatura["busto"] == 0 and pa.resistenza_tot("perforante") == 0
     pa2 = Personaggio("Corazzato2")
-    pa2.equipaggia_armatura(armor_combat, db_e["stances"], db_e["effetti"])
-    assert all(pa2.armatura[l] == armor_combat["armatura_hp"] for l in LOCAZIONI)
+    webapp._applica_item_a(pa2, "augment", aug_eso)
+    assert all(pa2.armatura[l] == 10 for l in LOCAZIONI)
     assert any(s["id"] == 17 for s in pa2.stance_conosciute)  # Corazza sbloccata
+    pa3 = Personaggio("Calotta")
+    webapp._applica_item_a(pa3, "augment", aug_calotta)
+    assert pa3.armatura["testa"] == 15 and pa3.armatura["busto"] == 0 and pa3.resistenza_tot("contundente") == 10
+    pa4 = Personaggio("Lama")
+    dotazione_base(pa4, db_e["attacchi"], db_e["stances"])
+    webapp._applica_item_a(pa4, "augment", aug_lama)
+    assert {48, 49} <= {a["id"] for a in pa4.attacchi}, "la lama sblocca taglio e affondo"
+    pa5 = Personaggio("Cannone")
+    dotazione_base(pa5, db_e["attacchi"], db_e["stances"])
+    webapp._applica_item_a(pa5, "protesi", protesi_cannone)
+    assert 2 in {a["id"] for a in pa5.attacchi} and pa5.protesi_equip == [protesi_cannone["id"]] and "braccio_sx" in pa5.protesi_locazioni
 
     # protesi: hp/hp_max sostituiti, mai CRIPPLED, +10 vs elettrico, sblocca un attacco
     pp = Personaggio("Cyborg")
@@ -1094,32 +1124,17 @@ def main():
     rec_inv["stats"]["mente"] = rec_inv["stats"]["sociale"] = 2  # umanità = 8
     webapp.STATO["personaggi"].append(rec_inv)
 
-    pistola = next(e for e in db_e["equip"] if e["nome"] == "Pistola")
-    spada = next(e for e in db_e["equip"] if e["nome"] == "Spada")
-
-    # arma: si equipaggiano fino a MAX_ARMI (il catalogo ha solo Pistola e Spada,
-    # quindi il tetto di 2 slot è già esercitato equipaggiandole entrambe)
+    # augment: si installano, costano Umanita', niente doppioni; togliere finisce in magazzino
     client = webapp.app.test_client()
-    r1 = client.post("/negozio/equip", data={"categoria": "arma", "iid": pistola["id"], "pid": 777})
+    n_mag = len(webapp.STATO["palestra"]["magazzino"])
+    r1 = client.post("/negozio/equip", data={"categoria": "augment", "iid": aug_lama["id"], "pid": 777})
     assert r1.status_code in (302, 303)
-    client.post("/negozio/equip", data={"categoria": "arma", "iid": spada["id"], "pid": 777})
-    assert rec_inv["armi"] == [pistola["id"], spada["id"]]
-    # doppione della stessa arma: rifiutato
-    client.post("/negozio/equip", data={"categoria": "arma", "iid": pistola["id"], "pid": 777})
-    assert rec_inv["armi"].count(pistola["id"]) == 1
-    # disequip libera lo slot
-    client.post("/negozio/disequip", data={"categoria": "arma", "iid": pistola["id"], "pid": 777})
-    assert rec_inv["armi"] == [spada["id"]]
-
-    # armatura: 1 slot, equipaggiarne una seconda sostituisce la prima
-    client.post("/negozio/equip", data={"categoria": "armatura", "iid": armor_gilet["id"], "pid": 777})
-    assert rec_inv["armatura_equip"] == armor_gilet["id"]
-    client.post("/negozio/equip", data={"categoria": "armatura", "iid": armor_combat["id"], "pid": 777})
-    assert rec_inv["armatura_equip"] == armor_combat["id"]
-    client.post("/negozio/disequip", data={"categoria": "armatura", "pid": 777})
-    assert rec_inv["armatura_equip"] is None
-    client.post("/negozio/equip", data={"categoria": "armatura", "iid": armor_combat["id"], "pid": 777})
-    assert rec_inv["armatura_equip"] == armor_combat["id"]
+    assert rec_inv["augments"] == [aug_lama["id"]] and webapp.umanita_usata(rec_inv) == 1
+    client.post("/negozio/equip", data={"categoria": "augment", "iid": aug_lama["id"], "pid": 777})
+    assert rec_inv["augments"].count(aug_lama["id"]) == 1  # doppione: rifiutato
+    client.post("/negozio/disequip", data={"categoria": "augment", "iid": aug_lama["id"], "pid": 777})
+    assert rec_inv["augments"] == [] and len(webapp.STATO["palestra"]["magazzino"]) == n_mag + 1
+    client.post("/negozio/equip", data={"categoria": "augment", "iid": aug_lama["id"], "pid": 777})
 
     # protesi: una sola per locazione, e il costo in umanità è vincolante
     client.post("/negozio/equip", data={"categoria": "protesi", "iid": protesi_braccio["id"], "pid": 777})
@@ -1127,27 +1142,38 @@ def main():
     prima_prot = len(rec_inv["protesi"])
     client.post("/negozio/equip", data={"categoria": "protesi", "iid": protesi_braccio["id"], "pid": 777})
     assert len(rec_inv["protesi"]) == prima_prot  # stessa locazione braccio_dx: rifiutata
-    # umanità disponibile = 8; braccio (3) + gamba (2) = 5, resta margine: deve passare
+    # la protesi di un'altra locazione passa (umanita' 8: lama 1 + braccio 3 + cannone 2 = 6)
+    client.post("/negozio/equip", data={"categoria": "protesi", "iid": protesi_cannone["id"], "pid": 777})
+    assert protesi_cannone["id"] in rec_inv["protesi"] and webapp.umanita_usata(rec_inv) == 6
+    # sostituire una protesi sulla stessa locazione: con `sostituisci` la vecchia va in magazzino (qui una protesi finta, solo per la prova)
+    finta = dict(protesi_braccio, id=9999, nome="Braccio di prova", costo_umanita=1)
+    assert not webapp._equipaggia(rec_inv, "protesi", finta)[0]
+    n_mag = len(webapp.STATO["palestra"]["magazzino"])
+    assert webapp._equipaggia(rec_inv, "protesi", finta, sostituisci=True)[0]
+    assert protesi_braccio["id"] not in rec_inv["protesi"] and 9999 in rec_inv["protesi"]
+    assert webapp.STATO["palestra"]["magazzino"][-1] == {"cat": "protesi", "id": protesi_braccio["id"]}
+    assert len(webapp.STATO["palestra"]["magazzino"]) == n_mag + 1
+    rec_inv["protesi"] = [x for x in rec_inv["protesi"] if x != 9999] + [protesi_braccio["id"]]
+    webapp.STATO["palestra"]["magazzino"].pop()
+    assert webapp.umanita_usata(rec_inv) == 6
+    # umanita': 8 - 6 = 2 liberi; la Calotta (1) passa, poi la Gamba (2) sfora e viene rifiutata
+    client.post("/negozio/equip", data={"categoria": "augment", "iid": aug_calotta["id"], "pid": 777})
+    assert aug_calotta["id"] in rec_inv["augments"] and webapp.umanita_usata(rec_inv) == 7
     client.post("/negozio/equip", data={"categoria": "protesi", "iid": protesi_gamba["id"], "pid": 777})
-    assert protesi_gamba["id"] in rec_inv["protesi"]
-    assert webapp.umanita_usata(rec_inv) == 5
-
-    # augment: rifiutato se sfora l'umanità rimasta (8 - 5 = 3 disponibili; Placche ne costa 3: passa,
-    # un secondo tentativo di qualsiasi altro augment con costo extra deve sforare e fallire)
+    assert protesi_gamba["id"] not in rec_inv["protesi"]  # avrebbe sforato: rifiutata
     client.post("/negozio/equip", data={"categoria": "augment", "iid": aug_passivo["id"], "pid": 777})
-    assert aug_passivo["id"] in rec_inv["augments"]
-    assert webapp.umanita_usata(rec_inv) == 8  # umanità esaurita
-    r_sfora = client.post("/negozio/equip",
-                          data={"categoria": "augment", "iid": aug_attivo["id"], "pid": 777})
-    assert aug_attivo["id"] not in rec_inv["augments"]  # avrebbe sforato: rifiutato
+    assert aug_passivo["id"] not in rec_inv["augments"]    # (Placche costa 3)
+    # la pagina del negozio mostra il corpo dell'allievo e le sue protesi
+    pagina = client.get("/negozio?pid=777").get_data(as_text=True)
+    assert "Braccio-cannone" in pagina and "Calotta in titanio" in pagina and "braccio sinistro" in pagina
 
     # record_to_pg: tutto l'inventario si applica correttamente a un Personaggio vero
     p_inv = webapp.record_to_pg(rec_inv)
-    assert any(a["id"] in spada["attacchi"] for a in p_inv.attacchi)
-    assert p_inv.armatura["testa"] == armor_combat["armatura_hp"]  # Armatura da combattimento, tutte le locazioni
-    assert "braccio_dx" in p_inv.protesi_locazioni and "gamba_sx" in p_inv.protesi_locazioni
+    assert {48, 49} <= {a["id"] for a in p_inv.attacchi}   # la Lama
+    assert p_inv.armatura["testa"] == 15                    # la Calotta
+    assert "braccio_dx" in p_inv.protesi_locazioni and "braccio_sx" in p_inv.protesi_locazioni
     assert p_inv.hp["braccio_dx"] == protesi_braccio["hp"]
-    assert any(s["def"] is aug_passivo and s["attivo"] for s in p_inv.augments)  # passivo già attivo
+    assert any(s["def"] is aug_lama and s["attivo"] for s in p_inv.augments)  # passivo già attivo
 
     webapp.STATO["personaggi"].remove(rec_inv)
     webapp.salva_stato = _salva4
@@ -1241,15 +1267,13 @@ def main():
     c_basso = Personaggio("CpuBasso")
     dotazione_base(c_basso, db_e["attacchi"], db_e["stances"])
     webapp._equipaggia_cpu(c_basso, 1)
-    assert hasattr(c_basso, "armi_equip")  # sempre presente, anche se vuoto
 
     n_equip_alto = 0
     for _ in range(20):
         c_alto = Personaggio("CpuAlto")
         dotazione_base(c_alto, db_e["attacchi"], db_e["stances"])
         webapp._equipaggia_cpu(c_alto, 10)
-        if (c_alto.armi_equip or c_alto.armatura["busto"]
-                or c_alto.protesi_locazioni or c_alto.augments):
+        if c_alto.protesi_locazioni or c_alto.augments:
             n_equip_alto += 1
     assert n_equip_alto >= 15, n_equip_alto  # a livello 10 quasi sempre equipaggiata
 
@@ -1260,7 +1284,7 @@ def main():
     assert tt.fase in ("risultato", "vittoria")
     if tt.fase == "risultato":
         eroe_t = tt.eroi[tt.io]
-        assert eroe_t.armi_equip == []  # nulla ancora scelto
+        assert eroe_t.protesi_equip == [] and not eroe_t.augments  # nulla ancora scelto
         pw = tt.scelte["poteri"][0]
         stat = tt.scelte["stats"][0] if tt.scelte["stats"] else None
         err_scelta = tt.scegli(pw["id"], stat)
@@ -1274,10 +1298,8 @@ def main():
             assert err_item is None
             assert tt.fase == "pronto" and tt.scelte_item is None
             # l'item si vede davvero sull'eroe, coerentemente con la categoria scelta
-            if categoria == "arma":
-                assert item["id"] in eroe_t.armi_equip
-            elif categoria == "armatura":
-                assert getattr(eroe_t, "armatura_equip_id", None) == item["id"]
+            if categoria == "protesi":
+                assert item["id"] in eroe_t.protesi_equip
             else:
                 assert any(s["def"] is item for s in eroe_t.augments)
             # una seconda chiamata a scegli_item senza una scelta in corso viene rifiutata
@@ -1371,9 +1393,11 @@ def overhaul(webapp):
     assert pr2.resistenza_tot("fuoco") == RESISTENZA_MAX
     pr2.applica_danno("busto", 100, "fuoco")
     assert pr2.hp["busto"] == pr2.hp_max["busto"] - 25
-    # le resistenze di armature e poteri dei dati stanno nella scala percentuale
-    for arm in db["armor"]:
-        assert all(0 <= r["valore"] <= RESISTENZA_MAX for r in arm["resistenze"]), arm["nome"]
+    # le resistenze degli impianti e dei poteri dei dati stanno nella scala percentuale
+    for ag in db["augments"]:
+        for eff in ag["effetti"].get("1", []):
+            if eff["tipo"] == "resistenza":
+                assert 0 <= eff["valore"] <= RESISTENZA_MAX, ag["nome"]
 
     # ---- overhaul fase 2/3: attacchi, slot, kit base ----
     # nessun attacco split sopra 270 totali: una zampata sola non uccide dalla testa
@@ -1493,27 +1517,20 @@ def overhaul(webapp):
     assert webapp.budget_cpu(1) < webapp.budget_cpu(5) <= webapp.BUDGET_CPU_MAX
     assert webapp.budget_cpu(40) == webapp.BUDGET_CPU_MAX
     prezzi = {(c, i["id"]): i["valore"] for c, cat in
-              (("arma", db["equip"]), ("armatura", db["armor"]), ("protesi", db["protesi"]),
-               ("augment", db["augments"])) for i in cat}
+              (("protesi", db["protesi"]), ("augment", db["augments"])) for i in cat}
     random.seed(21)
     for livello in (1, 2, 3, 5, 8, 12, 20):
         for _ in range(60):
             cpu = eroe_base(db["attacchi"], db["poteri"], db["stances"])
             webapp._equipaggia_cpu(cpu, livello)
-            speso = sum(prezzi[("arma", i)] for i in cpu.armi_equip)
-            speso += prezzi.get(("armatura", getattr(cpu, "armatura_equip_id", None)), 0)
-            for loc in cpu.protesi_locazioni:
-                speso += next(prezzi[("protesi", p["id"])] for p in db["protesi"] if p["locazione"] == loc)
+            speso = sum(prezzi[("protesi", i)] for i in cpu.protesi_equip)
             speso += sum(prezzi[("augment", s["def"]["id"])] for s in cpu.augments)
             assert speso <= webapp.budget_cpu(livello), (livello, speso)
-            assert len(cpu.armi_equip) <= webapp.MAX_ARMI
-            usata = sum(next(p for p in db["protesi"] if p["locazione"] == loc)["costo_umanita"]
-                        for loc in cpu.protesi_locazioni)
-            usata += sum(s["def"]["costo_umanita"] for s in cpu.augments)
-            assert usata <= umanita_max(cpu)
+            assert len(set(cpu.protesi_locazioni)) == len(cpu.protesi_equip)   # una protesi per locazione
+            assert webapp.umanita_spesa_pg(cpu) <= umanita_max(cpu)
     # eroe_livello: senza equip, con i Token spesi
     el = webapp.eroe_livello(6)
-    assert el.livello == 6 and not getattr(el, "armi_equip", []) and not el.protesi_locazioni
+    assert el.livello == 6 and not el.augments and not el.protesi_locazioni
 
     # ---- overhaul fase 4B: bias per personaggio, limitato e con rientro ----
     random.seed(4)
@@ -1624,7 +1641,7 @@ def overhaul(webapp):
     tu = webapp.TorneoEvo()
 
     def n_oggetti(x):
-        return len(x.armi_equip) + (1 if getattr(x, "armatura_equip_id", None) is not None else 0) + len(x.augments)
+        return len(x.protesi_equip) + len(x.augments)
     for e_cpu in [x for i, x in enumerate(tu.eroi) if i != tu.io][:6]:
         stat0, ogg0 = sum(e_cpu.stats[s] for s in tu.STATS_POTENZIABILI), n_oggetti(e_cpu)
         tu._evolvi_cpu(e_cpu, 2)

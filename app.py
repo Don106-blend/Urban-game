@@ -125,22 +125,17 @@ if _cambiato:
 
 
 # ---------------------------------------------------------------- personaggi persistenti
-MAX_ARMI = 2  # slot arma nell'inventario di un eroe
-
-
 def nuovo_record(p):
     """Personaggio del motore -> record salvabile. Cattura anche l'equip eventualmente
     già presente sul Personaggio (es. un campione del Torneo Evo che ha raccolto item
     durante il torneo): per un eroe appena creato questi campi sono comunque vuoti."""
-    protesi_ids = [pr["id"] for loc in p.protesi_locazioni
-                   for pr in DB["protesi"] if pr["locazione"] == loc]
+    protesi_ids = list(getattr(p, "protesi_equip", [])) or [pr["id"] for loc in p.protesi_locazioni
+                                                              for pr in DB["protesi"] if pr["locazione"] == loc]
     return {"id": None, "nome": p.nome, "data_nascita": p.data_nascita,
             "bio": p.bio, "stats": dict(p.stats), "skills": dict(p.skills),
             "poteri": [{"id": s["def"]["id"], "rango": s["rango"]} for s in p.poteri],
             "hp": dict(p.hp), "crippled": sorted(p.crippled),
             "livello": 1, "xp": 0, "token": 0, "toughness": 0,
-            "armi": list(getattr(p, "armi_equip", []))[:MAX_ARMI],
-            "armatura_equip": getattr(p, "armatura_equip_id", None),
             "protesi": protesi_ids,
             "augments": [s["def"]["id"] for s in p.augments],
             "vittorie": 0, "sconfitte": 0, "morto": False,
@@ -173,8 +168,48 @@ def umanita_installata(c):
     return tot
 
 
+# Fase 7 (CYBERWARE.md): armi e armature non esistono piu', sono protesi e augment. (categoria, id) di prima -> (categoria, id) di adesso.
+LEGACY_EQUIP = {("arma", 1): ("protesi", 4), ("arma", 2): ("augment", 8), ("armatura", 1): ("augment", 10),
+                ("armatura", 2): ("augment", 11), ("armatura", 3): ("augment", 9)}
+
+
+def _migra_record_equip(rec, magazzino=None):
+    """Un record con armi/armatura (salvataggio di prima della Fase 7): ogni pezzo diventa il suo cyberware. Se non ci sta (slot occupato,
+    Umanita' finita) va in magazzino, per un allievo; per un rivale o un aspirante si lascia perdere. Ritorna True se ha cambiato qualcosa."""
+    vecchi = [("arma", i) for i in (rec.pop("armi", None) or rec.pop("equip", None) or [])]
+    rec.pop("equip", None)
+    arm = rec.pop("armatura_equip", None)
+    if arm:
+        vecchi.append(("armatura", arm))
+    for v in vecchi:
+        cat, iid = LEGACY_EQUIP.get(v, (None, None))
+        item = next((x for x in (_catalogo(cat) or []) if x["id"] == iid), None)
+        if item is not None and not _equipaggia(rec, cat, item)[0] and magazzino is not None:
+            magazzino.append({"cat": cat, "id": iid})
+    return bool(vecchi)
+
+
+def migra_cyberware(stato):
+    """Porta un salvataggio alla Fase 7: allievi, aspiranti, rivali e magazzino. Ritorna True se ha cambiato qualcosa."""
+    cambiato = False
+    mag = palestra.stato_palestra(stato)["magazzino"]
+    for voce in list(mag):
+        if voce.get("cat") in ("arma", "armatura"):
+            nuova = LEGACY_EQUIP.get((voce["cat"], voce.get("id")))
+            if nuova:
+                voce["cat"], voce["id"] = nuova
+            else:
+                mag.remove(voce)
+            cambiato = True
+    for rec in stato.get("personaggi", []):
+        cambiato = _migra_record_equip(rec, mag) or cambiato
+    for rec in stato.get("contratti", []) + stato.get("rivali", []):
+        cambiato = _migra_record_equip(rec) or cambiato
+    return cambiato
+
+
 def record_to_pg(c):
-    """Record salvato -> Personaggio pronto al duello (armatura/stance/effetti resettati)."""
+    """Record salvato -> Personaggio pronto al duello (protesi, augment, stance e effetti resettati)."""
     p = Personaggio(c["nome"], c.get("data_nascita", ""), c.get("bio", ""))
     p.aspetto = c["aspetto"] if aspetto.valido(c.get("aspetto")) else aspetto.genera(c["nome"])
     p.stats.update(c.get("stats", {}))
@@ -186,18 +221,6 @@ def record_to_pg(c):
         pd = next((x for x in DB["poteri"] if x["id"] == pw["id"]), None)
         if pd:
             p.poteri.append({"def": pd, "rango": pw["rango"], "attivo": False})
-    # armi (fino a 2 slot): sbloccano attacchi (es. Pistola). "equip" = vecchi salvataggi.
-    for eid in c.get("armi", c.get("equip", []))[:MAX_ARMI]:
-        eq = next((x for x in DB["equip"] if x["id"] == eid), None)
-        for aid in (eq or {}).get("attacchi", []):
-            att = next((x for x in DB["attacchi"] if x["id"] == aid), None)
-            if att and all(x["id"] != att["id"] for x in p.attacchi):
-                p.attacchi.append(att)
-    # armatura (1 slot): hp extra, resistenze, stance — permanente per tutto il duello
-    if c.get("armatura_equip"):
-        arm = next((x for x in DB["armor"] if x["id"] == c["armatura_equip"]), None)
-        if arm:
-            p.equipaggia_armatura(arm, DB["stances"], DB["effetti"])
     # protesi: sostituiscono la locazione, sbloccano attacchi/stance permanentemente
     for pid in c.get("protesi", []):
         pr = next((x for x in DB["protesi"] if x["id"] == pid), None)
@@ -480,24 +503,21 @@ def _spendi_token_cpu(c, token, categorie=("stat", "skill", "potere")):
 
 
 def _applica_item_a(p, categoria, item):
-    """Equipaggia arma/armatura/augment su un Personaggio vivo (CPU o eroe del Torneo
-    Evo): stessa applicazione di record_to_pg, ma senza passare da un record salvato."""
-    if categoria == "arma":
-        if not hasattr(p, "armi_equip"):
-            p.armi_equip = []
-        p.armi_equip.append(item["id"])
-        for aid in item.get("attacchi", []):
-            att = next((x for x in DB["attacchi"] if x["id"] == aid), None)
-            if att and all(x["id"] != att["id"] for x in p.attacchi):
-                p.attacchi.append(att)
-    elif categoria == "armatura":
-        p.equipaggia_armatura(item, DB["stances"], DB["effetti"])
-        p.armatura_equip_id = item["id"]  # per ricostruire il record, v. nuovo_record
+    """Monta una protesi o un augment su un Personaggio vivo (CPU o eroe del Torneo Evo): stessa applicazione di
+    record_to_pg, ma senza passare da un record salvato."""
+    if categoria == "protesi":
+        p.equipaggia_protesi(item, DB["attacchi"], DB["stances"], DB["effetti"])
     else:  # augment
         slot = {"def": item, "rango": 1, "attivo": False}
         p.augments.append(slot)
         if not item.get("attivo", True):  # passivo: attivo da subito, per sempre
             p.attiva_potere(slot, DB["attacchi"], DB["stances"], DB["effetti"])
+
+
+def umanita_spesa_pg(p):
+    """Umanita' che costano le protesi e gli augment di un Personaggio vivo."""
+    tot = sum(s["def"].get("costo_umanita", 0) for s in p.augments)
+    return tot + sum(next((x for x in DB["protesi"] if x["id"] == i), {}).get("costo_umanita", 0) for i in p.protesi_equip)
 
 
 # ---------------------------------------------------------------- CPU: budget, non lotteria (4A)
@@ -521,40 +541,26 @@ def budget_cpu(livello):
 
 
 def _equipaggia_cpu(c, livello):
-    """La CPU compra come un giocatore: spende al piu' budget_cpu(livello) crediti, scegliendo
-    a caso tra gli stessi cataloghi del negozio con gli STESSI vincoli (2 armi, 1 armatura,
-    una protesi per locazione, umanita' per protesi e augment). Prima ogni oggetto veniva
-    assegnato con una probabilita' crescente col livello: a L5 l'80% delle CPU aveva un'arma,
-    il 49% un'armatura e il 100% protesi o augment che il giocatore non puo' permettersi
+    """La CPU compra come un giocatore: spende al piu' budget_cpu(livello) crediti, scegliendo a caso tra lo stesso catalogo del
+    negozio (protesi e augment: dalla Fase 7 non ci sono piu' armi e armature) con gli STESSI vincoli (una protesi per
+    locazione, Umanita' per tutto). Prima ogni oggetto veniva assegnato con una probabilita' crescente col livello: a L5
+    l'80% delle CPU aveva un'arma, il 49% un'armatura e il 100% protesi o augment che il giocatore non puo' permettersi
     (un eroe nudo di L5 vinceva il 27%, mira del .md: 42-50%)."""
-    c.armi_equip = []
     budget = budget_cpu(livello)
     umanita_libera = umanita_max(c)
-    catalogo = ([("arma", x) for x in DB["equip"]] + [("armatura", x) for x in DB["armor"]]
-                + [("protesi", x) for x in DB["protesi"]]
-                + [("augment", x) for x in DB["augments"]])
+    catalogo = ([("protesi", x) for x in DB["protesi"]] + [("augment", x) for x in DB["augments"]])
     random.shuffle(catalogo)  # ponytail: ordine d'acquisto casuale, non per valore/prezzo
     for categoria, item in catalogo:
         prezzo = item.get("valore", 0)
-        if prezzo > budget:
+        costo = item.get("costo_umanita", 0)
+        if prezzo > budget or costo > umanita_libera:
             continue
-        if categoria == "arma" and len(c.armi_equip) >= MAX_ARMI:
+        if categoria == "protesi" and item["locazione"] in c.protesi_locazioni:
             continue
-        if categoria == "armatura" and getattr(c, "armatura_equip_id", None) is not None:
+        if categoria == "augment" and any(s["def"]["id"] == item["id"] for s in c.augments):
             continue
-        if categoria in ("protesi", "augment"):
-            costo = item.get("costo_umanita", 0)
-            if costo > umanita_libera:
-                continue
-            if categoria == "protesi" and item["locazione"] in c.protesi_locazioni:
-                continue
-            if categoria == "augment" and any(s["def"]["id"] == item["id"] for s in c.augments):
-                continue
-            umanita_libera -= costo
-        if categoria == "protesi":
-            c.equipaggia_protesi(item, DB["attacchi"], DB["stances"], DB["effetti"])
-        else:
-            _applica_item_a(c, categoria, item)
+        umanita_libera -= costo
+        _applica_item_a(c, categoria, item)
         budget -= prezzo
 
 
@@ -749,32 +755,23 @@ def genera_avversario(record, pg):
 
 
 def valore_equip(rec):
-    """Quanto vale (in ¤ di listino) l'equipaggiamento di un record."""
-    cat = (("armi", "equip"), ("protesi", "protesi"), ("augments", "augments"))
-    tot = sum(next((x for x in DB[k] if x["id"] == i), {}).get("valore", 0) for lista, k in cat for i in rec.get(lista, []))
-    return tot + next((x for x in DB["armor"] if x["id"] == rec.get("armatura_equip")), {}).get("valore", 0)
+    """Quanto vale (in ¤ di listino) il cyberware di un record."""
+    cat = (("protesi", "protesi"), ("augments", "augments"))
+    return sum(next((x for x in DB[k] if x["id"] == i), {}).get("valore", 0) for lista, k in cat for i in rec.get(lista, []))
 
 
 def _rivale_compra(riv):
-    """Quando un rivale sale di livello puo' permettersi un oggetto in piu': uno solo, a caso, con gli stessi vincoli del negozio."""
+    """Quando un rivale sale di livello puo' permettersi un impianto in piu': uno solo, a caso, con gli stessi vincoli del negozio."""
     budget = budget_cpu(riv["livello"]) - valore_equip(riv)
     libera = umanita_max_record(riv) - umanita_installata(riv)
     occupate = {next((x for x in DB["protesi"] if x["id"] == i), {}).get("locazione") for i in riv.get("protesi", [])}
-    cat = []
-    if len(riv.get("armi", [])) < MAX_ARMI:
-        cat += [("armi", x) for x in DB["equip"] if x["id"] not in riv.get("armi", [])]
-    if riv.get("armatura_equip") is None:
-        cat += [("armatura_equip", x) for x in DB["armor"]]
-    cat += [("protesi", x) for x in DB["protesi"] if x["locazione"] not in occupate and x["id"] not in riv.get("protesi", [])]
+    cat = [("protesi", x) for x in DB["protesi"] if x["locazione"] not in occupate and x["id"] not in riv.get("protesi", [])]
     cat += [("augments", x) for x in DB["augments"] if x["id"] not in riv.get("augments", [])]
     random.shuffle(cat)
     for campo, item in cat:
         if item.get("valore", 0) > budget or item.get("costo_umanita", 0) > libera:
             continue
-        if campo == "armatura_equip":
-            riv[campo] = item["id"]
-        else:
-            riv.setdefault(campo, []).append(item["id"])
+        riv.setdefault(campo, []).append(item["id"])
         return item["nome"]
     return None
 
@@ -1152,6 +1149,8 @@ class DuelloWeb:
         if self.finito:
             return
         if colpi_rimasti > 1:
+            if loc not in self.altro.hp:       # la locazione colpita non c'e' piu' (un'ala distrutta se ne va con il potere): i colpi che restano vanno al busto
+                loc = "busto"
             self._tira_colpo(att, mirata, loc, colpi_rimasti - 1)
         else:
             self.fase = "player" if self.attivo is self.p else "cpu"
@@ -1778,7 +1777,6 @@ class TorneoEvo:
         for _ in range(16):
             e = eroe_base(DB["attacchi"], DB["poteri"], DB["stances"], usati)
             usati.add(e.nome)
-            e.armi_equip = []  # slot armi del torneo: vive sull'eroe, non su un record
             e.aspetto = aspetto.genera(e.nome, [x.aspetto for x in self.eroi])   # 16 aspetti tutti diversi
             self.eroi.append(e)
         self.io = random.randrange(16)
@@ -1837,18 +1835,16 @@ class TorneoEvo:
         e.mira = None
         e.emp_turni = 0
 
-    # ---------- equipaggiamento (armi/armatura/augment, pool condivisa col negozio) ----------
+    # ---------- equipaggiamento (protesi/augment, pool condivisa col negozio) ----------
     def _pool_item_validi(self, e):
-        """Item che l'eroe può ancora ricevere ora: stesso vincolo di slot/umanità di
-        un personaggio vero (niente doppioni, niente sforare l'umanità disponibile)."""
-        pool = [("arma", eq) for eq in DB["equip"]
-                if len(e.armi_equip) < MAX_ARMI and eq["id"] not in e.armi_equip]
-        pool += [("armatura", a) for a in DB["armor"]]
-        umanita_libera = umanita_max(e) - sum(s["def"].get("costo_umanita", 0)
-                                              for s in e.augments)
+        """Impianti che l'eroe può ancora ricevere ora: stesso vincolo di slot/umanità di
+        un personaggio vero (niente doppioni, una protesi per locazione, niente sforare l'umanità disponibile)."""
+        libera = umanita_max(e) - umanita_spesa_pg(e)
+        pool = [("protesi", pr) for pr in DB["protesi"]
+                if pr["locazione"] not in e.protesi_locazioni and pr.get("costo_umanita", 0) <= libera]
         pool += [("augment", ag) for ag in DB["augments"]
-                if ag.get("costo_umanita", 0) <= umanita_libera
-                and all(s["def"]["id"] != ag["id"] for s in e.augments)]
+                 if ag.get("costo_umanita", 0) <= libera
+                 and all(s["def"]["id"] != ag["id"] for s in e.augments)]
         return pool
 
     def _evolvi_cpu(self, e, rango_nuovo):
@@ -1994,9 +1990,8 @@ class TorneoEvo:
                      "stats": dict(self.eroi[self.io].stats),
                      "poteri": [{"nome": s["def"]["nome"], "rango": s["rango"]}
                                 for s in self.eroi[self.io].poteri],
-                     "armi": [eq["nome"] for eq in DB["equip"]
-                              if eq["id"] in self.eroi[self.io].armi_equip],
-                     "armatura_hp": sum(self.eroi[self.io].armatura.values()),
+                     "protesi": [pr["nome"] for pr in DB["protesi"]
+                                 if pr["id"] in self.eroi[self.io].protesi_equip],
                      "augments": [s["def"]["nome"] for s in self.eroi[self.io].augments]},
             "avversario": (self.eroi[self.avversario_idx()].nome
                            if self.fase in ("pronto", "duello") and self.mio_match() else None),
@@ -2012,7 +2007,7 @@ class TorneoEvo:
                              for cat, it in self.scelte_item] if self.scelte_item else None),
             "campione": self.campione,
             "pool_nomi": [p["nome"] for p in DB["poteri"]],
-            "pool_nomi_item": [it["nome"] for it in DB["equip"] + DB["armor"] + DB["augments"]],
+            "pool_nomi_item": [it["nome"] for it in DB["protesi"] + DB["augments"]],
             "bonus_accumulato": self.bonus_accumulato,
             "log_arena": self.log_arena[-6:],
         }
@@ -2319,8 +2314,6 @@ def personaggio(pid):
         if pd:
             poteri.append({"id": pw["id"], "nome": pd["nome"], "rango": pw["rango"],
                            "descrizione": pd.get("descrizione", "")})
-    armi = [e for e in DB["equip"] if e["id"] in c.get("armi", [])]
-    armatura = next((a for a in DB["armor"] if a["id"] == c.get("armatura_equip")), None)
     protesi = [{"def": pr, "loc": pr["locazione"]} for pr in DB["protesi"]
               if pr["id"] in c.get("protesi", [])]
     augments = [a for a in DB["augments"] if a["id"] in c.get("augments", [])]
@@ -2330,10 +2323,10 @@ def personaggio(pid):
     return render_template("personaggio.html", c=c, stato=stato_salute(c), nome_completo=nemesi.nome_completo(c),
                            sopr_pool=nemesi.soprannomi_disponibili(c), sopr_livello=nemesi.SOPRANNOME_LIVELLO,
                            recupero=giorni_recupero(c), poteri=poteri,
-                           upgrades=lista_upgrade(c), armi=armi, armatura=armatura,
+                           upgrades=lista_upgrade(c),
                            protesi=protesi, augments=augments,
                            umanita_max=umanita_max_record(c),
-                           umanita_usata=umanita_usata(c), MAX_ARMI=MAX_ARMI,
+                           umanita_usata=umanita_usata(c),
                            soglia=soglia_xp(c.get("livello", 1)),
                            LOCAZIONI=LOCAZIONI, STATS=STATS, SKILLS=SKILLS,
                            BONUS_RANGO=BONUS_RANGO, FALLBACK=FALLBACK,
@@ -2535,59 +2528,133 @@ def contratti_ingaggia(idx):
 
 
 # ---------------------------------------------------------------- negozio
+LOCAZIONI_CORPO = ["testa", "braccio_sx", "braccio_dx", "gamba_sx", "gamba_dx"]    # dove si monta una protesi (il busto ospita solo augment)
+NOMI_LOCAZIONE = {"testa": "testa", "busto": "busto", "braccio_sx": "braccio sinistro", "braccio_dx": "braccio destro",
+                  "gamba_sx": "gamba sinistra", "gamba_dx": "gamba destra"}
+
+
 def _catalogo(categoria):
-    return {"arma": DB["equip"], "armatura": DB["armor"], "protesi": DB["protesi"],
-            "augment": DB["augments"]}.get(categoria)
+    return {"protesi": DB["protesi"], "augment": DB["augments"]}.get(categoria)
 
 
-def _equipaggia(c, categoria, item):
-    """Mette `item` addosso al combattente se lo slot e l'umanita' lo permettono. Ritorna (ok, messaggio di rifiuto).
-    Non tocca i crediti. Un'armatura che ne sostituisce un'altra la manda in magazzino."""
+def _protesi_su(c, locazione):
+    """La protesi che il record ha montata su `locazione`, o None."""
+    return next((p for p in DB["protesi"] if p["id"] in c.get("protesi", []) and p["locazione"] == locazione), None)
+
+
+def _controlla_equip(c, categoria, item, sostituisci=False):
+    """Si puo' montare `item` su questo allievo? Non tocca niente. Ritorna (ok, motivo del rifiuto, protesi che verrebbe sostituita).
+    Con `sostituisci` una protesi gia' montata sulla stessa locazione non e' un ostacolo (finisce in magazzino)."""
     iid = item["id"]
-    if categoria == "arma":
-        if iid in c.get("armi", []):
-            return False, f"{c['nome']} possiede già {item['nome']}."
-        if len(c.get("armi", [])) >= MAX_ARMI:
-            return False, f"{c['nome']} ha già {MAX_ARMI} armi equipaggiate: rimuovine una prima."
-        c.setdefault("armi", []).append(iid)
-    elif categoria == "armatura":
-        if c.get("armatura_equip"):
-            palestra.deposita(STATO, "armatura", c["armatura_equip"])   # quella che sostituisce non si butta
-        c["armatura_equip"] = iid
-    elif categoria == "protesi":
-        occupata = next((p for p in DB["protesi"] if p["id"] in c.get("protesi", [])
-                         and p["locazione"] == item["locazione"]), None)
-        if occupata:
-            return False, f"{c['nome']} ha già una protesi su {item['locazione']}."
-        if umanita_usata(c) + item.get("costo_umanita", 0) > umanita_max_record(c):
-            return False, "Umanità insufficiente."
-        c.setdefault("protesi", []).append(iid)
-    else:  # augment
+    sostituita = None
+    prova = dict(c)                                      # una copia per contare l'Umanita' a cose fatte
+    if categoria == "protesi":
+        sostituita = _protesi_su(c, item["locazione"])
+        if sostituita is not None and sostituita["id"] == iid:
+            return False, "è già montata", None
+        if sostituita is not None and not sostituisci:
+            return False, f"{NOMI_LOCAZIONE[item['locazione']]} occupato da {sostituita['nome']}", sostituita
+        prova["protesi"] = [i for i in c.get("protesi", []) if not sostituita or i != sostituita["id"]] + [iid]
+    else:
         if iid in c.get("augments", []):
-            return False, f"{c['nome']} ha già {item['nome']}."
-        if umanita_usata(c) + item.get("costo_umanita", 0) > umanita_max_record(c):
-            return False, "Umanità insufficiente."
-        c.setdefault("augments", []).append(iid)
+            return False, "è già installato", None
+        prova["augments"] = list(c.get("augments", [])) + [iid]
+    if umanita_usata(prova) > umanita_max_record(c):
+        libera = umanita_max_record(c) - umanita_usata(c)
+        return False, f"Umanità insufficiente (servono {item.get('costo_umanita', 0)}, liberi {max(0, libera)})", sostituita
+    return True, "", sostituita
+
+
+def _equipaggia(c, categoria, item, sostituisci=False):
+    """Monta `item` addosso al combattente se lo slot e l'Umanita' lo permettono. Ritorna (ok, messaggio di rifiuto). Non tocca i crediti.
+    Una protesi che ne sostituisce un'altra la manda in magazzino (non si butta)."""
+    ok, motivo, sostituita = _controlla_equip(c, categoria, item, sostituisci)
+    if not ok:
+        return False, f"{c['nome']}: {motivo}."
+    if categoria == "protesi":
+        if sostituita is not None:
+            c["protesi"] = [i for i in c["protesi"] if i != sostituita["id"]]
+            palestra.deposita(STATO, "protesi", sostituita["id"])
+        c.setdefault("protesi", []).append(item["id"])
+    else:
+        c.setdefault("augments", []).append(item["id"])
     return True, ""
+
+
+def _dettagli_item(categoria, item):
+    """Cosa fa un impianto, a colpo d'occhio (etichette corte per la scheda del negozio): oltre alla descrizione dei dati."""
+    out = []
+    if categoria == "protesi":
+        out.append(f"{item.get('hp', 100)} hp, mai CRIPPLED")
+        att = item.get("attacchi", [])
+    else:
+        out.append(("Attivo" + (f", {item['usi_massimi']} usi" if item.get("usi_limitati") else "")) if item.get("attivo") else "Passivo: sempre acceso")
+        att = [a for lista in item.get("attacchi", {}).values() for a in lista]
+        for eff in item.get("effetti", {}).get("1", []):
+            if eff.get("tipo") == "armatura":
+                dove = eff.get("locazione", "tutte")
+                out.append(f"+{eff.get('flat', 0)} hp armatura " + ("su ogni locazione" if dove == "tutte" else f"sul {NOMI_LOCAZIONE.get(dove, dove)}"))
+            elif eff.get("tipo") == "resistenza":
+                out.append(f"−{eff.get('valore', 0)}% danni {eff.get('tipo_danno', '')}")
+    nomi = [a["nome"] for i in att for a in DB["attacchi"] if a["id"] == i]
+    if nomi:
+        out.append("Sblocca: " + ", ".join(nomi))
+    return out
+
+
+def _torna_negozio(pid=None, **filtri):
+    """Dopo un'azione si resta sulla stessa schermata: lo stesso allievo, gli stessi filtri."""
+    q = {k: v for k, v in filtri.items() if v}
+    if pid:
+        q["pid"] = pid
+    return redirect(url_for("negozio", **q))
+
+
+def _filtri_negozio(form):
+    return {"cat": form.get("cat", ""), "slot": form.get("slot", "")}
 
 
 @app.route("/negozio")
 def negozio():
-    curabili = [c for c in palestra.membri_attivi(STATO) if stato_salute(c) != "pronto"]
+    """Il negozio del cyberware: si sceglie l'allievo, si guarda il suo corpo (cinque posti per le protesi, gli impianti interni, l'Umanita')
+    e si installa da li'. Tutto in una pagina: niente liste e menu a tendina per comprare un impianto. Gli attrezzi sono un'altra scheda."""
     vivi = palestra.membri_attivi(STATO)
-    umanita = {c["id"]: (umanita_usata(c), umanita_max_record(c)) for c in vivi}
-    magazzino = []
-    for i, voce in enumerate(STATO["palestra"]["magazzino"]):
-        item = next((x for x in (_catalogo(voce["cat"]) or []) if x["id"] == voce["id"]), None)
-        if item:
-            magazzino.append({"indice": i, "cat": voce["cat"], "item": item})
-    return render_template("negozio.html", curabili=curabili, vivi=vivi,
-                           equip=DB["equip"], armor=DB["armor"], protesi=DB["protesi"],
-                           augments=DB["augments"], umanita=umanita,
-                           max_armi=MAX_ARMI, prezzo_medikit=PREZZO_MEDIKIT,
+    scheda = request.args.get("tab", "cyberware")
+    cat = request.args.get("cat", "tutto")
+    slot = request.args.get("slot", "")
+    sel = next((c for c in vivi if c["id"] == request.args.get("pid", type=int)), vivi[0] if vivi else None)
+    allievi = [{"rec": c, "stato": stato_salute(c), "usata": umanita_usata(c), "max": umanita_max_record(c),
+                "impianti": len(c.get("protesi", [])) + len(c.get("augments", []))} for c in vivi]
+    corpo, interni, voci, umanita = {}, [], [], None
+    if sel is not None:
+        umanita = (umanita_usata(sel), umanita_max_record(sel))
+        corpo = {loc: _protesi_su(sel, loc) for loc in LOCAZIONI_CORPO}
+        interni = [a for a in DB["augments"] if a["id"] in sel.get("augments", [])]
+        magazzino = STATO["palestra"]["magazzino"]
+        if cat != "magazzino":
+            elenco = ([("protesi", x) for x in DB["protesi"] if not slot or x["locazione"] == slot] if cat in ("tutto", "protesi") else [])
+            elenco += ([("augment", x) for x in DB["augments"]] if cat in ("tutto", "augment") and not slot else [])
+            for categoria, item in elenco:
+                ok, motivo, sost = _controlla_equip(sel, categoria, item, sostituisci=True)
+                ok = ok and STATO["crediti"] >= item.get("valore", 0)
+                if not ok and not motivo and STATO["crediti"] < item.get("valore", 0):
+                    motivo = "Crediti insufficienti"
+                voci.append({"cat": categoria, "item": item, "ok": ok, "motivo": motivo, "sostituisce": sost, "gratis": False,
+                             "indice": None, "dettagli": _dettagli_item(categoria, item)})
+            voci.sort(key=lambda v: (not v["ok"], v["item"].get("valore", 0)))
+        for i, voce in enumerate(magazzino):
+            item = next((x for x in (_catalogo(voce["cat"]) or []) if x["id"] == voce["id"]), None)
+            if item is None or (cat not in ("tutto", "magazzino")) or (slot and item.get("locazione") != slot):
+                continue
+            ok, motivo, sost = _controlla_equip(sel, voce["cat"], item, sostituisci=True)
+            voci.insert(0, {"cat": voce["cat"], "item": item, "ok": ok, "motivo": motivo, "sostituisce": sost, "gratis": True,
+                            "indice": i, "dettagli": _dettagli_item(voce["cat"], item)})
+    n_magazzino = len(STATO["palestra"]["magazzino"])
+    return render_template("negozio.html", scheda=scheda, allievi=allievi, sel=sel, corpo=corpo, interni=interni, voci=voci,
+                           umanita=umanita, cat=cat, slot=slot, nomi_loc=NOMI_LOCAZIONE, locazioni_corpo=LOCAZIONI_CORPO,
+                           n_magazzino=n_magazzino, prezzo_medikit=PREZZO_MEDIKIT, ferito=bool(sel) and stato_salute(sel) != "pronto",
                            attrezzi=palestra.ATTREZZI, posseduti=palestra.attrezzi_posseduti(STATO),
-                           magazzino=magazzino, capienza=palestra.capienza(STATO),
-                           occupati=len(vivi))
+                           capienza=palestra.capienza(STATO), occupati=len(vivi))
 
 
 @app.route("/negozio/attrezzo", methods=["POST"])
@@ -2596,64 +2663,67 @@ def negozio_attrezzo():
     flash(msg)
     if ok:
         salva_stato()
-    return redirect(url_for("negozio") + "#attrezzi")
+    return redirect(url_for("negozio", tab="attrezzi"))
 
 
 @app.route("/negozio/equip", methods=["POST"])
 def negozio_equip():
-    """Acquista ed equipaggia arma/armatura/protesi/augment (categoria nel form)."""
+    """Acquista e installa una protesi o un augment (categoria nel form). Con `sostituisci` una protesi gia' montata va in magazzino."""
     pid = request.form.get("pid", type=int)
     categoria = request.form.get("categoria")
     iid = request.form.get("iid", type=int)
+    filtri = _filtri_negozio(request.form)
     c = trova_record(pid)
     catalogo = _catalogo(categoria)
     if c is None or c.get("morto") or catalogo is None:
         flash("Acquisto non valido.")
-        return redirect(url_for("negozio"))
+        return _torna_negozio(**filtri)
     item = next((x for x in catalogo if x["id"] == iid), None)
     if item is None:
         flash("Oggetto non valido.")
-        return redirect(url_for("negozio"))
+        return _torna_negozio(pid, **filtri)
     if STATO["crediti"] < item.get("valore", 0):
         flash("Crediti insufficienti.")
-        return redirect(url_for("negozio"))
-    ok, msg = _equipaggia(c, categoria, item)
+        return _torna_negozio(pid, **filtri)
+    ok, msg = _equipaggia(c, categoria, item, sostituisci=request.form.get("sostituisci") == "1")
     if not ok:
         flash(msg)
-        return redirect(url_for("negozio"))
+        return _torna_negozio(pid, **filtri)
     STATO["crediti"] -= item.get("valore", 0)
     salva_stato()
-    flash(f"{item['nome']} consegnata a {c['nome']}.")
-    return redirect(url_for("negozio"))
+    flash(f"{item['nome']} installato su {c['nome']}.")
+    return _torna_negozio(pid, **filtri)
 
 
 @app.route("/negozio/magazzino/equip", methods=["POST"])
 def negozio_magazzino_equip():
     """Dal magazzino addosso a un allievo: gratis."""
-    c = _allievo(request.form.get("pid", type=int))
+    pid = request.form.get("pid", type=int)
+    c = _allievo(pid)
     indice = request.form.get("indice", type=int)
     m = STATO["palestra"]["magazzino"]
+    filtri = _filtri_negozio(request.form)
     if c is None or indice is None or not (0 <= indice < len(m)):
         flash("Oggetto non valido.")
-        return redirect(url_for("negozio") + "#magazzino")
+        return _torna_negozio(pid, **filtri)
     voce = m[indice]
     item = next((x for x in (_catalogo(voce["cat"]) or []) if x["id"] == voce["id"]), None)
     if item is None:
         flash("Oggetto non valido.")
-        return redirect(url_for("negozio") + "#magazzino")
-    ok, msg = _equipaggia(c, voce["cat"], item)
+        return _torna_negozio(pid, **filtri)
+    ok, msg = _equipaggia(c, voce["cat"], item, sostituisci=request.form.get("sostituisci") == "1")
     if not ok:
         flash(msg)
     else:
-        palestra.riprendi(STATO, indice)
+        palestra.riprendi(STATO, indice)             # (una protesi sostituita e' finita in coda: l'indice resta valido)
         salva_stato()
         flash(f"{item['nome']} passa a {c['nome']}.")
-    return redirect(url_for("negozio") + "#magazzino")
+    return _torna_negozio(pid, **filtri)
 
 
 @app.route("/negozio/disequip", methods=["POST"])
 def negozio_disequip():
-    """Toglie arma/armatura/protesi/augment equipaggiati: finiscono in magazzino (si possono rimontare gratis)."""
+    """Toglie una protesi o un augment: finiscono in magazzino (si possono rimontare gratis)."""
     pid = request.form.get("pid", type=int)
     categoria = request.form.get("categoria")
     iid = request.form.get("iid", type=int)
@@ -2661,15 +2731,7 @@ def negozio_disequip():
     if c is None:
         flash("Personaggio non valido.")
         return redirect(url_for("negozio"))
-    if categoria == "arma":
-        if iid in c.get("armi", []):
-            c["armi"] = [x for x in c["armi"] if x != iid]
-            palestra.deposita(STATO, "arma", iid)
-    elif categoria == "armatura":
-        if c.get("armatura_equip"):
-            palestra.deposita(STATO, "armatura", c["armatura_equip"])
-        c["armatura_equip"] = None
-    elif categoria == "protesi":
+    if categoria == "protesi":
         if iid in c.get("protesi", []):
             c["protesi"] = [x for x in c["protesi"] if x != iid]
             palestra.deposita(STATO, "protesi", iid)
@@ -2683,25 +2745,28 @@ def negozio_disequip():
     salva_stato()
     flash("Rimosso: è in magazzino.")
     indietro = request.form.get("indietro", "")
-    return redirect(indietro if indietro.startswith("/") and not indietro.startswith("//") else url_for("negozio"))
+    if indietro.startswith("/") and not indietro.startswith("//"):
+        return redirect(indietro)
+    return _torna_negozio(pid, **_filtri_negozio(request.form))
 
 
 @app.route("/negozio/medikit", methods=["POST"])
 def negozio_medikit():
     pid = request.form.get("pid", type=int)
     c = trova_record(pid)
+    filtri = _filtri_negozio(request.form)
     if c is None or c.get("morto"):
         flash("Personaggio non valido.")
         return redirect(url_for("negozio"))
     if STATO["crediti"] < PREZZO_MEDIKIT:
         flash("Crediti insufficienti.")
-        return redirect(url_for("negozio"))
+        return _torna_negozio(pid, **filtri)
     STATO["crediti"] -= PREZZO_MEDIKIT
     c["hp"] = dict(LOCAZIONI)
     c["crippled"] = []
     salva_stato()
     flash(f"{c['nome']} è stato curato completamente.")
-    return redirect(url_for("negozio"))
+    return _torna_negozio(pid, **filtri)
 
 
 @app.route("/duelli")
@@ -2854,6 +2919,10 @@ def debug_elimina():
     salva_stato()
     flash("Personaggio eliminato.")
     return redirect(url_for("debug"))
+
+
+if migra_cyberware(STATO):          # Fase 7: armi e armature di un salvataggio vecchio diventano cyberware
+    salva_stato()
 
 
 if __name__ == "__main__":

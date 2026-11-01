@@ -258,15 +258,13 @@ def main():
     a = assumi(nome="Test Quattro", tratti=["leale", "carismatico"])
     b = assumi(nome="Test Cinque", tratti=["leale", "disciplinato"])
     P.cambia_legame(a, b, 60)
-    a["armi"] = [DB["equip"][0]["id"]]
-    a["armatura_equip"] = DB["armor"][0]["id"]
-    a["augments"] = [DB["augments"][0]["id"]]
+    a["protesi"] = [DB["protesi"][0]["id"]]
+    a["augments"] = [DB["augments"][0]["id"], DB["augments"][1]["id"]]
     a["skills"]["tattica"] = 3
     b0 = P.punti_voce(b, P.miglior_voce(a))
     P.morte(S, a)
     ok(a["morto"] and P.salute(a) == "morto" and a in P.caduti(S) and a not in P.membri_attivi(S), "morto")
-    ok(len(S["palestra"]["magazzino"]) == 3 and not a["armi"] and a["armatura_equip"] is None and not a["augments"],
-       "l'equipaggiamento torna in magazzino")
+    ok(len(S["palestra"]["magazzino"]) == 3 and not a["protesi"] and not a["augments"], "il cyberware torna in magazzino")
     ok(P.punti_voce(b, P.miglior_voce(a)) > b0 or P.rango_voce(b, P.miglior_voce(a)) >= 4, "l'amico eredita")
     lutto = [e for e in S["palestra"]["eventi"] if e["tipo"] == "lutto"]
     ok(len(lutto) == 1, "un lutto da gestire")
@@ -279,19 +277,17 @@ def main():
     res = P.risolvi_evento(S, DB, 999, "silenzio")
     ok(not res["ok"], "evento inesistente")
 
-    # ---- via le armi dal magazzino
+    # ---- dal magazzino ad un allievo, e di nuovo in magazzino
     S["crediti"] = 5000
-    b["armi"] = []
-    idx = next(i for i, m in enumerate(S["palestra"]["magazzino"]) if m["cat"] == "arma")
+    b["protesi"], b["augments"] = [], []
+    b["stats"]["mente"] = b["stats"]["sociale"] = 3                 # umanita' 12: ci sta tutto
+    idx = next(i for i, m in enumerate(S["palestra"]["magazzino"]) if m["cat"] == "protesi")
     r = client.post("/negozio/magazzino/equip", data={"pid": b["id"], "indice": idx})
-    ok(b["armi"] == [DB["equip"][0]["id"]] and len(S["palestra"]["magazzino"]) == 2, "dal magazzino ad un allievo")
-    r = client.post("/negozio/disequip", data={"pid": b["id"], "categoria": "arma", "iid": b["armi"][0]})
-    ok(b["armi"] == [] and len(S["palestra"]["magazzino"]) == 3, "togliere un oggetto lo manda in magazzino, non lo distrugge")
-    nuovo_gilet = next(x for x in DB["armor"] if x["id"] != DB["armor"][0]["id"])
-    b["armatura_equip"] = DB["armor"][0]["id"]
-    n_m = len(S["palestra"]["magazzino"])
-    client.post("/negozio/equip", data={"categoria": "armatura", "iid": nuovo_gilet["id"], "pid": b["id"]})
-    ok(b["armatura_equip"] == nuovo_gilet["id"] and len(S["palestra"]["magazzino"]) == n_m + 1, "l'armatura sostituita non si butta")
+    ok(b["protesi"] == [DB["protesi"][0]["id"]] and len(S["palestra"]["magazzino"]) == 2, "dal magazzino ad un allievo")
+    r = client.post("/negozio/disequip", data={"pid": b["id"], "categoria": "protesi", "iid": b["protesi"][0]})
+    ok(b["protesi"] == [] and len(S["palestra"]["magazzino"]) == 3, "togliere un oggetto lo manda in magazzino, non lo distrugge")
+    pagina = client.get(f"/negozio?pid={b['id']}&cat=magazzino").get_data(as_text=True)
+    ok("IN MAGAZZINO" in pagina and "Monta" in pagina, "la scheda del negozio offre di montare gratis quel che e' in magazzino")
 
     # ============================================================ i tratti
     nuova_partita()
@@ -381,7 +377,7 @@ def main():
     v = assumi(nome="Vecchio Vecchi", tratti=["veterano", "leale"])
     v["data_nascita"] = P.data_nascita_per_eta(38, 0)
     v["skills"]["tattica"] = 4
-    v["armi"] = [DB["equip"][0]["id"]]
+    v["protesi"] = [DB["protesi"][0]["id"]]
     g = assumi(nome="Giovane Gio", tratti=["disciplinato", "leale"])
     g["piano"] = ["studio"] * 7
     g["focus"]["studio"] = "skill:tattica"
@@ -395,7 +391,7 @@ def main():
     ok(v["ruolo"] == "combattente" and v["ritiro_dopo"] > S["giorno"], "un'ultima stagione")
     ok(not any(e["tipo"] == "ritiro" for e in S["palestra"]["eventi"]), "rimandato")
     P.fai_istruttore(S, v)
-    ok(v["ruolo"] == "istruttore" and v["voce_istruttore"] == "skill:tattica" and not v["armi"], "diventa istruttore")
+    ok(v["ruolo"] == "istruttore" and v["voce_istruttore"] == "skill:tattica" and not v["protesi"], "diventa istruttore")
     ok(v in P.istruttori(S) and v not in P.membri_attivi(S) and P.posti_liberi(S) == P.CAPIENZA_BASE - 1, "non occupa un posto")
     ok(P.punti_sessione(S, g, "studio", "skill:tattica") > base, "l'istruttore da' +0,5 punti a chi allena la sua voce")
     ok(not client.post("/duelli/avvia", data={"pid": v["id"]}).status_code == 500 and webapp.DUELLO is None, "un istruttore non combatte")
@@ -431,7 +427,7 @@ def main():
                     if x not in S["personaggi"]:
                         S["personaggi"].append(x)
                     x["ruolo"] = "combattente"
-                    x["armi"] = []
+                    x["protesi"], x["augments"] = [], []
                     x["hp"] = {l: m for l, m in LOCAZIONI.items()}
                 S["palestra"]["eventi"].clear()
                 S["palestra"]["attrezzi"] = [i for i in S["palestra"]["attrezzi"] if i in ("sacco", "tatami")]
@@ -578,10 +574,10 @@ def main():
     a["colloquio_sett"] = 0
     client.post(f"/personaggio/{a['id']}/colloquio", data={"approccio": "ascolta"})
     ok(a["colloquio_sett"] == P.numero_settimana(S["giorno"]), "colloquio dalla scheda")
-    a["armi"] = [DB["equip"][0]["id"]]
+    a["protesi"] = [DB["protesi"][0]["id"]]
     n_m = len(S["palestra"]["magazzino"])
     client.post(f"/personaggio/{a['id']}/congeda")
-    ok(a not in S["personaggi"] and len(S["palestra"]["magazzino"]) == n_m + 1, "congedo: le armi restano")
+    ok(a not in S["personaggi"] and len(S["palestra"]["magazzino"]) == n_m + 1, "congedo: il cyberware resta in magazzino")
     # la scheda di un istruttore e di un caduto non si rompe, e non offre programma ne' colloquio
     S["crediti"] = 5000
     webapp.genera_contratti()

@@ -113,10 +113,10 @@ def _per_nome(catalogo, nome):
     return next(x["id"] for x in catalogo if x["nome"].lower() == nome.lower())
 
 
-def spec(stat=1, skill=None, poteri=(), armi=(), armatura=None, protesi=(), augments=(),
+def spec(stat=1, skill=None, poteri=(), protesi=(), augments=(),
          mira=None, stats=None, profilo=None, solo=None, azzardo=None, forza=None, tifo0=None, nodifesa=False):
-    """Descrizione picklable di un combattente. poteri = [(nome|id, rango)], armi/armatura/
-    protesi/augments per nome o id. mira = None | "testa" | "busto": policy 'mira sempre'.
+    """Descrizione picklable di un combattente. poteri = [(nome|id, rango)], protesi/augments
+    per nome o id (dalla Fase 7 non ci sono piu' armi e armature). mira = None | "testa" | "busto": policy 'mira sempre'.
     profilo = override delle manopole dell'IA (es. {"mira": 0}) per tutta la durata del duello.
     solo = nome di un attacco da usare SEMPRE quando e' giocabile (policy per misurare se una
     scelta e' dominata); se non e' giocabile decide la solita IA.
@@ -124,7 +124,7 @@ def spec(stat=1, skill=None, poteri=(), armi=(), armatura=None, protesi=(), augm
     TUTTI e due e dice come azzarda questo lato. forza = una giocata da fare SEMPRE appena si puo' ("ruota", "ruota1" una
     volta sola, "r1@55" = Rilancio solo se il colpo va a segno con >= 55%...); tifo0 = tifo di partenza (>0 per questo lato)."""
     return {"stat": stat, "skill": stat if skill is None else skill, "stats": stats or {},
-            "poteri": list(poteri), "armi": list(armi), "armatura": armatura,
+            "poteri": list(poteri),
             "protesi": list(protesi), "augments": list(augments), "mira": mira,
             "profilo": profilo or {}, "solo": solo, "azzardo": azzardo, "forza": forza, "tifo0": tifo0, "nodifesa": nodifesa}
 
@@ -139,8 +139,6 @@ def costruisci(sp, nome):
     stats.update(sp["stats"])
     rec = {"nome": nome, "stats": stats, "skills": {s: sp["skill"] for s in E.SKILLS},
            "poteri": [{"id": _id(DB["poteri"], p), "rango": r} for p, r in sp["poteri"]],
-           "armi": [_id(DB["equip"], a) for a in sp["armi"]],
-           "armatura_equip": (_id(DB["armor"], sp["armatura"]) if sp["armatura"] else None),
            "protesi": [_id(DB["protesi"], x) for x in sp["protesi"]],
            "augments": [_id(DB["augments"], x) for x in sp["augments"]],
            "hp": {}, "crippled": [], "livello": 1}
@@ -451,10 +449,6 @@ def m_decisioni(es, a, rep):
 def _items():
     """(etichetta, kwargs di spec, prezzo) di ogni oggetto dei cataloghi."""
     out = []
-    for e in DB["equip"]:
-        out.append((e["nome"], {"armi": [e["id"]]}, e.get("valore", 0)))
-    for x in DB["armor"]:
-        out.append((x["nome"], {"armatura": x["id"]}, x.get("valore", 0)))
     for x in DB["protesi"]:
         out.append((x["nome"], {"protesi": [x["id"]]}, x.get("valore", 0)))
     for x in DB["augments"]:

@@ -8,12 +8,21 @@ Server Flask + editor dei dati in Tkinter. Nessuna dipendenza oltre a Flask.
 
 | Cosa | Comando |
 |---|---|
-| Gioco (http://127.0.0.1:5000) | `python app.py` oppure `avvia_app.bat` |
+| Gioco (http://127.0.0.1:5000) | `avvia_app.bat` (Windows) o `sh avvia_app.sh`: controllano Python e Flask, **si aggiornano da GitHub** e aprono il browser. In sviluppo: `python app.py` |
 | Editor di attacchi, poteri, stance, effetti, oggetti | `python editor.py` oppure `avvia_editor.bat` |
-| Test delle regole | `python test_combat.py`, `python test_azzardo.py`, `python test_palestra.py`, `python test_editor.py`, `node test_fisica.js` |
+| Test delle regole | `python test_combat.py`, `python test_azzardo.py`, `python test_palestra.py`, `python test_editor.py`, `python test_nemesi.py`, `python test_cyberware.py`, `node test_fisica.js` |
 | Misure di bilanciamento | `python balance.py tutto` (v. sotto) |
 | Una palestra di prova nel browser (cartella temporanea) | `python tools/demo_palestra.py` (`--scenario base|vuota`), porta 5057 |
 | I ritmi della palestra (punti, ferite, stress, fiducia) | `python tools/sim_palestra.py --settimane 60 --allievi 3 --duelli 4` |
+
+## Farlo provare agli amici (avvio e aggiornamenti)
+
+- **Primo avvio.** `avvia_app.bat` cerca Python; se manca lo installa con `winget` (Windows 10/11), poi `avvia.py` installa Flask se non c'è
+  (`pip install --user flask`). Su macOS/Linux serve Python 3 già installato (`sh avvia_app.sh`).
+- **Aggiornamenti.** A ogni avvio `avvia.py` guarda l'ultimo commit di `main` su GitHub (`REPO` in `avvia.py`): se è nuovo, aggiorna con `git pull --ff-only`
+  (clone git) o scaricando lo zip del ramo (copia scaricata). Senza internet il gioco parte con la versione che c'è. `python test_avvia.py` prova la logica senza rete.
+- **I progressi non si toccano.** `save/` e `.versione` sono in `.gitignore` (e l'aggiornamento li salta): chi gioca tiene la sua partita, e la prima volta
+  la partita nasce **vuota** (nessun salvataggio nel repo). Per ripartire da zero basta cancellare `save/state.json`.
 
 I salvataggi stanno in `save/` (la partita, il profilo della CPU, i survey, gli incontri registrati per le tattiche). Una partita
 nuova: la pagina Debug ("Partita nuova"), o cancellare `save/state.json`. Test e harness usano **sempre** una cartella
@@ -101,6 +110,17 @@ prova con `python test_azzardo.py` e `python balance.py azzardo`). E' tutto opt-
   Esposto e, a Tutto o niente, anche azioni e un muscolo) e l'**Ultima Puntata** (una volta, con testa o busto sotto il 30%: 40% di rialzarsi, altrimenti si crolla
   e per un allievo della palestra scatta il tiro di morte). Li gioca anche la CPU, con la manopola `azzardo` del suo profilo (tarata dal questionario).
 - **La serie.** Ogni azzardo riuscito alza di +20% il pagamento delle puntate aperte (fino a +100%); il primo che va male la spezza.
+
+## Il cyberware (niente più armi e armature)
+
+Tutto l'equipaggiamento è cyberware: **protesi** (una per locazione: testa, braccia, gambe) e **augment** (impianti interni, passivi o attivi). Ogni pezzo costa
+**Umanità** (`(Mente + Sociale) × 2`, un colloquio ben riuscito ne ridà un punto), quindi Mente e Sociale decidono quanti impianti ci stanno. Pistola e Spada sono
+il Braccio-cannone e la Lama monomolecolare; Casco, Giubbotto e Armatura da combattimento sono Calotta, Sottopelle ed Esoscheletro (progetto, tabella e misure in
+`CYBERWARE.md`, prova con `python test_cyberware.py`). I vecchi salvataggi si convertono da soli (quel che non ci sta finisce in magazzino).
+
+Il **Negozio** parte dall'allievo: a sinistra gli allievi, al centro il suo corpo (cinque posti per le protesi, impianti interni, Umanità libera, Medikit), a destra il
+catalogo con un solo bottone per scheda («Installa su Marta», «Sostituisci…», «Monta gratis» dal magazzino) che, se non si può, dice perché. Gli attrezzi della
+palestra sono un'altra scheda.
 
 ## I rivali (il Nemesis system)
 

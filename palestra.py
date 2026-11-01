@@ -505,22 +505,14 @@ def riprendi(stato, indice):
     return m.pop(indice) if 0 <= indice < len(m) else None
 
 
-def svuota_equip(stato, rec, tutto=False):
-    """Mette nel magazzino l'equipaggiamento del combattente: armi e armatura sempre; con `tutto` (morto) anche protesi
-    e augment, che per un vivo restano sul suo corpo."""
-    for iid in rec.get("armi", rec.get("equip", [])) or []:
-        deposita(stato, "arma", iid)
-    rec["armi"] = []
-    rec.pop("equip", None)
-    if rec.get("armatura_equip"):
-        deposita(stato, "armatura", rec["armatura_equip"])
-    rec["armatura_equip"] = None
-    if tutto:
-        for iid in rec.get("protesi", []):
-            deposita(stato, "protesi", iid)
-        for iid in rec.get("augments", []):
-            deposita(stato, "augment", iid)
-        rec["protesi"], rec["augments"] = [], []
+def svuota_equip(stato, rec):
+    """Mette nel magazzino tutto il cyberware del combattente (protesi e augment): chi se ne va, si ritira o muore non se lo porta via,
+    cosi' l'investimento non si perde e si puo' rimontare su qualcun altro."""
+    for iid in rec.get("protesi", []):
+        deposita(stato, "protesi", iid)
+    for iid in rec.get("augments", []):
+        deposita(stato, "augment", iid)
+    rec["protesi"], rec["augments"] = [], []
 
 
 # ---------------------------------------------------------------- legami
@@ -953,7 +945,7 @@ def _chiudi_settimana(stato, db, rng, rie):
 
 # ---------------------------------------------------------------- partenze, ritiro, morte
 def congeda(stato, rec, motivo="congedo"):
-    """L'allievo lascia la palestra (si porta via protesi e augment, lascia armi e armatura)."""
+    """L'allievo lascia la palestra: il suo cyberware resta in magazzino."""
     svuota_equip(stato, rec)
     stato_palestra(stato)["ex"].append({"nome": rec["nome"], "giorno": stato["giorno"], "motivo": motivo})
     stato["personaggi"] = [c for c in stato["personaggi"] if c is not rec]
@@ -981,7 +973,7 @@ def morte(stato, rec, rng=random):
     rec["giorno_morte"] = stato["giorno"]
     stato_palestra(stato)["eventi"] = [e for e in stato["palestra"]["eventi"] if rec["id"] not in (e.get("a"), e.get("b"))]
     amici = amici_di(stato, rec)
-    svuota_equip(stato, rec, tutto=True)
+    svuota_equip(stato, rec)
     registra(stato, f"✝ {rec['nome']} è morto sul ring.", rec=rec)
     if amici:
         erede = max(amici, key=lambda c: legame(rec, c))

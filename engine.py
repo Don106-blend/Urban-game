@@ -129,7 +129,6 @@ def carica_db():
     """Tutti i database di gioco in un dict."""
     return {"attacchi": carica("attacks.json"), "poteri": carica("powers.json"),
             "stances": carica("stances.json"), "effetti": carica("effects.json"),
-            "equip": carica("equipment.json"), "armor": carica("armor.json"),
             "protesi": carica("protesi.json"), "augments": carica("augments.json")}
 
 
@@ -208,6 +207,7 @@ class Personaggio:
         self.stamina = None    # inizializzata a inizio combattimento (init_stamina)
         # protesi/augment/EMP
         self.protesi_locazioni = set()  # locazioni sostituite da protesi: mai CRIPPLED, +10 vs elettrico
+        self.protesi_equip = []        # gli id delle protesi montate (nuovo_record li salva)
         self.augments = []          # [{"def": augment, "rango": 1, "attivo": bool}], come i poteri
         self.augment_stato = {}     # id augment -> {"usi_rimasti": int|None}
         self.emp_turni = 0          # >0: augment disattivati, attacchi/stance da protesi inutilizzabili
@@ -735,38 +735,7 @@ class Personaggio:
                 righe += self._applica_effetti_stance(st["def"], avversario, db_effetti)
         return righe
 
-    # ---------- equipaggiamento permanente (armatura/protesi) ----------
-    def equipaggia_armatura(self, armor, db_stances, db_effetti):
-        """Applica un'armatura indossata: hp extra sulle locazioni coperte, resistenze,
-        stance sbloccate/attivate permanentemente. Niente toggle: dura tutto il duello."""
-        righe = [f"{self.nome} indossa {armor['nome']}."]
-        amt = armor.get("armatura_hp", 0)
-        for loc in armor.get("locazioni", []):
-            if loc in self.armatura:
-                self.armatura[loc] += amt
-        if amt:
-            righe.append(f"Armatura +{amt} su {', '.join(armor.get('locazioni', []))}.")
-        for r in armor.get("resistenze", []):
-            t, v = r.get("tipo_danno", "contundente"), r.get("valore", 0)
-            self.resistenze[t] = self.resistenze.get(t, 0) + v
-            righe.append(f"Resistenza {t} +{v}%.")
-        for sid in armor.get("stance", []):
-            sdef = next((x for x in db_stances if x["id"] == sid), None)
-            if sdef and all(x["id"] != sid for x in self.stance_conosciute):
-                self.stance_conosciute.append(sdef)
-                righe.append(f"Stance appresa: {sdef['nome']}.")
-        for sid in armor.get("stance_attivate", []):
-            sdef = next((x for x in db_stances if x["id"] == sid), None)
-            if sdef is None:
-                continue
-            if all(x["id"] != sid for x in self.stance_conosciute):
-                self.stance_conosciute.append(sdef)
-            if all(x["def"]["id"] != sid for x in self.stance_attive):
-                self.stance_attive.append({"def": sdef, "turni": -1})
-                righe.append(f"Stance {sdef['nome']} attiva (armatura).")
-        righe += self.applica_effetti(armor.get("effetti_nel_tempo", []), db_effetti)
-        return righe
-
+    # ---------- equipaggiamento permanente (protesi) ----------
     def equipaggia_protesi(self, protesi, db_attacchi, db_stances, db_effetti):
         """Sostituisce completamente una locazione: hp/hp_max personalizzati, mai CRIPPLED,
         debole all'elettrico. Sblocca attacchi/stance come farebbe un potere, ma per sempre."""
@@ -775,6 +744,7 @@ class Personaggio:
         self.hp[loc] = hp
         self.hp_max[loc] = hp
         self.protesi_locazioni.add(loc)
+        self.protesi_equip.append(protesi.get("id"))
         righe = [f"{self.nome} monta {protesi['nome']} ({loc}, {hp} hp)."]
         for aid in protesi.get("attacchi", []):
             att = next((x for x in db_attacchi if x["id"] == aid), None)
@@ -875,10 +845,12 @@ class Personaggio:
         for eff in per_rango(slot["def"].get("effetti", {}), rango):
             if eff["tipo"] == "armatura":
                 amt = self.tira_formula(eff)
-                for l in self.armatura:
+                loc = eff.get("locazione", "tutte")      # "tutte" (default) o una locazione: un giubbotto copre solo il busto
+                locs = [l for l in self.armatura if loc == "tutte" or l == loc]
+                for l in locs:
                     self.armatura[l] += amt
-                revert.append(("armatura", amt))
-                righe.append(f"Armatura +{amt} su ogni locazione.")
+                revert.append(("armatura", amt, locs))
+                righe.append(f"Armatura +{amt} su {'ogni locazione' if loc == 'tutte' else loc}.")
             elif eff["tipo"] == "cura":
                 # ponytail: cura tutte le locazioni; scelta della locazione quando servirà
                 amt = self.tira_formula(eff)
@@ -992,8 +964,9 @@ class Personaggio:
             if tipo == "locazione" and preserva_locazioni:
                 continue
             if tipo == "armatura":
-                for l in self.armatura:
-                    self.armatura[l] = max(0, self.armatura[l] - azione[1])
+                for l in (azione[2] if len(azione) > 2 else list(self.armatura)):
+                    if l in self.armatura:
+                        self.armatura[l] = max(0, self.armatura[l] - azione[1])
             elif tipo == "mod_statistica":
                 s, delta = azione[1], azione[2]
                 if s in self.stats:

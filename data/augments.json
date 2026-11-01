@@ -342,5 +342,216 @@
       "4": []
     },
     "id": 7
+  },
+  {
+    "id": 8,
+    "nome": "Lama monomolecolare",
+    "descrizione": "Impianto passivo: una lama retrattile nell'avambraccio. Sblocca il colpo di taglio con sanguinamento e l'affondo perforante.",
+    "valore": 150,
+    "costo_umanita": 1,
+    "attivo": false,
+    "costo_stamina": 0,
+    "durata_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "effetti": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "effetti_nel_tempo": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [
+        48,
+        49
+      ],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance_attivate": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    }
+  },
+  {
+    "id": 9,
+    "nome": "Calotta in titanio",
+    "descrizione": "Impianto passivo: calotta sotto il cuoio capelluto. +15 hp di armatura sulla testa e -10% ai danni contundenti.",
+    "valore": 150,
+    "costo_umanita": 1,
+    "attivo": false,
+    "costo_stamina": 0,
+    "durata_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "effetti": {
+      "1": [
+        {
+          "tipo": "armatura",
+          "dadi": [],
+          "flat": 15,
+          "mult": 1,
+          "locazione": "testa"
+        },
+        {
+          "tipo": "resistenza",
+          "tipo_danno": "contundente",
+          "valore": 10
+        }
+      ],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "effetti_nel_tempo": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance_attivate": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    }
+  },
+  {
+    "id": 10,
+    "nome": "Sottopelle balistico",
+    "descrizione": "Impianto passivo: fibre balistiche sul torace. +50 hp di armatura sul busto e -20% ai danni perforanti.",
+    "valore": 200,
+    "costo_umanita": 2,
+    "attivo": false,
+    "costo_stamina": 0,
+    "durata_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "effetti": {
+      "1": [
+        {
+          "tipo": "armatura",
+          "dadi": [],
+          "flat": 50,
+          "mult": 1,
+          "locazione": "busto"
+        },
+        {
+          "tipo": "resistenza",
+          "tipo_danno": "perforante",
+          "valore": 20
+        }
+      ],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "effetti_nel_tempo": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance_attivate": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    }
+  },
+  {
+    "id": 11,
+    "nome": "Esoscheletro da combattimento",
+    "descrizione": "Impianto passivo: un esoscheletro sotto la pelle che copre tutto il corpo. +10 hp di armatura per locazione, -8% ai danni contundenti e la stance Corazza.",
+    "valore": 600,
+    "costo_umanita": 4,
+    "attivo": false,
+    "costo_stamina": 0,
+    "durata_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "effetti": {
+      "1": [
+        {
+          "tipo": "armatura",
+          "dadi": [],
+          "flat": 10,
+          "mult": 1
+        },
+        {
+          "tipo": "resistenza",
+          "tipo_danno": "contundente",
+          "valore": 8
+        }
+      ],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "effetti_nel_tempo": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance": {
+      "1": [
+        17
+      ],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance_attivate": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    }
   }
 ]

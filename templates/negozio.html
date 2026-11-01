@@ -1,12 +1,20 @@
 {% extends "base.html" %}
 {% block title %}Negozio — Urban{% endblock %}
+
 {% block content %}
+{% macro pips(usate, tot) %}<span class="pallini" aria-hidden="true">{% for i in range(tot) %}<i class="pallino {{ 'on' if i < usate }}"></i>{% endfor %}</span>{% endmacro %}
 <div class="page-head">
   <h1>NEGOZIO</h1>
-  <p class="muted">Attrezzi per la palestra, equipaggiamento per i combattenti. Quello che togli a un combattente finisce in magazzino:
-     non si butta, si rimonta.</p>
+  <p class="muted">Tutto l'equipaggiamento è cyberware: ogni impianto occupa un posto nel corpo e costa Umanità (la alzano Mente e Sociale).
+     Scegli chi potenzi, guarda il suo corpo e installa da lì. Quello che togli finisce in magazzino: non si butta, si rimonta gratis.</p>
 </div>
 
+<div class="pal-tabs neg-tabs" role="tablist">
+  <a class="pal-tab" role="tab" aria-selected="{{ 'true' if scheda != 'attrezzi' }}" href="{{ url_for('negozio', pid=sel.id if sel else none) }}">Cyberware</a>
+  <a class="pal-tab" role="tab" aria-selected="{{ 'true' if scheda == 'attrezzi' }}" href="{{ url_for('negozio', tab='attrezzi') }}">Attrezzi della palestra</a>
+</div>
+
+{% if scheda == 'attrezzi' %}
 <h2 class="neg-sub" id="attrezzi">Attrezzi della palestra <span class="muted">· posti: {{ occupati }}/{{ capienza }}</span></h2>
 <div class="card-grid">
   {% for aid, a in attrezzi.items() if not a.iniziale %}
@@ -29,161 +37,128 @@
   {% endfor %}
 </div>
 
-{% if magazzino %}
-<h2 class="neg-sub" id="magazzino">Magazzino <span class="muted">· gratis da rimontare</span></h2>
-<div class="card-grid">
-  {% for m in magazzino %}
-  <div class="fighter-card shop-item">
-    <div class="fc-top">
-      <span class="fc-nome">{{ {'arma': '🗡', 'armatura': '🛡', 'protesi': '⚙', 'augment': '🔩'}[m.cat] }} {{ m.item.nome }}</span>
-      <span class="badge badge-rango">{{ m.cat|upper }}</span>
+{% elif not sel %}
+<div class="empty">
+  <p>Nessun allievo in palestra a cui montare un impianto.</p>
+  <a class="btn btn-volt" href="{{ url_for('contratti') }}">Vai agli aspiranti →</a>
+</div>
+
+{% else %}
+<div class="neg-layout">
+
+  <nav class="neg-allievi" aria-label="Chi potenzi">
+    <h3 class="neg-etichetta">Chi potenzi</h3>
+    {% for a in allievi %}
+    <a class="neg-allievo {{ 'on' if a.rec.id == sel.id }}" href="{{ url_for('negozio', pid=a.rec.id, cat=(cat if cat != 'tutto' else none), slot=slot or none) }}"
+       {{ 'aria-current=true' if a.rec.id == sel.id }}>
+      <span class="pal-ritratto"><canvas class="anteprima" data-aspetto='{{ a.rec.aspetto|tojson|forceescape }}' aria-hidden="true"></canvas></span>
+      <span class="neg-allievo-testo">
+        <b>{{ a.rec.nome }}</b>
+        <span class="muted">{{ a.impianti }} impiant{{ 'o' if a.impianti == 1 else 'i' }}{% if a.stato != 'pronto' %} · {{ a.stato }}{% endif %}</span>
+        <span class="neg-um" title="Umanità usata {{ a.usata }} su {{ a.max }}">{{ pips(a.usata, a.max) }}</span>
+      </span>
+    </a>
+    {% endfor %}
+  </nav>
+
+  <section class="neg-corpo" aria-label="Il corpo di {{ sel.nome }}">
+    <h3 class="neg-etichetta">Il corpo di <a href="{{ url_for('personaggio', pid=sel.id) }}">{{ sel.nome }}</a></h3>
+    <div class="neg-umanita" title="Ogni impianto costa Umanità; Mente e Sociale la alzano, un colloquio ben riuscito ne ridà un punto">
+      <span>Umanità</span> {{ pips(umanita[0], umanita[1]) }}
+      <b>{{ umanita[1] - umanita[0] }} liberi</b><span class="muted"> su {{ umanita[1] }}</span>
     </div>
-    <p class="muted">{{ m.item.descrizione }}</p>
-    {% if vivi %}
-    <form method="post" action="{{ url_for('negozio_magazzino_equip') }}">
-      <input type="hidden" name="indice" value="{{ m.indice }}">
-      <select name="pid" class="select">
-        {% for c in vivi %}<option value="{{ c.id }}">{{ c.nome }}</option>{% endfor %}
-      </select>
-      <button class="btn btn-ghost full">Consegna</button>
+
+    <div class="neg-figura">
+      {% for loc in locazioni_corpo %}
+      {% set p = corpo[loc] %}
+      <div class="neg-slot s-{{ loc }} {{ 'occupato' if p }} {{ 'scelto' if slot == loc }}">
+        <a href="{{ url_for('negozio', pid=sel.id, cat='protesi', slot=loc) }}" title="Mostra le protesi per {{ nomi_loc[loc] }}">
+          <small>{{ nomi_loc[loc] }}</small>
+          <b>{{ p.nome if p else '+ Protesi' }}</b>
+        </a>
+        {% if p %}
+        <form method="post" action="{{ url_for('negozio_disequip') }}" title="Rimuovi (va in magazzino)">
+          <input type="hidden" name="pid" value="{{ sel.id }}"><input type="hidden" name="categoria" value="protesi">
+          <input type="hidden" name="iid" value="{{ p.id }}"><input type="hidden" name="cat" value="{{ cat if cat != 'tutto' }}">
+          <button class="neg-x" aria-label="Rimuovi {{ p.nome }}">✕</button>
+        </form>
+        {% endif %}
+      </div>
+      {% endfor %}
+      <div class="neg-sagoma"><canvas class="anteprima" data-aspetto='{{ sel.aspetto|tojson|forceescape }}' aria-label="{{ sel.nome }}"></canvas></div>
+    </div>
+
+    <h3 class="neg-etichetta">Impianti interni</h3>
+    {% if interni %}
+    <ul class="neg-interni">
+      {% for ag in interni %}
+      <li>
+        <span><b>{{ ag.nome }}</b> <small class="muted">{{ 'attivo' if ag.attivo else 'passivo' }} · Umanità {{ ag.costo_umanita }}</small></span>
+        <form method="post" action="{{ url_for('negozio_disequip') }}" title="Rimuovi (va in magazzino)">
+          <input type="hidden" name="pid" value="{{ sel.id }}"><input type="hidden" name="categoria" value="augment">
+          <input type="hidden" name="iid" value="{{ ag.id }}"><input type="hidden" name="cat" value="{{ cat if cat != 'tutto' }}">
+          <button class="neg-x" aria-label="Rimuovi {{ ag.nome }}">✕</button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}<p class="muted">Nessun augment installato.</p>{% endif %}
+
+    {% if ferito %}
+    <form method="post" action="{{ url_for('negozio_medikit') }}" class="neg-medikit">
+      <input type="hidden" name="pid" value="{{ sel.id }}">
+      <button class="btn btn-ghost full" {{ 'disabled' if crediti < prezzo_medikit }}>⚕ Medikit · cura completa · ¤ {{ prezzo_medikit }}</button>
     </form>
     {% endif %}
-  </div>
-  {% endfor %}
+  </section>
+
+  <section class="neg-catalogo" aria-label="Catalogo">
+    <h3 class="neg-etichetta">Cosa installare su {{ sel.nome.split(' ')[0] }}</h3>
+    <div class="neg-filtri">
+      {% for k, nome in (('tutto', 'Tutto'), ('protesi', 'Protesi'), ('augment', 'Augment'), ('magazzino', 'Magazzino (' ~ n_magazzino ~ ')')) %}
+      <a class="neg-chip {{ 'on' if cat == k }}" href="{{ url_for('negozio', pid=sel.id, cat=(k if k != 'tutto' else none), slot=(slot if k in ('tutto', 'protesi', 'magazzino') and slot else none)) }}">{{ nome }}</a>
+      {% endfor %}
+      {% if slot %}<a class="neg-chip on" href="{{ url_for('negozio', pid=sel.id, cat=(cat if cat != 'tutto' else none)) }}">{{ nomi_loc[slot] }} ✕</a>{% endif %}
+    </div>
+
+    {% if not voci %}
+    <p class="muted neg-vuoto">{% if cat == 'magazzino' %}Il magazzino è vuoto: quello che togli ai combattenti finisce qui.{% else %}Niente da mostrare con questi filtri.{% endif %}</p>
+    {% endif %}
+    <div class="neg-griglia">
+      {% for v in voci %}
+      {% set it = v.item %}
+      <article class="fighter-card shop-item neg-item {{ 'non-ok' if not v.ok }}">
+        <span class="fc-nome neg-nome">{{ '⚙' if v.cat == 'protesi' else '🔩' }} {{ it.nome }}</span>
+        <div class="neg-meta">
+          <span class="badge badge-rango">{{ ('PROTESI · ' ~ nomi_loc[it.locazione]) if v.cat == 'protesi' else 'AUGMENT' }}</span>
+          <span class="neg-costo-um" title="Costo in Umanità">Umanità {{ pips(it.costo_umanita, it.costo_umanita) }} {{ it.costo_umanita }}</span>
+          {% if v.gratis %}<span class="badge badge-pronto neg-prezzo">IN MAGAZZINO</span>{% else %}<span class="costo neg-prezzo">¤ {{ it.valore }}</span>{% endif %}
+        </div>
+        <p class="muted">{{ it.descrizione }}</p>
+        <ul class="neg-dettagli">{% for d in v.dettagli %}<li>{{ d }}</li>{% endfor %}</ul>
+        <form method="post" action="{{ url_for('negozio_magazzino_equip') if v.gratis else url_for('negozio_equip') }}">
+          <input type="hidden" name="pid" value="{{ sel.id }}">
+          <input type="hidden" name="cat" value="{{ cat if cat != 'tutto' }}"><input type="hidden" name="slot" value="{{ slot }}">
+          {% if v.gratis %}<input type="hidden" name="indice" value="{{ v.indice }}">
+          {% else %}<input type="hidden" name="categoria" value="{{ v.cat }}"><input type="hidden" name="iid" value="{{ it.id }}">{% endif %}
+          {% if v.sostituisce %}<input type="hidden" name="sostituisci" value="1">{% endif %}
+          {% if v.ok %}
+          <button class="btn btn-volt full">
+            {{ ('Sostituisci ' ~ v.sostituisce.nome) if v.sostituisce else ('Monta' if v.gratis else 'Installa') }} su {{ sel.nome.split(' ')[0] }}{{ ' · gratis' if v.gratis else '' }}
+          </button>
+          {% if v.sostituisce %}<p class="muted neg-nota">{{ v.sostituisce.nome }} va in magazzino.</p>{% endif %}
+          {% else %}
+          <button class="btn btn-ghost full" disabled>{{ v.motivo or 'Non disponibile' }}</button>
+          {% endif %}
+        </form>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+
 </div>
 {% endif %}
 
-<h2 class="neg-sub">Equipaggiamento</h2>
-<div class="card-grid">
-  <div class="fighter-card shop-item">
-    <div class="fc-top">
-      <span class="fc-nome">⚕ Medikit</span>
-      <span class="costo">¤ {{ prezzo_medikit }}</span>
-    </div>
-    <p class="muted">Cura istantanea e completa di un combattente. Non riporta in vita i morti.</p>
-    {% if curabili %}
-    <form method="post" action="{{ url_for('negozio_medikit') }}">
-      <select name="pid" class="select">
-        {% for c in curabili %}
-        <option value="{{ c.id }}">{{ c.nome }}</option>
-        {% endfor %}
-      </select>
-      <button class="btn btn-volt full" {{ 'disabled' if crediti < prezzo_medikit }}>
-        {{ 'Compra e usa' if crediti >= prezzo_medikit else 'Crediti insufficienti' }}
-      </button>
-    </form>
-    {% else %}
-    <p class="muted">Nessun combattente da curare.</p>
-    {% endif %}
-  </div>
-
-  {% for e in equip %}
-  <div class="fighter-card shop-item">
-    <div class="fc-top">
-      <span class="fc-nome">🗡 {{ e.nome }}</span>
-      <span class="costo">¤ {{ e.valore }}</span>
-    </div>
-    <p class="muted">{{ e.descrizione or "Arma." }} (max {{ max_armi }} armi per eroe)</p>
-    {% if vivi %}
-    <form method="post" action="{{ url_for('negozio_equip') }}">
-      <input type="hidden" name="categoria" value="arma">
-      <input type="hidden" name="iid" value="{{ e.id }}">
-      <select name="pid" class="select">
-        {% for c in vivi %}
-        <option value="{{ c.id }}">{{ c.nome }}</option>
-        {% endfor %}
-      </select>
-      <button class="btn btn-volt full" {{ 'disabled' if crediti < e.valore }}>
-        {{ 'Compra' if crediti >= e.valore else 'Crediti insufficienti' }}
-      </button>
-    </form>
-    {% else %}
-    <p class="muted">Nessun allievo in palestra.</p>
-    {% endif %}
-  </div>
-  {% endfor %}
-
-  {% for a in armor %}
-  <div class="fighter-card shop-item">
-    <div class="fc-top">
-      <span class="fc-nome">🛡 {{ a.nome }}</span>
-      <span class="costo">¤ {{ a.valore }}</span>
-    </div>
-    <p class="muted">{{ a.descrizione or "Armatura." }}
-      +{{ a.armatura_hp }} hp su {{ a.locazioni|join(', ') }}{% for r in a.resistenze %} · -{{ r.valore }}% {{ r.tipo_danno }}{% endfor %} (1 slot, sostituisce quella indossata)</p>
-    {% if vivi %}
-    <form method="post" action="{{ url_for('negozio_equip') }}">
-      <input type="hidden" name="categoria" value="armatura">
-      <input type="hidden" name="iid" value="{{ a.id }}">
-      <select name="pid" class="select">
-        {% for c in vivi %}
-        <option value="{{ c.id }}">{{ c.nome }}</option>
-        {% endfor %}
-      </select>
-      <button class="btn btn-volt full" {{ 'disabled' if crediti < a.valore }}>
-        {{ 'Compra' if crediti >= a.valore else 'Crediti insufficienti' }}
-      </button>
-    </form>
-    {% else %}
-    <p class="muted">Nessun allievo in palestra.</p>
-    {% endif %}
-  </div>
-  {% endfor %}
-
-  {% for p in protesi %}
-  <div class="fighter-card shop-item">
-    <div class="fc-top">
-      <span class="fc-nome">⚙ {{ p.nome }}</span>
-      <span class="costo">¤ {{ p.valore }}</span>
-    </div>
-    <p class="muted">{{ p.descrizione or "Protesi." }}
-      Sostituisce {{ p.locazione.replace('_', ' ') }} ({{ p.hp }} hp) — costo umanità {{ p.costo_umanita }}</p>
-    {% if vivi %}
-    <form method="post" action="{{ url_for('negozio_equip') }}">
-      <input type="hidden" name="categoria" value="protesi">
-      <input type="hidden" name="iid" value="{{ p.id }}">
-      <select name="pid" class="select">
-        {% for c in vivi %}
-        <option value="{{ c.id }}">{{ c.nome }}
-          (umanità {{ umanita[c.id][1] - umanita[c.id][0] }}/{{ umanita[c.id][1] }})</option>
-        {% endfor %}
-      </select>
-      <button class="btn btn-volt full" {{ 'disabled' if crediti < p.valore }}>
-        {{ 'Compra' if crediti >= p.valore else 'Crediti insufficienti' }}
-      </button>
-    </form>
-    {% else %}
-    <p class="muted">Nessun allievo in palestra.</p>
-    {% endif %}
-  </div>
-  {% endfor %}
-
-  {% for ag in augments %}
-  <div class="fighter-card shop-item">
-    <div class="fc-top">
-      <span class="fc-nome">🔩 {{ ag.nome }}</span>
-      <span class="costo">¤ {{ ag.valore }}</span>
-    </div>
-    <p class="muted">{{ ag.descrizione or "Augment." }}
-      {{ 'Attivo' if ag.attivo else 'Passivo (sempre acceso)' }} — costo umanità {{ ag.costo_umanita }}</p>
-    {% if vivi %}
-    <form method="post" action="{{ url_for('negozio_equip') }}">
-      <input type="hidden" name="categoria" value="augment">
-      <input type="hidden" name="iid" value="{{ ag.id }}">
-      <select name="pid" class="select">
-        {% for c in vivi %}
-        <option value="{{ c.id }}">{{ c.nome }}
-          (umanità {{ umanita[c.id][1] - umanita[c.id][0] }}/{{ umanita[c.id][1] }})</option>
-        {% endfor %}
-      </select>
-      <button class="btn btn-volt full" {{ 'disabled' if crediti < ag.valore }}>
-        {{ 'Compra' if crediti >= ag.valore else 'Crediti insufficienti' }}
-      </button>
-    </form>
-    {% else %}
-    <p class="muted">Nessun allievo in palestra.</p>
-    {% endif %}
-  </div>
-  {% endfor %}
-</div>
+<script src="{{ url_for('static', filename='arena.js') }}"></script>
+<script src="{{ url_for('static', filename='anteprima.js') }}" data-ripeti></script>
 {% endblock %}

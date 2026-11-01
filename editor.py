@@ -12,8 +12,8 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(BASE, "data")
 FILES = {k: os.path.join(DATA, f"{v}.json") for k, v in
          {"attacchi": "attacks", "poteri": "powers", "skill": "skills",
-          "stance": "stances", "effetti": "effects", "equip": "equipment",
-          "armatura": "armor", "protesi": "protesi", "augment": "augments"}.items()}
+          "stance": "stances", "effetti": "effects",
+          "protesi": "protesi", "augment": "augments"}.items()}
 
 STATS = ["fisico", "riflessi", "mente", "sociale", "controllo"]
 TIPI_DANNO = ["contundente", "perforante", "taglio", "fuoco", "elettrico",
@@ -282,7 +282,7 @@ class RigheEffettiPotere(RigheDinamiche):
         azv = tk.StringVar(value=str(item.get("azioni", 0)))
         bov = tk.StringVar(value=str(item.get("bonus", 0)))
         riv = tk.StringVar(value=str(item.get("risposte", 0)))
-        lv = tk.StringVar(value=item.get("nome", ""))
+        lv = tk.StringVar(value=item.get("nome", item.get("locazione", "")))   # nome della locazione extra, o dove vale un'armatura
 
         corpo = ttk.Frame(riga)
         corpo.pack(side="left")
@@ -290,7 +290,7 @@ class RigheEffettiPotere(RigheDinamiche):
         linea1.pack(anchor="w")
         campo(linea1, "Tipo", combo(linea1, tv, lambda: TIPI_EFFETTO_POTERE, 15))
         campo(linea1, "Valore (armatura/cura)", ttk.Entry(linea1, textvariable=fv, width=7))
-        campo(linea1, "Nome locazione extra", ttk.Entry(linea1, textvariable=lv, width=14))
+        campo(linea1, "Locazione (extra / armatura)", ttk.Entry(linea1, textvariable=lv, width=14))
 
         linea2 = ttk.Frame(corpo)
         linea2.pack(anchor="w", pady=(6, 0))
@@ -324,7 +324,10 @@ class RigheEffettiPotere(RigheDinamiche):
                 out.append({"tipo": t, "azioni": num(azv), "bonus": num(bov),
                             "risposte": num(riv)})
             else:  # armatura/cura: valore piatto, niente più dadi moltiplicati
-                out.append({"tipo": t, "dadi": [], "flat": num(fv), "mult": 1})
+                voce = {"tipo": t, "dadi": [], "flat": num(fv), "mult": 1}
+                if t == "armatura" and lv.get().strip() not in ("", "tutte"):
+                    voce["locazione"] = lv.get().strip()     # un giubbotto copre solo il busto; senza, vale su ogni locazione
+                out.append(voce)
         return out
 
 
@@ -1136,131 +1139,6 @@ class TabEffetti(CrudTab):
         }
 
 
-class TabEquip(CrudTab):
-    file = FILES["equip"]
-    titolo = "Equipaggiamento"
-
-    def costruisci_form(self, form):
-        self.nome = tk.StringVar()
-        self.valore = tk.StringVar(value="50")
-
-        r1 = ttk.Frame(form)
-        r1.pack(anchor="w")
-        ttk.Label(r1, text="Nome").pack(side="left")
-        ttk.Entry(r1, textvariable=self.nome, width=34).pack(side="left", padx=6)
-        ttk.Label(r1, text="Valore (crediti)").pack(side="left")
-        ttk.Entry(r1, textvariable=self.valore, width=8).pack(side="left", padx=6)
-        ttk.Label(form, text="Descrizione").pack(anchor="w", pady=(6, 0))
-        self.descr = tk.Text(form, width=60, height=3)
-        self.descr.pack(anchor="w", pady=2)
-        lf = ttk.LabelFrame(form, text="Attacchi sbloccati dall'arma", padding=4)
-        lf.pack(anchor="w", fill="x", pady=6)
-        self.sel_attacchi = SelettoreRighe(lf, self.get_attacchi)
-        self.sel_attacchi.frame.pack(anchor="w")
-
-    def form_da_item(self, e):
-        self.nome.set(e.get("nome", ""))
-        self.valore.set(str(e.get("valore", 50)))
-        self.descr.delete("1.0", "end")
-        self.descr.insert("1.0", e.get("descrizione", ""))
-        self.sel_attacchi.set_ids(e.get("attacchi", []))
-
-    def item_da_form(self):
-        nome = self.chiedi_nome()
-        if not nome:
-            return None
-        return {
-            "nome": nome,
-            "descrizione": self.descr.get("1.0", "end").strip(),
-            "valore": num(self.valore, 50),
-            "attacchi": self.sel_attacchi.get(),
-        }
-
-
-class TabArmatura(CrudTab):
-    file = FILES["armatura"]
-    titolo = "Armatura"
-
-    def costruisci_form(self, form):
-        self.nome = tk.StringVar()
-        self.valore = tk.StringVar(value="100")
-        self.armatura_hp = tk.StringVar(value="20")
-
-        r1 = ttk.Frame(form)
-        r1.pack(anchor="w")
-        ttk.Label(r1, text="Nome").pack(side="left")
-        ttk.Entry(r1, textvariable=self.nome, width=34).pack(side="left", padx=6)
-        ttk.Label(r1, text="Valore (crediti)").pack(side="left")
-        ttk.Entry(r1, textvariable=self.valore, width=8).pack(side="left", padx=6)
-        ttk.Label(form, text="Descrizione").pack(anchor="w", pady=(6, 0))
-        self.descr = tk.Text(form, width=60, height=3)
-        self.descr.pack(anchor="w", pady=2)
-
-        lf_loc = ttk.LabelFrame(form, text="Locazioni coperte (hp extra su ognuna)", padding=4)
-        lf_loc.pack(anchor="w", fill="x", pady=6)
-        self.loc_vars = {loc: tk.BooleanVar() for loc in LOCAZIONI_BASE}
-        for loc in LOCAZIONI_BASE:
-            ttk.Checkbutton(lf_loc, text=loc, variable=self.loc_vars[loc]).pack(side="left", padx=4)
-        ttk.Label(lf_loc, text="  Armatura (hp) per locazione coperta").pack(side="left", padx=(12, 2))
-        tk.Spinbox(lf_loc, from_=0, to=200, width=5, textvariable=self.armatura_hp).pack(side="left")
-
-        lf_res = ttk.LabelFrame(form, text="Resistenze (% del danno, tetto 75% sommando tutte le fonti)",
-                                padding=4)
-        lf_res.pack(anchor="w", fill="x", pady=6)
-        self.resistenze = RigheResistenze(lf_res)
-        self.resistenze.frame.pack(anchor="w")
-
-        sblocchi = ttk.Frame(form)
-        sblocchi.pack(anchor="w", pady=4)
-        lf1 = ttk.LabelFrame(sblocchi, text="Stance sbloccate (manuali)", padding=4)
-        lf1.grid(row=0, column=0, sticky="nw", padx=4)
-        self.sel_stance = SelettoreRighe(lf1, self.get_stances)
-        self.sel_stance.frame.pack(anchor="w")
-        lf2 = ttk.LabelFrame(sblocchi, text="Stance attive finché indossata", padding=4)
-        lf2.grid(row=0, column=1, sticky="nw", padx=4)
-        self.sel_stance_auto = SelettoreRighe(lf2, self.get_stances)
-        self.sel_stance_auto.frame.pack(anchor="w")
-
-        lf3 = ttk.LabelFrame(form, text="Effetti nel tempo su chi la indossa", padding=4)
-        lf3.pack(anchor="w", fill="x", pady=6)
-        self.eff_tempo = RigheEffettiApplicati(lf3, self.get_effetti)
-        self.eff_tempo.frame.pack(anchor="w")
-
-    def form_da_item(self, e):
-        self.nome.set(e.get("nome", ""))
-        self.valore.set(str(e.get("valore", 100)))
-        self.descr.delete("1.0", "end")
-        self.descr.insert("1.0", e.get("descrizione", ""))
-        coperte = e.get("locazioni", [])
-        for loc, v in self.loc_vars.items():
-            v.set(loc in coperte)
-        self.armatura_hp.set(str(e.get("armatura_hp", 20)))
-        self.resistenze.set(e.get("resistenze", []))
-        self.sel_stance.set_ids(e.get("stance", []))
-        self.sel_stance_auto.set_ids(e.get("stance_attivate", []))
-        self.eff_tempo.set(e.get("effetti_nel_tempo", []))
-
-    def item_da_form(self):
-        nome = self.chiedi_nome()
-        if not nome:
-            return None
-        return {
-            "nome": nome,
-            "descrizione": self.descr.get("1.0", "end").strip(),
-            "valore": num(self.valore, 100),
-            "locazioni": [loc for loc, v in self.loc_vars.items() if v.get()],
-            "armatura_hp": num(self.armatura_hp, 0),
-            "resistenze": self.resistenze.get(),
-            "stance": self.sel_stance.get(),
-            "stance_attivate": self.sel_stance_auto.get(),
-            "effetti_nel_tempo": self.eff_tempo.get(),
-        }
-
-    def refresh_selettori(self):
-        self.sel_stance.refresh_valori()
-        self.sel_stance_auto.refresh_valori()
-
-
 class TabProtesi(CrudTab):
     file = FILES["protesi"]
     titolo = "Protesi"
@@ -1506,8 +1384,6 @@ def main():
     tpot = TabPoteri(nb, get_tipi=get_tipi, get_effetti=get_effetti,
                      get_attacchi=lambda: tatt.etichette(),
                      get_stances=lambda: tstance.etichette())
-    tequip = TabEquip(nb, get_attacchi=lambda: tatt.etichette())
-    tarm = TabArmatura(nb, get_stances=lambda: tstance.etichette(), get_effetti=get_effetti)
     tprot = TabProtesi(nb, get_attacchi=lambda: tatt.etichette(),
                        get_stances=lambda: tstance.etichette(), get_effetti=get_effetti)
     taug = TabAugment(nb, get_tipi=get_tipi, get_effetti=get_effetti,
@@ -1515,14 +1391,12 @@ def main():
                       get_stances=lambda: tstance.etichette())
     nb.add(tatt, text="Attacchi")
     nb.add(tpot, text="Poteri")
-    nb.add(tequip, text="Armi")
-    nb.add(tarm, text="Armatura")
     nb.add(tprot, text="Protesi")
     nb.add(taug, text="Augment")
     nb.add(tskill, text="Skill")
     nb.add(tstance, text="Stance")
     nb.add(teff, text="Effetti")
-    tutte_le_tab = (tpot, tarm, tprot, taug)
+    tutte_le_tab = (tpot, tprot, taug)
     nb.bind("<<NotebookTabChanged>>",
            lambda e: [t.refresh_selettori() for t in tutte_le_tab])
     nb.pack(fill="both", expand=True)

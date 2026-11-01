@@ -1045,3 +1045,70 @@ body.duello-mode .scena-allarme { white-space: nowrap; overflow: hidden; text-ov
 .riv-bilancio span { color: var(--muted); }
 .riv-nemico strong, .riv-ti_ha_battuto strong { color: var(--danger); }
 .riv-battuto strong, .riv-domato strong { color: var(--volt); }
+
+/* il negozio del cyberware: allievi / corpo / catalogo (stesso linguaggio della palestra: ritratti, tab, pallini) */
+.neg-tabs { margin: 0 0 16px; padding: 0; }
+a.pal-tab { text-decoration: none; display: inline-block; }
+.neg-layout { display: grid; grid-template-columns: 210px minmax(300px, 360px) minmax(0, 1fr); gap: 20px; align-items: start; }
+.neg-etichetta { font-size: 12px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; }
+.neg-etichetta a:hover { color: var(--volt); }
+.neg-allievi { display: flex; flex-direction: column; gap: 8px; }
+.neg-allievi .neg-etichetta { margin-bottom: 2px; }
+.neg-allievo { display: flex; gap: 10px; align-items: center; padding: 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+.neg-allievo:hover { border-color: var(--muted); }
+.neg-allievo.on { border-color: var(--volt); box-shadow: 0 0 0 1px var(--volt) inset; }
+.neg-allievo .pal-ritratto { flex: 0 0 auto; }
+.neg-allievo-testo { display: flex; flex-direction: column; gap: 3px; min-width: 0; font-size: 13px; }
+.neg-allievo-testo b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.neg-allievo-testo .muted { font-size: 11.5px; }
+.neg-corpo { position: sticky; top: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+.neg-umanita { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; margin-bottom: 6px; }
+.neg-umanita > span:first-child { font-size: 11px; font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); }
+.neg-figura { display: grid; grid-template-columns: 1fr 96px 1fr; grid-template-rows: auto auto auto auto; gap: 8px; align-items: center; margin: 8px 0 18px; }
+.neg-sagoma { grid-column: 2; grid-row: 2 / 4; justify-self: center; }
+.neg-sagoma canvas { display: block; width: 96px; height: 222px; image-rendering: pixelated; }
+.neg-slot { display: flex; align-items: center; gap: 4px; border: 1px dashed var(--line); border-radius: 10px; padding: 6px 8px; background: var(--panel-2); min-width: 0; }
+.neg-slot > a { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; gap: 1px; }
+.neg-slot small { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+.neg-slot b { font-size: 12.5px; line-height: 1.25; color: var(--muted); }
+.neg-slot:hover { border-color: var(--muted); }
+.neg-slot.occupato { border-style: solid; border-color: var(--teal); }
+.neg-slot.occupato b { color: var(--text); }
+.neg-slot.scelto { border-color: var(--volt); box-shadow: 0 0 0 1px var(--volt) inset; }
+.neg-slot.s-testa { grid-column: 2; grid-row: 1; justify-self: center; width: max-content; min-width: 130px; max-width: 190px; }
+.neg-slot.s-braccio_sx { grid-column: 1; grid-row: 2; }
+.neg-slot.s-braccio_dx { grid-column: 3; grid-row: 2; }
+.neg-slot.s-gamba_sx { grid-column: 1; grid-row: 3; }
+.neg-slot.s-gamba_dx { grid-column: 3; grid-row: 3; }
+.neg-x { flex: 0 0 auto; background: none; border: 1px solid var(--line); color: var(--muted); border-radius: 6px; width: 22px; height: 22px; font-size: 11px; cursor: pointer; line-height: 1; }
+.neg-x:hover { color: var(--danger); border-color: var(--danger); }
+.neg-slot form, .neg-interni form { margin: 0; }
+.neg-interni { list-style: none; display: flex; flex-direction: column; gap: 6px; margin: 0 0 12px; padding: 0; }
+.neg-interni li { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); }
+.neg-medikit { margin-top: 8px; }
+.neg-filtri { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.neg-chip { padding: 5px 12px; border: 1px solid var(--line); border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.neg-chip:hover { color: var(--text); border-color: var(--muted); }
+.neg-chip.on { color: #111; background: var(--volt); border-color: var(--volt); }
+.neg-griglia { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
+.neg-item { display: flex; flex-direction: column; gap: 8px; }
+.neg-item.non-ok { opacity: .72; }
+.neg-item form { margin-top: auto; }
+.neg-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; }
+.neg-costo-um { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); }
+.neg-dettagli { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; }
+.neg-dettagli li { font-size: 11.5px; padding: 2px 8px; border-radius: 999px; background: rgba(33, 208, 178, .12); color: var(--teal); }
+.neg-nota { font-size: 12px; margin: 6px 0 0; }
+.neg-vuoto { padding: 12px 0; }
+@media (max-width: 1100px) {
+  .neg-layout { grid-template-columns: 1fr; }
+  .neg-allievi { flex-direction: row; overflow-x: auto; padding-bottom: 6px; }
+  .neg-allievi .neg-etichetta { display: none; }
+  .neg-allievo { flex: 0 0 220px; }
+  .neg-corpo { position: static; }
+}
+.neg-nome { font-size: 15px; line-height: 1.25; }
+.neg-prezzo { margin-left: auto; }
+.neg-item .btn[disabled] { text-transform: none; letter-spacing: 0; font-size: 12px; line-height: 1.3; white-space: normal; padding: 8px 10px; }
+.neg-allievo .pallini { flex-wrap: wrap; gap: 3px; }
+.neg-allievo .pallino { width: 7px; height: 7px; border-width: 1px; }

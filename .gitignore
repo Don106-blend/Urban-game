@@ -1,2 +1,6 @@
 __pycache__/
 *.pyc
+
+# i progressi di chi gioca: restano sul suo computer e un aggiornamento non li tocca (la partita nasce vuota al primo avvio)
+save/
+.versione
