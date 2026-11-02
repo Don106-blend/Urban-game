@@ -289,11 +289,11 @@
     "attivo_default": false,
     "split_danni": false,
     "tipo_danno": "taglio",
-    "skill_colpire": "controllo",
+    "skill_colpire": "armi_corpo_a_corpo",
     "danno": {
       "dadi": [],
-      "flat": 125,
-      "mult": 1
+      "mult": 1,
+      "flat": 125
     },
     "sostituisce": 11,
     "effetti_applicati": [
@@ -308,7 +308,8 @@
     "usi_limitati": false,
     "usi_massimi": 1,
     "colpi": 1,
-    "costo_azioni": 1
+    "costo_azioni": 1,
+    "parabile": true
   },
   {
     "nome": "Braccio Lama",
@@ -1463,5 +1464,94 @@
     "colpi": 1,
     "costo_azioni": 1,
     "nome": "Pugno cibernetico"
+  },
+  {
+    "id": 57,
+    "nome": "Morso",
+    "descrizione": "Un morso feroce, a zanne scoperte: ferisce e fa sanguinare.",
+    "ranged": false,
+    "can_aim": true,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": false,
+    "tipo_danno": "perforante",
+    "skill_colpire": "fisico",
+    "danno": {
+      "dadi": [],
+      "mult": 1,
+      "flat": 110
+    },
+    "sostituisce": null,
+    "effetti_applicati": [
+      {
+        "effetto": 3,
+        "turni": 2,
+        "persistente": false
+      }
+    ],
+    "cooldown_turni": 3,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "colpi": 1,
+    "costo_azioni": 1,
+    "parabile": true
+  },
+  {
+    "id": 58,
+    "nome": "DDOS",
+    "descrizione": "Un attacco informatico: se va a segno, per 1d Mente turni l'avversario non può accendere augment (quelli già accesi restano accesi). Una volta per combattimento.",
+    "ranged": true,
+    "can_aim": false,
+    "can_dodge": false,
+    "attivo_default": false,
+    "split_danni": false,
+    "tipo_danno": "nessuno",
+    "skill_colpire": "mente",
+    "danno": {
+      "dadi": [],
+      "mult": 1,
+      "flat": 0
+    },
+    "sostituisce": null,
+    "speciale": "ddos",
+    "senza_danno": true,
+    "effetti_applicati": [],
+    "cooldown_turni": 0,
+    "usi_limitati": true,
+    "usi_massimi": 1,
+    "colpi": 1,
+    "costo_azioni": 1,
+    "parabile": false
+  },
+  {
+    "nome": "Artigli sanguinari",
+    "descrizione": "Artigli retrattili: cercano il sangue.",
+    "ranged": false,
+    "can_aim": true,
+    "can_dodge": true,
+    "attivo_default": false,
+    "split_danni": false,
+    "tipo_danno": "taglio",
+    "skill_colpire": "armi_corpo_a_corpo",
+    "danno": {
+      "dadi": [],
+      "mult": 1,
+      "flat": 125
+    },
+    "sostituisce": null,
+    "effetti_applicati": [
+      {
+        "effetto": 3,
+        "turni": 3,
+        "persistente": false
+      }
+    ],
+    "id": 59,
+    "cooldown_turni": 3,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "colpi": 1,
+    "costo_azioni": 1,
+    "parabile": true
   }
 ]

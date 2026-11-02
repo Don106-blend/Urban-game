@@ -156,6 +156,19 @@ def umanita_usata(c):
     return inst - min(max(0, c.get("umanita_recuperata", 0)), inst)
 
 
+def umanita_settimanale(stato, db, rng, rie):
+    """Gancio di fine settimana: con la Sala di decompressione chi ha umanita' spesa ne recupera (come con un colloquio azzeccato)."""
+    punti = sum(palestra.ATTREZZI[a].get("umanita_settimanale", 0) for a in palestra.attrezzi_posseduti(stato))
+    for c in palestra.membri_attivi(stato):
+        n = min(punti, umanita_usata(c))
+        if n > 0:
+            c["umanita_recuperata"] = c.get("umanita_recuperata", 0) + n
+            rie["righe"].append(f"{palestra.nome_breve(c)} si ritrova nella Sala di decompressione: +{n} umanità.")
+
+
+palestra.GANCI_SETTIMANA.append(umanita_settimanale)
+
+
 def umanita_installata(c):
     """Umanità che costano protesi e augment installati."""
     tot = 0
@@ -298,10 +311,56 @@ def sconta_duello_pendente():
     rec = trova_record(pid)
     if rec and not rec.get("morto"):
         rec["sconfitte"] = rec.get("sconfitte", 0) + 1
+        if STATO.pop("duello_mortale", False):
+            rec["morto"] = True
+            palestra.morte(STATO, rec)
+    STATO.pop("duello_mortale", None)
     salva_stato()
 
 
 sconta_duello_pendente()
+
+
+def nemesi_ostile(stato, db, rng, rie):
+    """Gancio di fine giornata: una nemesi battuta troppe volte da un allievo puo' decidere di cercarlo fuori dal ring (evento "imboscata")."""
+    p = palestra.stato_palestra(stato)
+    if any(e["tipo"] == "imboscata" for e in p["eventi"]):
+        return
+    occupati = palestra._in_attesa(stato)
+    for c in palestra.membri_attivi(stato):
+        if c["id"] in occupati or not palestra.puo_combattere(stato, c)[0]:
+            continue
+        r = nemesi.scegli_ostile(stato.get("rivali", []), c["id"], rng)
+        if r is None:
+            continue
+        r["ostile"] = c["id"]
+        ev = palestra._crea_evento(stato, "imboscata", a=c, extra={"r": r["id"]})
+        rie["eventi_nuovi"].append(ev["id"])
+        rie["righe"].append(f"{nemesi.nome_completo(r)} è ostile: cerca {palestra.nome_breve(c)} fuori dalla palestra.")
+        return
+
+
+palestra.GANCI_GIORNO.append(nemesi_ostile)
+
+
+def avvia_imboscata(pid, rid):
+    """Il duello mortale della nemesi ostile contro il suo allievo. Ritorna l'indirizzo della pagina del duello (None se non si puo')."""
+    global DUELLO
+    c = trova_record(pid)
+    if c is None or c.get("morto"):
+        return None
+    riv = next((x for x in STATO.get("rivali", []) if x["id"] == rid), None)
+    if riv is None:                       # (non dovrebbe succedere: la potatura salva gli ostili) ne arriva uno nuovo
+        riv = _nuovo_rivale(c, record_to_pg(c))
+        STATO.setdefault("rivali", []).append(riv)
+    cpu = record_to_pg(riv)
+    cpu.nome = nemesi.nome_completo(riv)
+    cpu.rivale = riv
+    DUELLO = DuelloWeb(c, avversario=cpu, mortale=True)
+    c["ultimo_duello"] = STATO["giorno"]
+    STATO["duello_pendente"] = pid
+    STATO["duello_mortale"] = True
+    return url_for("duello")
 
 
 def costo_contratto(c):
@@ -360,7 +419,8 @@ def pannello(p, turno):
         "poteri": [{"id": s["def"]["id"], "nome": s["def"]["nome"],
                     "rango": s["rango"], "attivo": s["attivo"]} for s in p.poteri],
         "augments": [{"id": s["def"]["id"], "nome": s["def"]["nome"],
-                     "attivo": s["attivo"], "passivo": not s["def"].get("attivo", True)}
+                     "attivo": s["attivo"], "passivo": not s["def"].get("attivo", True),
+                     "cooldown": p.stato_augment(s["def"])["cooldown"]}
                     for s in p.augments],
         "stance": [{"id": s["id"], "nome": s["nome"],
                     "turni": next((x["turni"] for x in p.stance_attive
@@ -370,7 +430,7 @@ def pannello(p, turno):
                    for s in p.stance_conosciute],
         "effetti": [{"nome": e["def"]["nome"], "turni": e["turni"]}
                     for e in p.effetti_attivi],
-        "emp_turni": p.emp_turni,
+        "emp_turni": p.emp_turni, "ddos_turni": p.ddos_turni,
     }
 
 
@@ -704,6 +764,8 @@ def info_attacco(att):
         tags.append(f"{att.get('usi_massimi', 1)} usi per duello")
     if att.get("speciale") == "assorbi_caratteristica":
         tags.append(f"scambia una statistica a caso per {att.get('speciale_turni', 3)} turni")
+    if att.get("speciale") == "ddos":
+        tags.append("blocca l'accensione degli augment per 1d Mente turni")
     effetti = []
     for sp in att.get("effetti_applicati", []):
         e = next((x for x in DB["effetti"] if x["id"] == sp.get("effetto")), None)
@@ -800,8 +862,11 @@ def cresce_rivale(riv, vinto_allievo):
 class DuelloWeb:
     """Stato del duello lato server, pilotato da /api/duello/azione."""
 
-    def __init__(self, record=None, pg=None, avversario=None, torneo=None, posta=None, azzardo_attivo=None):
+    def __init__(self, record=None, pg=None, avversario=None, torneo=None, posta=None, azzardo_attivo=None, mortale=False):
         self.rec = record  # None = duello senza palestra: torneo (o CPU vs CPU)
+        self.mortale = mortale    # l'imboscata di una nemesi: chi perde muore, niente resa e niente azzardo (v. avvia_imboscata)
+        self.luogo = "vicolo" if mortale else None    # lo sfondo dell'arena (static/arena.js)
+        self.destino = None       # dopo una vittoria mortale: "risparmia" | "uccidi" (v. risolvi_destino)
         self.torneo = torneo  # riferimento al TorneoEvo, se questo duello ne fa parte
         self.posta = dict(POSTA_BASE, **(posta or {}))   # quanto paga la vittoria e quanto e' pericolosa la morte
         self.rivale = None       # il rivale persistente di questo duello (Nemesis system), se c'e'
@@ -830,12 +895,14 @@ class DuelloWeb:
         self.arena_attiva = record is not None or torneo is not None
         self.db = DB
         giocabile = self.arena_attiva if azzardo_attivo is None else bool(azzardo_attivo)
-        self.tavolo = azzardo.Tavolo(self, banco=self.arena_attiva) if (self.arena_attiva or giocabile) else None
+        self.tavolo = azzardo.Tavolo(self, banco=self.arena_attiva) if (not mortale and (self.arena_attiva or giocabile)) else None
         # le scelte del giocatore si registrano solo nel gioco vero (duello della palestra o torneo), mai nel harness
         self.reg = tattiche.Registratore("torneo" if torneo is not None else "duello") if self.arena_attiva else None
         self.usato_potere = False   # per le clausole "stoico"/"bestia"
         self.min_hp_crit = 1.0      # hp minimi (frazione di testa + busto) toccati dal player, per la clausola "incassatore"
         self.scriv("=== DUELLO ===")
+        if mortale:
+            self.scriv("☠ IMBOSCATA: in fondo a un vicolo, uno dei due non uscirà vivo. Niente resa, niente azzardi.", "crit")
         self.scriv(f"{self.p.nome} (LIV {getattr(self.p, 'livello', 1)}) contro "
                    f"{self.cpu.nome} (LIV {getattr(self.cpu, 'livello', 1)}) — "
                    f"potenziale {valuta(self.p)} vs {valuta(self.cpu)}.")
@@ -846,13 +913,15 @@ class DuelloWeb:
             if r1 != r2:
                 break
             self.scriv("Pareggio, si ritira.")
-        self.ordine = [self.p, self.cpu] if r1 > r2 else [self.cpu, self.p]
-        self.scriv(f"{self.ordine[0].nome} agisce per primo.")
+        self.ordine = [self.p, self.cpu] if (r1 > r2 and not mortale) else [self.cpu, self.p]   # l'imboscata da' l'iniziativa a chi aspettava
+        self.scriv(f"{self.ordine[0].nome} agisce per primo." + (" L'imboscata gli regala il vantaggio." if mortale else ""))
         self.round = 0
         self.evento("inizio", nome1=self.p.nome, tiro1=r1, nome2=self.cpu.nome, tiro2=r2,
                     primo=self.ordine[0].nome)
         self.nuovo_round()
         self._rivalita()
+        if mortale:
+            self.posta = dict(self.posta, paga=0, taglia=0)   # nessun premio: si combatte per la pelle
 
     # ---------- il Nemesis system: chi sei per lui ----------
     def _rivalita(self):
@@ -889,6 +958,19 @@ class DuelloWeb:
         return {"nome": nemesi.nome_completo(riv), "livello": riv["livello"], "stato": eti["stato"], "testo": eti["testo"], "breve": eti["breve"],
                 "vinte": r["vinte"], "perse": r["perse"], "taglia": self.posta.get("taglia", 0),
                 "rivincita": nemesi.chi_cerca_rivincita(riv, self.rec.get("id")), "incontri": riv.get("incontri", 0)}
+
+    def destino_atteso(self):
+        """Dopo una vittoria in un duello mortale il giocatore decide della nemesi: risparmiarla o lasciarla morire."""
+        return self.mortale and self.finito and self.vincitore is self.p and self.destino is None
+
+    def scegli_destino(self, scelta):
+        if not self.destino_atteso():
+            return "nessuna scelta da fare"
+        if scelta not in ("risparmia", "uccidi"):
+            return "scelta non valida"
+        self.destino = scelta
+        risolvi_destino(self, scelta)
+        return None
 
     # ---------- log ----------
     def scriv(self, msg, tag=None):
@@ -947,7 +1029,7 @@ class DuelloWeb:
         """Un augment Passivo resta sempre acceso: se un EMP l'ha appena spento e
         ora è finito (emp_turni tornato a 0), lo riaccende in automatico.
         Idempotente: sugli augment già attivi non fa nulla."""
-        if chi.emp_turni > 0:
+        if chi.emp_turni > 0 or chi.ddos_turni > 0:
             return
         for slot in chi.augments:
             if not slot["def"].get("attivo", True) and not slot["attivo"]:
@@ -955,6 +1037,8 @@ class DuelloWeb:
                     self.scriv("  " + r)
 
     def fine_turno(self):
+        for pg in (self.p, self.cpu):
+            pg.reazioni_bloccate = False     # il Modulo di IA predittiva vale per il turno in cui e' stato usato
         if MIRA_DURA_TURNO:
             self.attivo.mira = None   # una mira di turno non si porta in quello dopo
         if self.tavolo is not None:
@@ -1054,17 +1138,20 @@ class DuelloWeb:
         self._spettacolo(chi, "potere")
 
     def usa_augment(self, chi, slot):
-        if not chi.puo_attivare_augment(slot):
+        if not (chi.puo_attivare_augment(slot) and chi.puo_pagare_augment(slot)):
             self.scriv(f"{slot['def']['nome']} non è attivabile ora.")
             return
-        chi.azioni -= 1
+        if slot["def"].get("costo_bonus"):       # il Convertitore nutrizionale costa un'azione bonus, gli altri un'azione
+            chi.bonus -= 1
+        else:
+            chi.azioni -= 1
         i0 = len(self.log)
-        for r in chi.attiva_augment(slot, DB["attacchi"], DB["stances"], DB["effetti"]):
+        for r in chi.attiva_augment(slot, DB["attacchi"], DB["stances"], DB["effetti"],
+                                    avversario=self.cpu if chi is self.p else self.p):
             self.scriv(r)
         self.evento("potere", i0 + 1, titolo=slot["def"]["nome"], rango=None,
                     desc=slot["def"].get("descrizione", ""), righe=[x["t"] for x in self.log[i0:]])
-        if chi is self.p:
-            self.usato_potere = True  # un augment è meccanicamente un potere
+        # niente `usato_potere`: la clausola Stoico (azzardo.py) conta solo i POTERI, non gli augment
         self._spettacolo(chi, "potere")
 
     def usa_stance(self, chi, sdef, avversario):
@@ -1378,7 +1465,12 @@ class DuelloWeb:
         else:
             margine = min(max(ta - td, 0), MARGINE_CAP) * MARGINE_FATTORE
             base = a.tira_formula(att["danno"], d)
-            danno = base + margine
+            danno = 0 if att.get("senza_danno") else base + margine     # (DDOS: nessun danno, solo l'effetto)
+            bers = a.bonus_berserker()           # Berserker: piu' vita hai perso, piu' fai male
+            if bers > 0 and danno > 0:
+                extra = int(danno * bers)
+                danno += extra
+                self.scriv(f"Berserker: +{round(bers * 100)}% ai danni (+{extra}).")
             if self.tavolo is not None:
                 danno = self.tavolo.danno_rilanciato(a, d, loc, danno)     # ...e se e' a segno la posta paga
             if mitiga_meta:
@@ -1391,6 +1483,10 @@ class DuelloWeb:
             if att.get("speciale") == "assorbi_caratteristica":
                 for r in a.assorbi_caratteristica(d, att.get("speciale_turni", 3)):
                     self.scriv("  " + r)
+            if att.get("speciale") == "ddos":
+                n = max(1, a.tira("mente", d))      # [1d Mente] turni; il +1 perche' il conto scala all'inizio del turno del bersaglio
+                d.ddos_turni = max(d.ddos_turni, n + 1)
+                self.scriv(f"  {d.nome} subisce un DDOS: nessun augment attivabile per {n} turni (quelli già accesi restano accesi).")
             danno_reale = hp_prima - sum(d.hp.values())
             assorbito = max(0, arm_prima - sum(d.armatura.values()))
             for r in d.applica_effetti(att.get("effetti_applicati", []),
@@ -1432,7 +1528,7 @@ class DuelloWeb:
 
     def _cpu_vuole_arrendersi(self):
         """La CPU getta la spugna se ha subito danni troppo ingenti (mai nel Torneo Evo)."""
-        if self.rec is None:  # duello di torneo: la resa non esiste
+        if self.rec is None or self.mortale:  # duello di torneo o imboscata: la resa non esiste
             return False
         c = self.cpu
         tot = sum(max(0, c.hp[l]) for l in c.hp)
@@ -1490,7 +1586,7 @@ class DuelloWeb:
                            and (a.stamina or 0) >= (drain + s["rango"]) * 2] + \
                           [(s, self.usa_augment) for s in a.augments
                            if s["def"].get("attivo", True) and not s["attivo"]
-                           and a.puo_attivare_augment(s)
+                           and a.puo_attivare_augment(s) and a.puo_pagare_augment(s)
                            and (a.stamina or 0) >= (drain + s["def"].get("costo_stamina", 1)) * 2]
             if sostenibili and random.random() < self._prob("potere_subito", "potere"):
                 slot, azione = random.choice(sostenibili)
@@ -1519,7 +1615,8 @@ class DuelloWeb:
         return {"mira": a.puo_mirare() and (a.mira_bonus or a.azioni >= 2),
                 "potere": a.azioni >= 1 and (any(not s["attivo"] and a.puo_attivare_potere(s) for s in a.poteri)
                                              or any(s["def"].get("attivo", True) and not s["attivo"]
-                                                    and a.puo_attivare_augment(s) for s in a.augments)),
+                                                    and a.puo_attivare_augment(s) and a.puo_pagare_augment(s)
+                                                    for s in a.augments)),
                 "stance": a.bonus >= 1 and any(all(x["def"]["id"] != s["id"] for x in a.stance_attive)
                                                and a.puo_attivare_stance(s) for s in a.stance_conosciute)}
 
@@ -1572,6 +1669,8 @@ class DuelloWeb:
     def _azione_player(self, dati):
         """Esegue un'azione del giocatore; ritorna un messaggio d'errore o None."""
         tipo = dati.get("tipo")
+        if tipo == "destino":
+            return self.scegli_destino(dati.get("scelta"))
         if self.finito and tipo != "cpu_step":
             return "il duello è concluso"
         if tipo == "risposta":
@@ -1608,6 +1707,8 @@ class DuelloWeb:
         if tipo == "resa":
             if self.rec is None:
                 return "nel Torneo Evo non ci si arrende"
+            if self.mortale:
+                return "non c'è resa: è un duello all'ultimo sangue"
             self.resa(self.p)
         elif tipo == "fine_turno":
             self.fine_turno()
@@ -1659,10 +1760,10 @@ class DuelloWeb:
                          if s["def"]["id"] == dati.get("id") and not s["attivo"]), None)
             if slot is None:
                 return "augment non disponibile"
-            if a.azioni < 1:
-                return "azioni esaurite"
+            if not a.puo_pagare_augment(slot):
+                return "azioni bonus esaurite" if slot["def"].get("costo_bonus") else "azioni esaurite"
             if not a.puo_attivare_augment(slot):
-                return "augment inutilizzabile (EMP o utilizzi esauriti)"
+                return "augment inutilizzabile (EMP, DDOS, in ricarica, senza stamina o utilizzi esauriti)"
             self.usa_augment(a, slot)
         elif tipo == "disattiva_augment":
             slot = next((s for s in a.augments
@@ -1716,7 +1817,10 @@ class DuelloWeb:
             # sono sempre accesi (vedi record_to_pg)
             "augment": [{"id": s["def"]["id"], "nome": s["def"]["nome"],
                         "desc": s["def"].get("descrizione", ""),
-                        "ok": a.azioni >= 1 and a.puo_attivare_augment(s)}
+                        "costo": "bonus" if s["def"].get("costo_bonus") else "azione",
+                        "cooldown": a.stato_augment(s["def"])["cooldown"],
+                        "usi_rimasti": a.stato_augment(s["def"])["usi_rimasti"],
+                        "ok": a.puo_pagare_augment(s) and a.puo_attivare_augment(s)}
                        for s in a.augments if s["def"].get("attivo", True) and not s["attivo"]],
             "augment_attivi": [{"id": s["def"]["id"], "nome": s["def"]["nome"],
                                 "turni_rimasti": s.get("turni_rimasti"), "ok": a.bonus >= 1}
@@ -1756,6 +1860,8 @@ class DuelloWeb:
             "torneo": self.rec is None,
             "arena": self.info_arena(),
             "rivale": self.info_rivale(),
+            "mortale": self.mortale, "luogo": self.luogo,
+            "destino": {"atteso": self.destino_atteso(), "scelto": self.destino, "nome": self.cpu.nome} if self.mortale else None,
         }
 
 
@@ -2036,6 +2142,8 @@ def forfeit_su_uscita():
             and request.endpoint is not None
             and request.endpoint not in ("duello", "api_duello_stato",
                                          "api_duello_azione", "static")):
+        if DUELLO.mortale:           # dal vicolo non si esce: ogni altra pagina riporta al duello (chiudere l'app, invece, e' una sconfitta: v. sconta_duello_pendente)
+            return redirect(url_for("duello"))
         abbandona_duello()
 
 
@@ -2077,7 +2185,10 @@ def chiudi_duello():
     danni_subiti = sum(max(0, LOCAZIONI[l] - d.p.hp[l]) for l in LOCAZIONI)
     # oltre il fondo scala su testa/busto la morte è probabilistica:
     # la Toughness accumulata riduce la chance (min 10%); la posta del duello puo' renderla piu' o meno probabile
-    if d.p.hp["testa"] <= -LOCAZIONI["testa"] or d.p.hp["busto"] <= -LOCAZIONI["busto"]:
+    if d.mortale and d.vincitore is not d.p:
+        rec["morto"] = True
+        d.scriv(f"{rec['nome']} muore nel vicolo.", "crit")
+    elif d.p.hp["testa"] <= -LOCAZIONI["testa"] or d.p.hp["busto"] <= -LOCAZIONI["busto"]:
         prob = min(1.0, max(0.10, 0.75 - rec.get("toughness", 0) * 0.01) * d.posta.get("morte", 1.0))
         if random.random() < prob:
             rec["morto"] = True
@@ -2099,6 +2210,7 @@ def chiudi_duello():
     if riv is not None:
         prima = nemesi.rapporto(riv, rec.get("id"))["ultimo"]
         nemesi.registra(riv, rec.get("id"), vittoria, STATO["giorno"])
+        riv.pop("ostile", None)       # la caccia e' finita, comunque sia andata (chi ha vinto decide poi la sorte dell'altro)
         rec["ultimo_rivale"] = riv["id"]
         if prima == "r" and vittoria:
             palestra.cambia_fiducia(rec, nemesi.FIDUCIA_VENDETTA)
@@ -2131,6 +2243,29 @@ def chiudi_duello():
         for nota in assegna_xp(rec, xp):
             d.scriv(nota, "round")
     STATO.pop("duello_pendente", None)  # duello concluso regolarmente
+    STATO.pop("duello_mortale", None)
+    salva_stato()
+
+
+def risolvi_destino(d, scelta):
+    """La nemesi e' a terra e l'allievo ha vinto: la risparmia (rispetto, lei lo lascia in pace a lungo) o la lascia morire (e' finita, ma pesa)."""
+    rec, riv = d.rec, d.rivale
+    nome = d.cpu.nome
+    if scelta == "uccidi":
+        if riv is not None and riv in STATO.get("rivali", []):
+            STATO["rivali"].remove(riv)
+        palestra.cambia_stress(rec, nemesi.STRESS_UCCISIONE)
+        palestra.cambia_fiducia(rec, nemesi.FIDUCIA_UCCISIONE)
+        palestra.registra(STATO, f"{nome} è morto nel vicolo, per mano di {rec['nome']}.", rec=rec)
+        d.scriv(f"☠ {nome} muore nel vicolo. {rec['nome']} resta a guardare: stress su, fiducia giù.", "crit")
+    else:
+        if riv is not None:
+            r = nemesi.rapporto(riv, rec["id"])
+            riv.setdefault("rapporti", {})[str(rec["id"])] = dict(r, grazia=r["vinte"])   # ricomincia da zero: serviranno altre sconfitte
+        palestra.cambia_stress(rec, nemesi.STRESS_GRAZIA)
+        palestra.cambia_fiducia(rec, nemesi.FIDUCIA_GRAZIA)
+        palestra.registra(STATO, f"{rec['nome']} ha risparmiato {nome}.", rec=rec)
+        d.scriv(f"{rec['nome']} abbassa il pugno. {nome} se ne va zoppicando: non sarà più la stessa nemesi.")
     salva_stato()
 
 
@@ -2274,8 +2409,9 @@ def api_palestra_azione():
         r = palestra.risolvi_evento(STATO, DB, dati.get("id"), dati.get("scelta"))
         if not r["ok"]:
             return errore(r["errore"])
+        vai = avvia_imboscata(r.get("a"), r.get("rivale")) if r.get("duello") == "mortale" else None
         salva_stato()
-        return risposta_palestra(esito=r)
+        return risposta_palestra(esito=r, duello=vai)
 
     c = _allievo(dati.get("pid"))
     if c is None:

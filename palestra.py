@@ -24,6 +24,7 @@ import math
 import random
 
 import aspetto as asp
+import nemesi
 from engine import LOCAZIONI, STATS, SKILLS, costo_upgrade, carica
 
 # ---------------------------------------------------------------- calendario
@@ -1164,6 +1165,9 @@ def _testo(stato, ev, txt):
         c["m"] = nome_breve(m)
     if ev.get("extra", {}).get("attrezzo") in ATTREZZI:
         c["attrezzo"] = ATTREZZI[ev["extra"]["attrezzo"]]["nome"].lower()
+    riv = next((x for x in stato.get("rivali", []) if x["id"] == ev.get("extra", {}).get("r")), None)
+    if riv is not None:
+        c["r"] = nemesi.nome_completo(riv)
     return txt.format_map(c)
 
 
@@ -1292,7 +1296,7 @@ def risolvi_evento(stato, db, ev_id, scelta_id, rng=random):
             fai_istruttore(stato, rec)
             righe.append(f"{nome_breve(rec)} diventa istruttore")
     registra(stato, f"{d['titolo']}: {scelta_txt}", pid=ev.get("a"))
-    return {"ok": True, "esito": esito, "righe": righe}
+    return {"ok": True, "esito": esito, "righe": righe, "duello": sc.get("duello"), "a": ev.get("a"), "rivale": ev.get("extra", {}).get("r")}
 
 
 # ---------------------------------------------------------------- la vista per l'interfaccia

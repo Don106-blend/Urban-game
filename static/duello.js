@@ -6,8 +6,9 @@ const CPU_DELAY = 2600;  // pausa tra le azioni della CPU: il tempo di leggere l
 
 /* abbandonare il combattimento in qualsiasi modo = sconfitta */
 const MSG_ABBANDONO = "Sei sicuro di abbandonare il combattimento? Risulterà in una sconfitta.";
+const MSG_VICOLO = "Dal vicolo non si esce finché uno dei due è in piedi.";
 window.addEventListener("beforeunload", e => {
-  if (S && !S.finito) {
+  if (S && !S.finito && !S.mortale) {      // (nel vicolo ricaricare la pagina riprende il duello: non c'e' niente da perdere)
     e.preventDefault();
     e.returnValue = MSG_ABBANDONO;
   }
@@ -15,7 +16,7 @@ window.addEventListener("beforeunload", e => {
 document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll(".nav a, .wordmark").forEach(a =>
     a.addEventListener("click", e => {
-      if (S && !S.finito && !confirm(MSG_ABBANDONO)) e.preventDefault();
+      if (S && !S.finito && (S.mortale ? (alert(MSG_VICOLO), true) : !confirm(MSG_ABBANDONO))) e.preventDefault();
     }));
 });
 
@@ -246,7 +247,7 @@ function renderPannello(dove, p, mira_su) {
   // liste in linea (a chip) per non allungare la scheda: niente scroll durante il duello
   const chip = (testo, tag, cls = "tag-attiva") => `<span class="pi">${esc(testo)}${tag ? ` <small class="${cls}">${tag}</small>` : ""}</span>`;
   const poteri = p.poteri.map(x => chip(`${x.nome} r${x.rango}`, x.attivo ? "ATTIVO" : "")).join("");
-  const augments = p.augments.map(x => chip(x.nome, x.passivo ? "passivo" : (x.attivo ? "ATTIVO" : ""),
+  const augments = p.augments.map(x => chip(x.nome, x.passivo ? "passivo" : (x.attivo ? "ATTIVO" : (x.cooldown > 0 ? `ricarica ${x.cooldown}t` : "")),
     x.passivo ? "muted" : "tag-attiva")).join("");
   const stance = p.stance.filter(x => x.turni != null).map(x =>
     chip(x.nome, x.turni < 0 ? "perm." : x.turni + "t")).join("");
@@ -266,6 +267,7 @@ function renderPannello(dove, p, mira_su) {
       ${staminaBar(r)}
       ${p.mira ? `<span>MIRA: ${p.mira}</span>` : ""}
       ${p.emp_turni > 0 ? `<span class="chip-crip">⚡EMP: ${p.emp_turni}t</span>` : ""}
+      ${p.ddos_turni > 0 ? `<span class="chip-crip" title="Nessun augment si può accendere">⛓DDOS: ${p.ddos_turni}t</span>` : ""}
     </div>
     <div class="pan-sec pan-locs">${hp}</div>
     ${riga("Poteri", poteri)}${riga("Augment", augments)}${riga("Stance", stance)}${riga("Effetti", effetti)}${riga("Azzardo", azzardo)}
@@ -587,11 +589,19 @@ function renderAzioni() {
 
   if (S.finito) {
     const vinto = S.vinto_dal_player;
+    const titolo = S.mortale ? (vinto ? "VITTORIA" : "SCONFITTA — MORTE")
+      : vinto ? (S.torneo ? "VITTORIA!" : `VITTORIA! +¤${S.ricompensa}`) : "SCONFITTA";
     const esito = `
       <div class="esito ${vinto ? "vittoria" : "sconfitta"}">
-        ${vinto ? (S.torneo ? "VITTORIA!" : `VITTORIA! +¤${S.ricompensa}`) : "SCONFITTA"}
+        ${titolo}
         — ${S.vincitore} vince
       </div>${riassuntoBanco()}`;
+    if (S.destino && S.destino.atteso) {      // la nemesi e' a terra: la sorte e' nelle mani del giocatore
+      box.innerHTML = esito + `<div class="titolo-menu">${esc(S.destino.nome)} è a terra, e ti guarda.</div>` +
+        bottone("✋ Risparmialo", 'invia({tipo:"destino",scelta:"risparmia"})', "btn-azione") +
+        bottone("☠ Lascialo morire", 'invia({tipo:"destino",scelta:"uccidi"})', "btn-azione");
+      return;
+    }
     const dopo = S.torneo
       ? `<a class="btn btn-volt" href="/torneo">Torna al torneo →</a>`
       : `<a class="btn btn-volt" href="/palestra">Torna alla palestra →</a>
@@ -673,7 +683,8 @@ function renderAzioni() {
       bottone("← Indietro", "menu=null;render()", "btn-ghost");
   } else if (menu === "augment") {
     box.innerHTML = testaMenu("Augment") +
-      m.augment.map(a => bottone(opz(`Attiva: ${esc(a.nome)}`, costoPallini(1), a.desc),
+      m.augment.map(a => bottone(opz(`Attiva: ${esc(a.nome)}`, costoPallini(1, a.costo === "bonus" ? "bonus" : "az") +
+          (a.cooldown > 0 ? ` · ricarica ${a.cooldown} turni` : "") + (a.usi_rimasti != null ? ` · ${a.usi_rimasti} uso/i` : ""), a.desc),
         `invia({tipo:"augment",id:${a.id}})`, "btn-azione btn-opz", !a.ok)).join("") +
       m.augment_attivi.map(a => bottone(opz(`Disattiva: ${esc(a.nome)}`,
         costoPallini(1, "bonus") + (a.turni_rimasti != null ? ` · ${a.turni_rimasti} turni rimasti` : ""), a.desc),
@@ -704,7 +715,7 @@ function renderAzioni() {
       (m.azzardi ? bottone("🎲 Azzardo", 'menu="azzardo";render()', "btn-azione", !haAzzardo) : "") +
       bottone("Fine turno →", 'invia({tipo:"fine_turno"})',
               nonRestaNulla ? "btn-volt btn-consigliato" : "btn-volt") +
-      (S.torneo ? "" :
+      (S.torneo || S.mortale ? "" :
         bottone("🏳 Resa", 'if(confirm("Ti arrendi? Sconfitta immediata, ma eviti altri danni."))invia({tipo:"resa"})', "btn-ghost"));
   }
 }

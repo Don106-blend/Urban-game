@@ -116,6 +116,14 @@
                    "altrimenti": [{"chi": "a", "fiducia": 6}, {"testo": "{a} ne esce in piedi e con le tasche piene: si è fatto rispettare."}]}]}
    ]},
 
+  {"id": "imboscata", "titolo": "Un conto in sospeso", "peso": 1.0, "automatico": true,
+   "ruoli": {"a": {}},
+   "testo": "{a} sta tornando a casa a notte fonda quando una sagoma sbarra la strada, in fondo a un vicolo senza lampioni. È {r}: {a} l'ha battut{o_a} troppe volte, e quello non l'ha mandata giù. Non è un incontro sul ring: qui nessuno si arrende e nessuno arbitra. Uno dei due non uscirà vivo.",
+   "scelte": [
+     {"id": "affronta", "testo": "{a} non ha scelta: si combatte", "duello": "mortale",
+      "esito": "Il vicolo si chiude alle sue spalle. Le regole le ha scritte {r}, e sono poche."}
+   ]},
+
   {"id": "compleanno", "titolo": "Compleanno", "automatico": true,
    "ruoli": {"a": {}},
    "testo": "Oggi {a} compie {eta_a} anni.",

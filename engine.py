@@ -44,6 +44,12 @@ RESISTENZA_MAX = 75
 MARGINE_CAP = 8
 MARGINE_FATTORE = 2
 MAX_POTERI = 4
+# cyberwear (v. CYBERWARE.md, sez. "nuovi impianti"): i numeri delle regole speciali degli augment (campo "speciale" dei dati)
+COSTO_CONVERTITORE = 3      # Convertitore nutrizionale: stamina che si converte in un'azione extra
+SOGLIA_CUSCINETTO = 50      # Cuscinetto di emergenza: hp veri persi in un colpo solo da una locazione...
+HP_CUSCINETTO = 50          # ...e hp temporanei (armatura) che ne ottiene, una volta per combattimento
+BERSERKER_MAX = 0.75        # Berserker: danno in piu' al massimo (+75%)...
+BERSERKER_SOGLIA = 0.05     # ...quando resta il 5% della vita generale (prima cresce in modo lineare)
 # testa 80 e busto 120 (erano 50 e 150): con la testa a 50 ogni colpo da >= 50 la uccideva in un
 # colpo solo e 9 duelli su 10 si decidevano alla lotteria della testa; a 80 non la uccide quasi
 # mai da solo (serve un margine alto o due colpi) e il busto diventa un bersaglio vero
@@ -213,6 +219,9 @@ class Personaggio:
         self.emp_turni = 0          # >0: augment disattivati, attacchi/stance da protesi inutilizzabili
         self.attacchi_protesi = set()  # id attacco sbloccati da una protesi (bersaglio dell'EMP)
         self.stance_protesi = set()    # id stance sbloccate da una protesi (bersaglio dell'EMP)
+        self.ddos_turni = 0            # >0: nessun augment si puo' accendere (Modulo DDOS); quelli gia' accesi restano accesi
+        self.reazioni_bloccate = False  # True nel turno di chi usa il Modulo di IA predittiva: niente schivata
+        self.cuscinetto_usato = False  # il Cuscinetto di emergenza scatta una volta sola per combattimento
 
     # ---------- dadi ----------
     def _mod_rango(self, tipo, target):
@@ -282,7 +291,12 @@ class Personaggio:
     def rango_potere_attivo(self, nome):
         """Il rango del potere `nome` se e' attivo, 0 se no: la scena lo usa per gli effetti che crescono col rango
         (Supervelocita': animazioni piu' veloci; Super Forza: braccia e busto piu' grandi)."""
-        return max((s["rango"] for s in self.poteri if s["attivo"] and s["def"]["nome"] == nome), default=0)
+        r = max((s["rango"] for s in self.poteri if s["attivo"] and s["def"]["nome"] == nome), default=0)
+        for s in self.augments:      # uno Speedwear acceso si vede come Supervelocita' al rango 1 ("come_potere" nei dati)
+            cp = s["def"].get("come_potere")
+            if s["attivo"] and cp and cp.get("nome") == nome:
+                r = max(r, cp.get("rango", 1))
+        return r
 
     def malus_bracci(self):
         """-1 a colpire per ogni braccio con hp in negativo (cumulativo)."""
@@ -299,8 +313,8 @@ class Personaggio:
         return random.choices(locs, [PESO_LOCAZIONE.get(l, 1) for l in locs])[0]
 
     def puo_schivare(self):
-        """Una gamba CRIPPLED toglie la schivata."""
-        return not any(l in self.crippled for l in self.hp if l.startswith("gamba"))
+        """Una gamba CRIPPLED toglie la schivata, e anche il Modulo di IA predittiva dell'avversario (per tutto il suo turno)."""
+        return not self.reazioni_bloccate and not any(l in self.crippled for l in self.hp if l.startswith("gamba"))
 
     def puo_mirare(self):
         risorsa = self.bonus if self.mira_bonus else self.azioni
@@ -361,6 +375,29 @@ class Personaggio:
         return any(m["tipo"] == "debolezza" and m.get("tipo_danno") in (tipo_danno, "tutto")
                    for m in mods)
 
+    # ---------- regole speciali degli augment ("speciale" nei dati) ----------
+    def augment_speciale(self, nome):
+        """Lo slot dell'augment ACCESO con questa regola speciale (un EMP li spegne), o None."""
+        return next((s for s in self.augments if s["attivo"] and s["def"].get("speciale") == nome), None)
+
+    def _cuscinetto(self, loc, perso):
+        """Cuscinetto di emergenza (passivo): la prima locazione che perde 50 hp o piu' in un colpo solo (hp veri, non l'armatura) ne
+        ottiene 50 temporanei: armatura, che assorbe prima degli hp. Una volta per combattimento."""
+        slot = self.augment_speciale("cuscinetto")
+        if slot is None or self.cuscinetto_usato or perso < SOGLIA_CUSCINETTO:
+            return []
+        self.cuscinetto_usato = True
+        self.armatura[loc] = self.armatura.get(loc, 0) + HP_CUSCINETTO
+        return [f"{slot['def']['nome']}: {loc} ottiene {HP_CUSCINETTO} hp temporanei."]
+
+    def bonus_berserker(self):
+        """Danno in piu' (frazione) col Berserker: cresce in modo lineare con la vita generale persa (tutte le locazioni insieme),
+        fino a +75% quando resta il 5%. 0 senza Berserker acceso."""
+        if self.augment_speciale("berserker") is None:
+            return 0.0
+        resta = sum(max(0, self.hp[l]) for l in self.hp) / max(1, sum(self.hp_max.values()))
+        return BERSERKER_MAX * min(1.0, max(0.0, (1 - resta) / (1 - BERSERKER_SOGLIA)))
+
     # ---------- danni ----------
     def _assorbi(self, loc, danno):
         """Armatura della locazione: assorbe prima degli hp."""
@@ -406,13 +443,16 @@ class Personaggio:
                 if dmg > 0:
                     self.hp[l] -= dmg
                     self._nota_tipo(l, tipo_danno, dmg)
+                    righe += self._cuscinetto(l, dmg)
         else:
             danno, r2 = self._assorbi(loc, danno)
             righe += r2
+            perso_loc = 0                # hp veri che questo colpo toglie a `loc` (il Cuscinetto guarda solo quelli)
             if danno > 0 and loc in ("testa", "busto"):
                 self.hp[loc] -= danno
                 self._nota_tipo(loc, tipo_danno, danno)
                 righe.append(f"{loc}: -{danno} ({self.hp[loc]} hp)")
+                perso_loc = danno
             elif danno > 0:
                 # arto: danno pieno finché è sopra 0, poi metà all'arto e metà alle altre parti
                 if self.hp[loc] > 0:
@@ -420,10 +460,12 @@ class Personaggio:
                     self.hp[loc] -= diretto
                     self._nota_tipo(loc, tipo_danno, diretto)
                     danno -= diretto
+                    perso_loc += diretto
                     righe.append(f"{loc}: -{diretto} ({self.hp[loc]} hp)")
                 if danno > 0:
                     meta = danno // 2
                     self.hp[loc] -= meta
+                    perso_loc += meta
                     self._nota_tipo(loc, tipo_danno, meta)
                     altre = [l for l in self.hp if l != loc]
                     quota = (danno - meta) // len(altre)  # ponytail: resti persi
@@ -431,6 +473,7 @@ class Personaggio:
                         self.hp[l] -= quota
                     righe.append(f"{loc} è a 0: -{meta} all'arto ({self.hp[loc]} hp), "
                                  f"-{quota} a ciascuna altra locazione.")
+            righe += self._cuscinetto(loc, perso_loc)
         for l in self.hp:
             if l in ("testa", "busto") or l in self.protesi_locazioni:
                 continue  # una protesi non va mai in CRIPPLED
@@ -480,6 +523,13 @@ class Personaggio:
             slot.pop("spento_ora", None)
         if self.emp_turni > 0:
             self.emp_turni -= 1
+        if self.ddos_turni > 0:
+            self.ddos_turni -= 1
+            if self.ddos_turni == 0:
+                righe.append("Il DDOS è finito: gli augment tornano attivabili.")
+        for stato in self.augment_stato.values():   # ricarica degli augment (IA predittiva): scorre a inizio turno, come le mosse
+            if stato.get("cooldown", 0) > 0:
+                stato["cooldown"] -= 1
         for stato in list(self.stance_stato.values()) + list(self.attacco_stato.values()):
             if stato["cooldown"] > 0:  # cooldown residui da turni precedenti
                 stato["cooldown"] -= 1
@@ -788,28 +838,57 @@ class Personaggio:
         aid = aug.get("id", id(aug))
         return self.augment_stato.setdefault(aid, {
             "usi_rimasti": aug.get("usi_massimi", 1) if aug.get("usi_limitati") else None,
+            "cooldown": 0,
         })
 
     def puo_attivare_augment(self, slot):
-        if self.emp_turni > 0:
-            return False  # EMP: gli augment sono fuori uso
+        if self.emp_turni > 0 or self.ddos_turni > 0:
+            return False  # EMP: gli augment sono fuori uso; DDOS: non se ne puo' accendere nessuno
         if not self.puo_attivare_potere(slot):
             return False
         stato = self.stato_augment(slot["def"])
+        if stato["cooldown"] > 0:
+            return False
+        if slot["def"].get("speciale") == "convertitore" and (self.stamina or 0) < COSTO_CONVERTITORE:
+            return False  # il Convertitore nutrizionale vive di stamina
         return stato["usi_rimasti"] is None or stato["usi_rimasti"] > 0
 
-    def attiva_augment(self, slot, db_attacchi, db_stances, db_effetti):
-        """Un augment Attivo è meccanicamente un potere: stesso attiva_potere(), più
-        un tetto di utilizzi e una durata (turni) impostati nell'editor (non dal rango)."""
+    def puo_pagare_augment(self, slot):
+        """Ha la risorsa per accenderlo: un'azione, o un'azione bonus (`costo_bonus`: il Convertitore nutrizionale)."""
+        return (self.bonus if slot["def"].get("costo_bonus") else self.azioni) >= 1
+
+    def attiva_augment(self, slot, db_attacchi, db_stances, db_effetti, avversario=None):
+        """Un augment Attivo è meccanicamente un potere: stesso attiva_potere(), più un tetto di utilizzi, una durata (turni) e una
+        ricarica impostati nei dati (non dal rango). Un augment `istantaneo` (Convertitore, IA predittiva) fa il suo effetto e non
+        resta acceso. `avversario` serve a chi agisce su di lui (IA predittiva)."""
         if not self.puo_attivare_augment(slot):
             return [f"{slot['def']['nome']} non è attivabile ora."]
-        stato = self.stato_augment(slot["def"])
+        d = slot["def"]
+        stato = self.stato_augment(d)
         if stato["usi_rimasti"] is not None:
             stato["usi_rimasti"] -= 1
-        righe = self.attiva_potere(slot, db_attacchi, db_stances, db_effetti)
-        durata = slot["def"].get("durata_turni") or 0
-        slot["turni_rimasti"] = durata if durata > 0 else None
+        if d.get("istantaneo"):
+            righe = self._effetto_istantaneo(slot, avversario)
+        else:
+            righe = self.attiva_potere(slot, db_attacchi, db_stances, db_effetti)
+            durata = d.get("durata_turni") or 0
+            slot["turni_rimasti"] = durata if durata > 0 else None
+        f = d.get("ricarica")      # {"base": 10, "dado": "mente", "min": 2}: si ricarica in base - 1d(dado) turni, mai meno di min
+        if f:
+            stato["cooldown"] = max(f.get("min", 1), f["base"] - self.tira(f["dado"], avversario))
+            righe.append(f"{d['nome']} si ricarica in {stato['cooldown']} turni.")
         return righe
+
+    def _effetto_istantaneo(self, slot, avversario):
+        nome, sp = slot["def"]["nome"], slot["def"].get("speciale")
+        if sp == "convertitore":
+            self.stamina -= COSTO_CONVERTITORE
+            self.azioni += 1
+            return [f"{self.nome} usa {nome}: -{COSTO_CONVERTITORE} stamina ({self.stamina}/{self.stamina_max()}), +1 azione."]
+        if sp == "ia_predittiva" and avversario is not None:
+            avversario.reazioni_bloccate = True
+            return [f"{self.nome} attiva {nome}: {avversario.nome} non può schivare in questo turno."]
+        return [f"{self.nome} usa {nome}."]
 
     # ---------- poteri ----------
     def arto_potere_rotto(self, slot):
@@ -860,9 +939,13 @@ class Personaggio:
             elif eff["tipo"] == "mod_statistica":
                 s, delta = eff["statistica"], eff["delta"]
                 if s in self.stats:
-                    self.stats[s] = max(1, min(4, self.stats[s] + delta))
+                    prima = self.stats[s]
+                    self.stats[s] = max(1, min(4, prima + delta))
+                    delta = self.stats[s] - prima      # il rango sta tra 1 e 4: alla disattivazione si restituisce solo quanto e' cambiato davvero
                 else:
-                    self.skills[s] = max(0, min(4, self.skills.get(s, 0) + delta))
+                    prima = self.skills.get(s, 0)
+                    self.skills[s] = max(0, min(4, prima + delta))
+                    delta = self.skills[s] - prima
                 revert.append(("mod_statistica", s, delta))
                 righe.append(f"{s}: {'+' if delta >= 0 else ''}{delta}.")
             elif eff["tipo"] == "resistenza":

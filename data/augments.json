@@ -553,5 +553,397 @@
       "3": [],
       "4": []
     }
+  },
+  {
+    "id": 12,
+    "nome": "Speedwear",
+    "descrizione": "Una sovrapposizione neuromuscolare: per 3 turni ti muovi come chi ha Supervelocità al rango 1 (+1 azione bonus, riflessi aumentati, Attacco Rapido). Un solo uso per combattimento.",
+    "valore": 450,
+    "costo_umanita": 2,
+    "attivo": true,
+    "costo_stamina": 1,
+    "durata_turni": 3,
+    "usi_limitati": true,
+    "usi_massimi": 1,
+    "effetti": {
+      "1": [
+        {
+          "tipo": "azioni",
+          "azioni": 0,
+          "bonus": 1,
+          "risposte": 0
+        }
+      ],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "effetti_nel_tempo": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [
+        18
+      ],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance_attivate": {
+      "1": [
+        11
+      ],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "come_potere": {
+      "nome": "Supervelocità",
+      "rango": 1
+    }
+  },
+  {
+    "id": 13,
+    "nome": "Convertitore nutrizionale",
+    "descrizione": "Un bioreattore sotto lo sterno: con un'azione bonus converte 3 punti di stamina in 1 azione extra, subito.",
+    "valore": 300,
+    "costo_umanita": 1,
+    "attivo": true,
+    "costo_stamina": 0,
+    "durata_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "effetti": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "effetti_nel_tempo": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance_attivate": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "istantaneo": true,
+    "costo_bonus": true,
+    "speciale": "convertitore"
+  },
+  {
+    "id": 14,
+    "nome": "Modulo DDOS",
+    "descrizione": "Impianto passivo: sblocca la mossa DDOS, una volta per combattimento. Se va a segno, per 1d Mente turni l'avversario non può accendere augment (quelli già accesi restano accesi).",
+    "valore": 500,
+    "costo_umanita": 2,
+    "attivo": false,
+    "costo_stamina": 0,
+    "durata_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "effetti": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "effetti_nel_tempo": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [
+        58
+      ],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance_attivate": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    }
+  },
+  {
+    "id": 15,
+    "nome": "Modulo di IA predittiva",
+    "descrizione": "Anticipa le mosse dell'avversario: nel turno in cui lo attivi non può schivare. Si ricarica in 10 − 1d Mente turni (minimo 2).",
+    "valore": 600,
+    "costo_umanita": 2,
+    "attivo": true,
+    "costo_stamina": 0,
+    "durata_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "effetti": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "effetti_nel_tempo": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance_attivate": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "istantaneo": true,
+    "speciale": "ia_predittiva",
+    "ricarica": {
+      "base": 10,
+      "dado": "mente",
+      "min": 2
+    }
+  },
+  {
+    "id": 16,
+    "nome": "Cuscinetto di emergenza",
+    "descrizione": "Impianto passivo: la prima locazione che subisce 50 o più danni ai suoi hp (non a quelli temporanei) in un solo colpo ottiene 50 hp temporanei.",
+    "valore": 350,
+    "costo_umanita": 1,
+    "attivo": false,
+    "costo_stamina": 0,
+    "durata_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "effetti": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "effetti_nel_tempo": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance_attivate": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "speciale": "cuscinetto"
+  },
+  {
+    "id": 17,
+    "nome": "Berserker",
+    "descrizione": "Impianto passivo: il danno che infliggi cresce con la vita generale persa, fino a +75% quando ne resta il 5%.",
+    "valore": 400,
+    "costo_umanita": 2,
+    "attivo": false,
+    "costo_stamina": 0,
+    "durata_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "effetti": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "effetti_nel_tempo": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance_attivate": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "speciale": "berserker"
+  },
+  {
+    "id": 18,
+    "nome": "IA supportiva",
+    "descrizione": "Impianto passivo: un'intelligenza di supporto che ragiona con te. +3 a Mente (il rango non supera mai 4).",
+    "valore": 500,
+    "costo_umanita": 2,
+    "attivo": false,
+    "costo_stamina": 0,
+    "durata_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "effetti": {
+      "1": [
+        {
+          "tipo": "mod_statistica",
+          "statistica": "mente",
+          "delta": 3
+        }
+      ],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "effetti_nel_tempo": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance_attivate": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    }
+  },
+  {
+    "id": 19,
+    "nome": "Armatura subdermale \"Biohazard\"",
+    "descrizione": "Impianto passivo: una pelle di polimeri sigillanti. Tutti i danni elementali (fuoco, elettrico, gelo, acido) sono ridotti del 30%.",
+    "valore": 450,
+    "costo_umanita": 2,
+    "attivo": false,
+    "costo_stamina": 0,
+    "durata_turni": 0,
+    "usi_limitati": false,
+    "usi_massimi": 1,
+    "effetti": {
+      "1": [
+        {
+          "tipo": "resistenza",
+          "tipo_danno": "fuoco",
+          "valore": 30
+        },
+        {
+          "tipo": "resistenza",
+          "tipo_danno": "elettrico",
+          "valore": 30
+        },
+        {
+          "tipo": "resistenza",
+          "tipo_danno": "gelo",
+          "valore": 30
+        },
+        {
+          "tipo": "resistenza",
+          "tipo_danno": "acido",
+          "valore": 30
+        }
+      ],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "effetti_nel_tempo": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "attacchi": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "stance_attivate": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    }
   }
 ]

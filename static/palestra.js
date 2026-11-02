@@ -35,6 +35,7 @@ async function azione(corpo) {
     else {
       if (dati.riepiloghi) riepilogo = dati.riepiloghi;
       if (dati.esito) esitoEvento = dati.esito;
+      if (dati.duello) { window.location.href = dati.duello; return dati; }      // l'imboscata di una nemesi: si va nel vicolo
       if (corpo.tipo === "avanti" || corpo.tipo === "settimana") esitoEvento = null;
     }
     disegnaTutto();

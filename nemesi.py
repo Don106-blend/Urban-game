@@ -31,6 +31,14 @@ STRESS_SCONFITTA = 8         # un allievo battuto di nuovo dal suo nemico: stres
 FIDUCIA_SCONFITTA = -6
 STRESS_VENDETTA = -6         # un allievo che batte chi l'aveva battuto: stress giu', fiducia su
 FIDUCIA_VENDETTA = 8
+SOGLIA_OSTILE = 3            # una nemesi battuta tante volte da un allievo (dall'ultima grazia) puo' decidere di cercarlo fuori dal ring...
+P_OSTILE = 0.04              # ...con questa probabilita' al giorno alla soglia...
+P_OSTILE_PER_SCONFITTA = 0.04   # ...piu' questa per ogni sconfitta oltre la soglia...
+P_OSTILE_MAX = 0.3           # ...fino a questo tetto
+STRESS_UCCISIONE = 15        # l'allievo che lascia morire la sua nemesi: stress su, fiducia giu' (e' finita, ma pesa)
+FIDUCIA_UCCISIONE = -6
+STRESS_GRAZIA = -5           # chi la risparmia: un peso in meno
+FIDUCIA_GRAZIA = 5
 
 _cache = {}
 
@@ -114,6 +122,23 @@ def registra(rival, pid, vinto_allievo, giorno):
     return r
 
 
+def prob_ostile(rival, pid):
+    """Probabilita' giornaliera che il rivale, battuto troppe volte da `pid`, lo cerchi per un regolamento di conti. 0 sotto soglia.
+    La grazia (v. app.risolvi_destino) azzera il conto: servono altre sconfitte."""
+    r = rapporto(rival, pid)
+    n = r["vinte"] - r.get("grazia", 0)
+    if n < SOGLIA_OSTILE or rival.get("ostile"):
+        return 0.0
+    return min(P_OSTILE_MAX, P_OSTILE + P_OSTILE_PER_SCONFITTA * (n - SOGLIA_OSTILE))
+
+
+def scegli_ostile(rivali, pid, rng=random):
+    """Il rivale che stanotte decide di cercare `pid`, o None."""
+    cand = [r for r in rivali if prob_ostile(r, pid) > 0]
+    rng.shuffle(cand)
+    return next((r for r in cand if rng.random() < prob_ostile(r, pid)), None)
+
+
 def chi_cerca_rivincita(rival, pid):
     """'a' se l'ultima volta ha perso l'allievo, 'r' se ha perso il rivale, None se non si sono mai incontrati."""
     u = rapporto(rival, pid)["ultimo"]
@@ -161,7 +186,7 @@ def taglia(rival):
 # ---------------------------------------------------------------- la scelta dell'avversario
 def adatti(rivali, pid, livello_mm):
     """I rivali presentabili a questo allievo: non troppo lontani dal livello di matchmaking. `livello_mm` = livello + bias."""
-    return [r for r in rivali if abs(r.get("livello", 1) - livello_mm) <= FASCIA_LIVELLO]
+    return [r for r in rivali if abs(r.get("livello", 1) - livello_mm) <= FASCIA_LIVELLO and not r.get("ostile")]
 
 
 def scegli(rivali, pid, livello_mm, rng=random, ultimo_id=None):
@@ -178,7 +203,7 @@ def pota(rivali, protetti=()):
     """Il mondo e' piccolo: sopra MAX_RIVALI si dimentica il rivale meno memorabile (meno incontri, piu' debole). Ritorna i rimossi."""
     tolti = []
     while len(rivali) > MAX_RIVALI:
-        liberi = [r for r in rivali if r["id"] not in protetti]
+        liberi = [r for r in rivali if r["id"] not in protetti and not r.get("ostile")]
         if not liberi:
             break
         r = min(liberi, key=lambda x: (x.get("incontri", 0), x.get("livello", 1)))

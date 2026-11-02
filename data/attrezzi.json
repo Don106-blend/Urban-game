@@ -33,5 +33,9 @@
 
   {"id": "camera_controllo", "nome": "Camera di controllo", "prezzo": 400, "iniziale": false, "regalabile": false,
    "descrizione": "Un cerchio di cemento rinforzato e un muro che regge quasi tutto.",
-   "effetto": "Controllo: +25% punti e nessuna scarica.", "bonus": {"sessione": "controllo", "punti": 1.25}, "sicuro": "controllo"}
+   "effetto": "Controllo: +25% punti e nessuna scarica.", "bonus": {"sessione": "controllo", "punti": 1.25}, "sicuro": "controllo"},
+
+  {"id": "decompressione", "nome": "Sala di decompressione", "prezzo": 350, "iniziale": false, "regalabile": false,
+   "descrizione": "Luci basse, una vasca, silenzio. Un posto dove ricordarsi di essere persone.",
+   "effetto": "Ogni settimana, chi ha umanità spesa in impianti ne recupera 1 punto.", "umanita_settimanale": 1}
 ]

@@ -36,6 +36,7 @@ const Arena = (() => {
   let vittoria = null;              // fine del duello: {lato, tipo, avviata}; chi vince esulta quando gli scambi sono finiti
   let colori = {};
   let ultimoStato = null;
+  let luogo = null;                 // lo sfondo del duello (St.luogo): null = l'arena con la folla, "vicolo" = l'imboscata
 
   const hash = (x, y, s) => {
     let h = (x * 374761393 + y * 668265263 + s * 2147483647) | 0;
@@ -502,6 +503,110 @@ const Arena = (() => {
     }
   }
 
+  /* Il vicolo fatiscente dell'imboscata (duello mortale, St.luogo === "vicolo"): un muro di mattoni scrostato con finestre sbarrate,
+     scala antincendio e tubo che perde, un bidone e delle casse in fondo, l'asfalto crepato e una lampada che sfarfalla. La parte
+     ferma sta in una tela a parte (si rifa' al ridimensionamento), la lampada e la goccia si animano ogni fotogramma. Niente folla. */
+  const vicolo = {tela: null, chiave: ""};
+  const X_TUBO = 0.62, X_LAMPADA = 0.5;
+  function costruisciVicolo() {
+    const u = Math.max(1, Math.round(S)), c = document.createElement("canvas");
+    c.width = Math.round(W * dpr); c.height = Math.round(H * dpr);
+    const g = c.getContext("2d");
+    g.setTransform(dpr, 0, 0, dpr, 0, 0); g.imageSmoothingEnabled = false;
+    const R = (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); };
+    // il muro: mattoni sfalsati, qualcuno caduto, la malta scura
+    const bw = 10 * u, bh = 5 * u;
+    for (let r = 0, y = 0; y < pavY; r++, y += bh) {
+      for (let k = 0, x = -(r % 2) * bw / 2; x < W; k++, x += bw) {
+        const h = hash(k, r, 5), v = 20 + Math.floor(h * 14);
+        if (h > 0.975) { R(x, y, bw, bh, "#07080a"); continue; }
+        R(x, y, bw, bh, `rgb(${v + 7},${v + 1},${v - 1})`);
+        R(x, y, bw, u, `rgb(${v + 13},${v + 6},${v + 3})`);
+        R(x + bw - u, y, u, bh, "#0a0b0d"); R(x, y + bh - u, bw, u, "#0a0b0d");
+      }
+    }
+    // intonaco scrostato e macchie d'umido
+    for (let i = 0; i < 9; i++) {
+      const x = hash(i, 1, 9) * W, y = hash(i, 2, 9) * pavY * 0.8, w = (14 + hash(i, 3, 9) * 26) * u, h = (8 + hash(i, 4, 9) * 16) * u;
+      R(x, y, w, h, "#2b2d33"); R(x + 2 * u, y - 2 * u, w - 5 * u, 2 * u, "#2b2d33"); R(x - 2 * u, y + 3 * u, 2 * u, h - 6 * u, "#2b2d33");
+      R(x + 3 * u, y + 2 * u, w * 0.5, h * 0.4, "#202228");
+    }
+    // finestre sbarrate con assi
+    for (const fx of [0.2, 0.8]) {
+      const x = W * fx - 9 * u, y = Math.max(6 * u, pavY * 0.16), w = 18 * u, h = 26 * u;
+      R(x - 2 * u, y - 2 * u, w + 4 * u, h + 4 * u, "#0a0b0d"); R(x, y, w, h, "#10151f"); R(x, y, w, 3 * u, "#1c2a44");
+      for (let i = 0; i < 3; i++) {
+        const py = y + (2 + i * 8) * u, dx = (hash(i, Math.round(fx * 10), 11) - 0.5) * 4 * u;
+        R(x - 3 * u + dx, py, w + 6 * u, 4 * u, "#3b2a1c"); R(x - 3 * u + dx, py, w + 6 * u, u, "#5e4129");
+        R(x + dx, py + u, u, u, "#a8b0be"); R(x + w - u + dx, py + u, u, u, "#a8b0be");
+      }
+    }
+    // scala antincendio a sinistra: piattaforma, ringhiera, rampa
+    {
+      const x = W * 0.06, y = pavY * 0.52, w = 40 * u;
+      R(x, y, w, 2 * u, "#1b1e24"); R(x, y, w, u, "#343a45");
+      for (let i = 0; i <= 10; i++) R(x + i * 4 * u, y - 8 * u, u, 8 * u, "#14171c");
+      R(x, y - 8 * u, w, u, "#2a2e37");
+      for (let i = 0; i < 9; i++) R(x + w + i * 3 * u, y + 2 * u + i * 3 * u, 6 * u, u, "#2a2e37");
+      R(x + 2 * u, y + 2 * u, u, pavY * 0.1, "#14171c"); R(x + w - 3 * u, y + 2 * u, u, pavY * 0.1, "#14171c");
+    }
+    // tubo di scarico che perde, con le fascette e l'alone sotto
+    {
+      const x = W * X_TUBO;
+      R(x, 0, 3 * u, pavY, "#1b1e24"); R(x, 0, u, pavY, "#2f343e");
+      for (let y = 14 * u; y < pavY; y += 34 * u) R(x - u, y, 5 * u, 2 * u, "#3a404c");
+      R(x - 2 * u, pavY - 5 * u, 7 * u, 5 * u, "#0a0b0d"); R(x - 4 * u, pavY - 2 * u, 11 * u, 2 * u, "#0a0b0d");
+    }
+    // un graffito che non dice niente di buono
+    g.globalAlpha = 0.3;
+    for (let i = 0; i < 8; i++) { R(W * 0.36 + i * 3 * u, pavY * 0.58 + i * 2 * u, 3 * u, 2 * u, "#d63a46"); R(W * 0.36 + (8 - i) * 3 * u, pavY * 0.58 + i * 2 * u, 3 * u, 2 * u, "#d63a46"); }
+    g.globalAlpha = 1;
+    // bidone (a sinistra, in fondo) e casse (a destra)
+    {
+      const x = W * 0.015, w = 34 * u, h = 20 * u, y = pavY - h + 2 * u;
+      R(x, y, w, h, "#1d2b27"); R(x, y, w, 4 * u, "#2b3f39"); R(x - u, y - u, w + 2 * u, 3 * u, "#14201d"); R(x, y + h - 3 * u, w, 3 * u, "#0a0b0d");
+      for (let i = 1; i < 5; i++) R(x + i * 7 * u, y + 5 * u, u, h - 8 * u, "#14201d");
+      R(x + 6 * u, y + 6 * u, 2 * u, 9 * u, "#5a3a22"); R(x + 22 * u, y + 8 * u, 2 * u, 7 * u, "#5a3a22");    // ruggine
+      R(x + w + 2 * u, pavY - 4 * u, 8 * u, 5 * u, "#0d1012"); R(x + w + 4 * u, pavY - 6 * u, 4 * u, 3 * u, "#0d1012");   // sacchi
+    }
+    for (const [dx, dy, s] of [[0, 0, 16], [17, 0, 14], [6, -15, 15]]) {
+      const x = W * 0.935 + dx * u, y = pavY - (s - 1) * u + dy * u;
+      R(x, y, s * u, s * u, "#3b2a1c"); R(x, y, s * u, 2 * u, "#5e4129"); R(x + 2 * u, y + 2 * u, (s - 4) * u, u, "#2a1d12");
+      R(x + 2 * u, y + s * u - 3 * u, (s - 4) * u, u, "#2a1d12"); R(x + u, y + u, u, s * u - 2 * u, "#2a1d12"); R(x + s * u - 2 * u, y + u, u, s * u - 2 * u, "#2a1d12");
+    }
+    // l'asfalto: cordolo, crepe, pozze
+    R(0, pavY, W, H - pavY, "#08090b"); R(0, pavY, W, u, "#2a2e37");
+    for (let i = 0; i < 6; i++) { let x = hash(i, 5, 13) * W, y = pavY + 3 * u; for (let k = 0; k < 4; k++) { R(x, y, 5 * u, u, "#15181d"); x += 5 * u; y += (k % 2 ? -1 : 1) * u; } }
+    for (const [fx, fw] of [[0.3, 26], [0.7, 18]]) { R(W * fx, pavY + 2 * u, fw * u, 2 * u, "#141b26"); R(W * fx + 3 * u, pavY + 2 * u, 8 * u, u, "#2c3d57"); }
+    // buio ai bordi
+    const v = g.createRadialGradient(W / 2, pavY * 0.55, H * 0.2, W / 2, pavY * 0.55, W * 0.7);
+    v.addColorStop(0, "rgba(0,0,0,0)"); v.addColorStop(1, "rgba(0,0,0,0.62)");
+    g.fillStyle = v; g.fillRect(0, 0, W, H);
+    vicolo.tela = c; vicolo.chiave = [W, H, u, dpr].join("x");
+  }
+
+  function disegnaVicolo() {
+    if (vicolo.chiave !== [W, H, Math.max(1, Math.round(S)), dpr].join("x")) costruisciVicolo();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(vicolo.tela, 0, 0);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const t = performance.now() / 1000, u = Math.max(1, Math.round(S));
+    // la lampada: un cavo, un cappello, il cono di luce che sfarfalla e ogni tanto salta
+    const lx = W * X_LAMPADA, ly = Math.max(14 * u, pavY * 0.2);
+    const luce = 0.8 + 0.12 * Math.sin(t * 9) + 0.05 * Math.sin(t * 23) - (hash(Math.floor(t * 11), 3, 17) > 0.93 ? 0.6 : 0);
+    ctx.fillStyle = "#0a0b0d"; ctx.fillRect(Math.round(lx), 0, u, ly);
+    ctx.fillStyle = "#2a2e37"; ctx.fillRect(Math.round(lx - 5 * u), Math.round(ly), 11 * u, 3 * u);
+    ctx.fillStyle = luce > 0.4 ? "#ffe6a3" : "#5a4f33"; ctx.fillRect(Math.round(lx - 3 * u), Math.round(ly + 3 * u), 7 * u, 2 * u);
+    const cono = ctx.createRadialGradient(lx, ly + 4 * u, 2 * u, lx, ly + 4 * u, pavY * 0.95);
+    cono.addColorStop(0, `rgba(255,226,150,${0.26 * Math.max(0, luce)})`); cono.addColorStop(1, "rgba(255,226,150,0)");
+    ctx.fillStyle = cono; ctx.fillRect(0, 0, W, H);
+    // la goccia dal tubo
+    const ph = (t % 1.7) / 1.7, gx = W * X_TUBO + u, g0 = pavY * 0.55;
+    ctx.fillStyle = "#6f8aa6";
+    if (ph < 0.96) ctx.fillRect(Math.round(gx), Math.round(g0 + ph * ph * (pavY - g0 - 6 * u)), u, 2 * u);
+    else { ctx.fillRect(Math.round(gx - 2 * u), pavY - u, u, u); ctx.fillRect(Math.round(gx + 3 * u), pavY - u, u, u); }
+  }
+
   /* trasformazione mondo (px sprite, y = 111 sul pavimento) -> schermo, per un combattente (specchiato per la CPU) */
   function mondo(L) {
     const o = scossa.a > 0.01 ? [scossa.x, scossa.y] : [0, 0];
@@ -688,8 +793,8 @@ const Arena = (() => {
 
   function disegna() {
     if (!ctx || !lati.p) return;
-    disegnaFondale();
-    disegnaFolla();
+    if (luogo === "vicolo") disegnaVicolo();      // il duello mortale: un vicolo, senza pubblico
+    else { disegnaFondale(); disegnaFolla(); }
     for (const L of Object.values(lati)) disegnaOmbra(L);
     disegnaParticelle();
     // chi e' in piedi dietro, chi e' caduto davanti non conta: si disegna prima la CPU, poi il giocatore
@@ -1027,6 +1132,7 @@ const Arena = (() => {
     }
     ultimoStato = St;
     folla.tifo = St.folla ? St.folla.tifo : 0;
+    luogo = St.luogo || null;
     const primo = !lati.p;
     if (primo) {
       arenaEl.innerHTML = "";

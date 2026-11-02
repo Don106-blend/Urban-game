@@ -70,3 +70,32 @@ Le metriche M5 fuori fascia sono le stesse di prima (Pistola/Cannone, Scudi, EMP
 
 * Ogni posto ha **una sola protesi** (testa, braccio dx, braccio sx, gamba sx, gamba dx: la **Gamba corazzata**, 300¤, Umanità 1, 250 hp e stance Barriera sempre attiva, 63% in M5): la sostituzione c'è già ma ha senso solo quando ci saranno alternative per lo stesso posto.
 * Il Braccio-cannone, come la Pistola di prima, sta appena sotto la fascia M5 (51%).
+
+## 6. Nuovi impianti (fase 8)
+
+`tools/fase8_cyberwear.py` (idempotente: aggiorna per nome/id quel che c'è e lascia il resto) aggiunge 8 augment e 2 protesi (3 voci); `python test_cyberwear.py` li prova
+(regole speciali in `engine.py`, campo `speciale` dell'augment; la CPU li usa come il giocatore).
+
+| Impianto | Tipo | Cosa fa |
+|---|---|---|
+| **Speedwear** | attivo, 1 volta per duello, 3 turni | come Supervelocità r1 (bonus +1, Riflessi aumentati, Attacco Rapido) e si vede come tale (`come_potere`) |
+| **Convertitore nutrizionale** | attivo, azione bonus | 3 punti di stamina → 1 azione extra, subito (`istantaneo`, `costo_bonus`) |
+| **Modulo DDOS** | passivo | sblocca la mossa **DDOS** (una volta per duello, tiro Mente contro riflessi, nessun danno): per 1d Mente turni l'avversario non può accendere augment (quelli accesi restano accesi, anche con EMP) |
+| **Modulo di IA predittiva** | attivo, 1 azione | nel turno in cui lo usi l'avversario non può schivare; si ricarica in 10 − 1d Mente turni (minimo 2) |
+| **Cuscinetto di emergenza** | passivo | la prima locazione che perde 50+ hp *reali* in un colpo (non temporanei) ottiene 50 hp temporanei |
+| **Berserker** | passivo | i danni che infliggi crescono con la vita generale persa, fino a +75% al 5% rimasto |
+| **IA supportiva** | passivo | +3 Mente (il rango resta ≤ 4) |
+| **Armatura subdermale "Biohazard"** | passivo | −30% a tutti i danni elementali (fuoco, elettrico, gelo, acido) |
+| **Wolf fangs** (testa) | protesi | sblocca **Morso** (110 danni, sanguinamento, ricarica 3) — pensato anche per il futuro potere a tema licantropia |
+| **Cyber artigli** (braccio dx/sx) | protesi | sbloccano **Artigli sanguinari** (attacco 59, ricarica 3: una copia di quelli di Appendici Affilate, che restano com'erano) |
+
+Bug corretto: attivare un augment contava come "usare un potere" per la clausola **Stoico** (`azzardo.py`); ora conta solo l'uso dei poteri.
+
+Scelte dove la richiesta lasciava spazio: l'IA predittiva costa 1 azione e blocca solo la schivata (non la parata); la Speedwear costa 1 di stamina come un potere di rango 1;
+l'IA supportiva oltre rango 4 non conta; `tools/fase2_attacchi.py` conosce i tre nuovi attacchi (le fasce di slot valgono anche per loro: Morso e Artigli hanno una motivazione per la ricarica 3).
+Non ho rifatto le misure M di `OVERHAUL_GAMEPLAY.md` con i nuovi impianti: il bilanciamento è da verificare con `python balance.py`.
+
+### Ricaricare l'umanità fuori dal combattimento
+
+Oltre al colloquio azzeccato (`palestra.colloquio`): la **Sala di decompressione** (attrezzo, 350¤, negozio → Attrezzi). A fine settimana (`GANCI_SETTIMANA`, `app.umanita_settimanale`)
+ogni allievo con umanità spesa in impianti ne recupera 1 punto (mai più di quelli spesi: il massimo non cresce), e il riepilogo lo racconta.

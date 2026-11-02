@@ -97,3 +97,19 @@ esplicito: non hanno rivali, e le loro metriche non cambiano.
 * I soprannomi dei rivali non sono modificabili e per ora non compaiono nelle carte della palestra (solo scheda e duello).
 * **Opzione B** (OPZIONE_B_CIRCUITO.md): `genera_avversario` è già il punto in cui, invece di un rivale del pool, si pescherà un membro vero
   di una crew di distretto; la memoria (`rapporti`) e la Rivincita varrebbero invariate.
+
+## 7. La nemesi ostile: l'imboscata
+
+Una nemesi battuta troppe volte può smettere di cercare la rivincita sul ring e cercare l'allievo **fuori dalla palestra**.
+
+* **Quando.** Ogni giorno (`GANCI_GIORNO`, `app.nemesi_ostile`), per ogni rivale che l'allievo ha battuto almeno `SOGLIA_OSTILE` (3) volte dall'ultima grazia, la probabilità
+  è `P_OSTILE` (4%) più 4% per ogni sconfitta oltre la soglia, fino al 30% (`nemesi.prob_ostile`). Succede solo a chi può combattere e non ha altri eventi in attesa.
+  Il rivale diventa **ostile** (`rivale["ostile"] = id dell'allievo`, chip OSTILE in /rivali): non viene più proposto come avversario normale e la potatura non lo dimentica.
+* **L'evento** (`imboscata`, in `data/eventi_palestra.json`) ha una sola scelta: si combatte. Non si rifiuta.
+* **Il duello** (`DuelloWeb(mortale=True)`, `app.avvia_imboscata`): chi perde **muore** (l'allievo non ha il tiro della Toughness); niente resa (né per l'allievo né per la CPU), niente azzardi,
+  puntate, folla o premio; la nemesi agisce per prima (l'agguato); lo sfondo è un **vicolo fatiscente** (`luogo: "vicolo"`, disegnato da `static/arena.js`: mattoni scrostati,
+  finestre sbarrate, scala antincendio, tubo che perde, bidone e casse, lampada che sfarfalla; niente pubblico). Dal duello non si esce navigando altrove (ogni pagina riporta al duello);
+  chiudere l'app a metà conta come sconfitta, quindi come morte (`sconta_duello_pendente`).
+* **Dopo la vittoria** il giocatore sceglie (`risolvi_destino`): **Risparmialo** (stress −5, fiducia +5; il conto delle sconfitte riparte da zero: `grazia`) o **Lascialo morire**
+  (la nemesi esce dal registro; stress +15, fiducia −6). Se non sceglie, la nemesi resta viva e la caccia è comunque finita.
+* `python test_imboscata.py` (106 verifiche) prova la probabilità, l'evento, le regole del duello mortale, la scelta finale, il riavvio e 6 duelli mortali completi giocati dalla CPU.

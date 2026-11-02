@@ -20,6 +20,7 @@
     <div class="fc-preview"><canvas class="anteprima" data-aspetto='{{ r.aspetto|tojson|forceescape }}' aria-label="Anteprima di {{ s.nome }}"></canvas></div>
     <div class="fc-top">
       <span class="fc-nome">{{ s.nome }}</span>
+      {% if r.ostile %}<span class="badge badge-taglia" title="Lo sta cercando fuori dalla palestra">OSTILE</span>{% endif %}
       {% if s.taglia %}<span class="badge badge-taglia" title="Alla vittoria su di lui">TAGLIA ¤ {{ s.taglia }}</span>{% endif %}
     </div>
     <div class="fc-liv">LIV {{ r.livello }} · {{ r.get('vittorie', 0) }}V / {{ r.get('sconfitte', 0) }}S · {{ r.get('incontri', 0) }} incontri</div>

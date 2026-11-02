@@ -99,6 +99,9 @@ TABELLA = {
     54: (1, 50, 0, ""),                      # Doppio pugno: 2 colpi x 50
     55: (3, 42, 2, ""),                      # Raffica a quattro braccia: 4 colpi x 42
     56: (1, 70, 0, ""),                      # Pugno cibernetico (Braccio prostetico)
+    57: (2, 110, 3, "Morso (Wolf fangs): sanguinamento e ricarica 3 turni, come da richiesta"),
+    58: (1, 0, 0, "DDOS: nessun danno, il valore e' l'effetto (una volta per duello)"),
+    59: (2, 125, 3, "Artigli sanguinari delle protesi: copia di quelli di Appendici Affilate ma con ricarica 3 turni, come da richiesta"),
 }
 # campi che lo script imposta oltre a danno/cooldown (id: {campo: valore})
 EXTRA = {

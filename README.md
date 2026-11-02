@@ -10,7 +10,7 @@ Server Flask + editor dei dati in Tkinter. Nessuna dipendenza oltre a Flask.
 |---|---|
 | Gioco (http://127.0.0.1:5000) | `avvia_app.bat` (Windows) o `sh avvia_app.sh`: controllano Python e Flask, **si aggiornano da GitHub** e aprono il browser. In sviluppo: `python app.py` |
 | Editor di attacchi, poteri, stance, effetti, oggetti | `python editor.py` oppure `avvia_editor.bat` |
-| Test delle regole | `python test_combat.py`, `python test_azzardo.py`, `python test_palestra.py`, `python test_editor.py`, `python test_nemesi.py`, `python test_cyberware.py`, `node test_fisica.js` |
+| Test delle regole | `python test_combat.py`, `python test_azzardo.py`, `python test_palestra.py`, `python test_editor.py`, `python test_nemesi.py`, `python test_cyberware.py`, `python test_cyberwear.py`, `python test_imboscata.py`, `node test_fisica.js` |
 | Misure di bilanciamento | `python balance.py tutto` (v. sotto) |
 | Una palestra di prova nel browser (cartella temporanea) | `python tools/demo_palestra.py` (`--scenario base|vuota`), porta 5057 |
 | I ritmi della palestra (punti, ferite, stress, fiducia) | `python tools/sim_palestra.py --settimane 60 --allievi 3 --duelli 4` |

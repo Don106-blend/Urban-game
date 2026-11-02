@@ -73,5 +73,50 @@
       32
     ],
     "effetti_nel_tempo": []
+  },
+  {
+    "id": 6,
+    "nome": "Wolf fangs",
+    "descrizione": "Sostituisce la dentatura e rinforza la testa (100 hp, mai CRIPPLED): sblocca la mossa Morso (ricarica 3 turni).",
+    "valore": 350,
+    "locazione": "testa",
+    "hp": 100,
+    "costo_umanita": 2,
+    "attacchi": [
+      57
+    ],
+    "stance": [],
+    "stance_attivate": [],
+    "effetti_nel_tempo": []
+  },
+  {
+    "id": 7,
+    "nome": "Cyber artigli (dx)",
+    "descrizione": "Sostituisce il braccio destro con artigli retrattili (120 hp, mai CRIPPLED): sblocca la mossa Artigli sanguinari (ricarica 3 turni).",
+    "valore": 450,
+    "locazione": "braccio_dx",
+    "hp": 120,
+    "costo_umanita": 2,
+    "attacchi": [
+      59
+    ],
+    "stance": [],
+    "stance_attivate": [],
+    "effetti_nel_tempo": []
+  },
+  {
+    "id": 8,
+    "nome": "Cyber artigli (sx)",
+    "descrizione": "Sostituisce il braccio sinistro con artigli retrattili (120 hp, mai CRIPPLED): sblocca la mossa Artigli sanguinari (ricarica 3 turni).",
+    "valore": 450,
+    "locazione": "braccio_sx",
+    "hp": 120,
+    "costo_umanita": 2,
+    "attacchi": [
+      59
+    ],
+    "stance": [],
+    "stance_attivate": [],
+    "effetti_nel_tempo": []
   }
 ]

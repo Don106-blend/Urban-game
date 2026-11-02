@@ -71,7 +71,7 @@ def main():
         ok(t["ama"] in P.APPROCCI + (None,) and t["odia"] in P.APPROCCI + (None,) and t["ama"] != t["odia"], t["id"])
         ok(t["nome"] and t["descrizione"] and t["effetto"] and t["bio"], t["id"])
     for e in P.EVENTI.values():
-        ok(2 <= len(e["scelte"]) or e["id"] == "amicizia", e["id"])
+        ok(2 <= len(e["scelte"]) or e["id"] in ("amicizia", "imboscata"), e["id"])
         ids = [s["id"] for s in e["scelte"]]
         ok(len(ids) == len(set(ids)), "id di scelta unici " + e["id"])
     for a in P.ATTREZZI.values():
