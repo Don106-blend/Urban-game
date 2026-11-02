@@ -396,7 +396,7 @@ def aggiungi_aspirante():
 
 
 # ---------------------------------------------------------------- duello web
-def pannello(p, turno):
+def pannello(p, turno, altro=None):
     return {
         "nome": p.nome, "turno": turno, "sconfitto": p.sconfitto(),
         "aspetto": getattr(p, "aspetto", None),
@@ -431,6 +431,7 @@ def pannello(p, turno):
         "effetti": [{"nome": e["def"]["nome"], "turni": e["turni"]}
                     for e in p.effetti_attivi],
         "emp_turni": p.emp_turni, "ddos_turni": p.ddos_turni,
+        "modificatori": p.modificatori_tiri(altro),     # bonus e malus ai tiri di adesso (arti feriti, stance, effetti)
     }
 
 
@@ -1837,8 +1838,8 @@ class DuelloWeb:
         }
 
     def stato(self):
-        pl = pannello(self.p, self.attivo is self.p and not self.finito)
-        cp = pannello(self.cpu, self.attivo is self.cpu and not self.finito)
+        pl = pannello(self.p, self.attivo is self.p and not self.finito, self.cpu)
+        cp = pannello(self.cpu, self.attivo is self.cpu and not self.finito, self.p)
         if self.tavolo is not None:     # rilancio in corso, Ultima Puntata gia' giocata, pip della folla: per entrambi uguale
             pl["azzardo"], cp["azzardo"] = self.tavolo.stato_lato(self.p), self.tavolo.stato_lato(self.cpu)
         return {

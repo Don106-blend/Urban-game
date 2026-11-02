@@ -306,6 +306,50 @@ class Personaggio:
         """-1 a schivare per ogni gamba con hp in negativo (cumulativo)."""
         return -sum(1 for l in self.hp if l.startswith("gamba") and self.hp[l] < 0)
 
+    def modificatori_tiri(self, avversario=None):
+        """Tutto cio' che oggi sposta i tiri di questo combattente, per mostrarlo in duello: [{tiro, valore, unita, fonte, dado}].
+        `valore` e' None per un divieto (niente schivata, niente mira); `unita` e' "rango" per i delta di rango (altrimenti un flat sul tiro);
+        `dado` e' True se il modificatore tira anche un dado. Stesse fonti di bonus_colpire e _calcola_rango, piu' arti feriti e CRIPPLED."""
+        nome = lambda l: l.replace("_", " ")
+        out = []
+
+        def aggiungi(tiro, valore, fonte, unita="", dado=False):
+            if valore or dado or valore is None:
+                out.append({"tiro": tiro, "valore": valore, "unita": unita, "fonte": fonte, "dado": dado})
+        bracci = [l for l in self.hp if l.startswith("braccio") and self.hp[l] < 0]
+        gambe = [l for l in self.hp if l.startswith("gamba") and self.hp[l] < 0]
+        aggiungi("colpire", -len(bracci), ", ".join(nome(l) for l in bracci) + " in negativo")
+        aggiungi("schivata", -len(gambe), ", ".join(nome(l) for l in gambe) + " in negativo")
+        if any(l in self.crippled for l in self.hp if l.startswith("gamba")):
+            aggiungi("schivata", None, "gamba CRIPPLED")
+        if self.reazioni_bloccate:
+            aggiungi("schivata", None, "Modulo di IA predittiva")
+        if any(l in self.crippled for l in self.hp if l.startswith("braccio")) and not self.potere_attivo("2x2"):
+            aggiungi("mira", None, "braccio CRIPPLED")
+        for st in self.stance_attive:
+            for m in st["def"].get("modificatori", []):
+                if m["tipo"] == "colpire_proprio":
+                    aggiungi("colpire", m.get("flat", 0), st["def"]["nome"], dado=bool(m.get("dado_proprio") or m.get("dado_avversario")))
+                elif m["tipo"] == "mod_rango" and m.get("target") == "self":
+                    aggiungi(nome(m["statistica"]), m.get("delta", 0), st["def"]["nome"], "rango")
+        for e in self.effetti_attivi:
+            for m in e["def"].get("modificatori", []):
+                if m["tipo"] == "colpire":
+                    aggiungi("colpire", m.get("flat", 0), e["def"]["nome"])
+                elif m["tipo"] == "mod_rango":
+                    aggiungi(nome(m["statistica"]), m.get("delta", 0), e["def"]["nome"], "rango")
+                elif m["tipo"] == "flat_risultato":
+                    aggiungi(nome(m["statistica"]), m.get("valore", 0), e["def"]["nome"])
+        if avversario is not None:       # le stance dell'altro che pesano su di me
+            for st in avversario.stance_attive:
+                for m in st["def"].get("modificatori", []):
+                    if m["tipo"] == "colpire_avversario":
+                        aggiungi("colpire", _valore_mod(m, avversario, self) if not (m.get("dado_proprio") or m.get("dado_avversario")) else m.get("flat", 0),
+                                 st["def"]["nome"] + " (avversario)", dado=bool(m.get("dado_proprio") or m.get("dado_avversario")))
+                    elif m["tipo"] == "mod_rango" and m.get("target") == "avversario":
+                        aggiungi(nome(m["statistica"]), m.get("delta", 0), st["def"]["nome"] + " (avversario)", "rango")
+        return out
+
     def locazione_casuale(self):
         """Locazione colpita da un attacco non mirato (pesata da PESO_LOCAZIONE, uniforme di
         default); comprende gli arti extra di Ali/2x2."""

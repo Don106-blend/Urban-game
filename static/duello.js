@@ -252,6 +252,11 @@ function renderPannello(dove, p, mira_su) {
   const stance = p.stance.filter(x => x.turni != null).map(x =>
     chip(x.nome, x.turni < 0 ? "perm." : x.turni + "t")).join("");
   const effetti = p.effetti.map(x => chip(x.nome, x.turni < 0 ? "∞" : x.turni + "t", "chip-crip")).join("");
+  // i bonus e malus ai tiri di adesso (arti feriti, stance, effetti): ogni chip dice cosa tira e da dove viene
+  const segno = n => (n >= 0 ? "+" : "−") + Math.abs(n);
+  const tiri = (p.modificatori || []).map(m => chip(
+    m.valore == null ? `${m.tiro}: no` : `${m.tiro} ${segno(m.valore)}${m.unita ? " " + m.unita : ""}${m.dado ? " +dado" : ""}`,
+    m.fonte, m.valore == null || m.valore < 0 ? "chip-crip" : "tag-attiva")).join("");
   const riga = (et, v) => v ? `<div class="pan-inline"><b>${et}</b>${v}</div>` : "";
   // gli azzardi: un rilancio da giocare, l'Ultima Puntata gia' usata, la spinta della folla sul dado (uguale e contraria per i due lati)
   const az = p.azzardo || {};
@@ -270,7 +275,7 @@ function renderPannello(dove, p, mira_su) {
       ${p.ddos_turni > 0 ? `<span class="chip-crip" title="Nessun augment si può accendere">⛓DDOS: ${p.ddos_turni}t</span>` : ""}
     </div>
     <div class="pan-sec pan-locs">${hp}</div>
-    ${riga("Poteri", poteri)}${riga("Augment", augments)}${riga("Stance", stance)}${riga("Effetti", effetti)}${riga("Azzardo", azzardo)}
+    ${riga("Poteri", poteri)}${riga("Augment", augments)}${riga("Stance", stance)}${riga("Effetti", effetti)}${riga("Tiri", tiri)}${riga("Azzardo", azzardo)}
     ${dove === "pan-player" ? renderArena() : renderRivale()}
   `;
 }

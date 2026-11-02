@@ -336,6 +336,27 @@ def main():
             else:
                 d.cpu_step()
         ok(d.finito and d.round < 60, (i, d.round))
+    # ============================================================ i bonus e malus ai tiri si leggono nelle schede
+    p, c = eroe("A"), eroe("B")
+    d = duello(p, c)
+    ok(p.modificatori_tiri(c) == [] and d.stato()["player"]["modificatori"] == [], "senza niente, nessun modificatore")
+    p.hp["braccio_dx"] = -5
+    p.hp["gamba_sx"] = -5
+    mt = {(m["tiro"], m["valore"]): m["fonte"] for m in d.stato()["player"]["modificatori"]}
+    ok(mt.get(("colpire", -1)) == "braccio dx in negativo" and mt.get(("schivata", -1)) == "gamba sx in negativo", mt)
+    p.hp["braccio_sx"] = -5
+    p.crippled |= {"braccio_dx", "gamba_sx"}
+    mt = d.stato()["player"]["modificatori"]
+    ok(any(m["tiro"] == "colpire" and m["valore"] == -2 for m in mt), "due bracci: -2 a colpire")
+    ok(any(m["tiro"] == "schivata" and m["valore"] is None for m in mt) and any(m["tiro"] == "mira" and m["valore"] is None for m in mt),
+       "gamba e braccio CRIPPLED: niente schivata ne' mira")
+    ok(not d.stato()["cpu"]["modificatori"], "l'avversario sano non ha modificatori")
+    ok(sum(m["valore"] or 0 for m in mt if m["tiro"] == "colpire") == E.bonus_colpire(p, c), "la scheda e il tiro dicono la stessa cosa")
+    c.applica_effetti([{"effetto": next(e["id"] for e in DB["effetti"] if e["nome"] == "Stordimento"), "turni": 2}], DB["effetti"])
+    mt = c.modificatori_tiri(p)
+    ok(any(m["fonte"] == "Stordimento" and m["tiro"] == "colpire" and m["valore"] == -1 for m in mt), "gli effetti si leggono")
+    ok(any(m["fonte"] == "Stordimento" and m["unita"] == "rango" and m["tiro"] == "sociale" for m in mt), "...anche i delta di rango")
+    ok(sum(m["valore"] for m in c.modificatori_tiri(p) if m["tiro"] == "colpire" and m["valore"]) == E.bonus_colpire(c, p))
     print(f"OK: {n} verifiche")
 
 
