@@ -17,7 +17,7 @@
 <script>
   // (con un numero di versione: il server di prova non dice quando rileggere i file)
   const v = Date.now();
-  for (const f of ["fisica", "pupazzo", "arena"]) document.write(`<script src="/static/${f}.js?v=${v}"><\/script>`);
+  for (const f of ["fisica", "pupazzo", "poteri", "arena"]) document.write(`<script src="/static/${f}.js?v=${v}"><\/script>`);
 </script>
 <script>
   const HPMAX = {testa: 80, busto: 120, braccio_sx: 100, braccio_dx: 100, gamba_sx: 100, gamba_dx: 100};
@@ -25,10 +25,12 @@
      combinazione: pg("A", {}, [], {capelli: "f2", maglia: "tshirt", pantaloni: "lunghi", seed: 7}) */
   const ASPETTO = {p: {sesso: "M", capelli: "m2", maglia: "tshirt", pantaloni: "lunghi", seed: 1234567},
                    c: {sesso: "F", capelli: "f2", maglia: "lunga", pantaloni: "tre_quarti", seed: 98765432}};
-  /* extra = {ali, braccia, volo, velocita, forza} (poteri Ali e 2x2, stance Volo; velocita e forza = rango di Supervelocita' e Super Forza, 0 = spenti); tipi = {locazione: {fuoco, acido, elettrico: danni subiti}} per le texture delle ferite */
-  function pg(nome, hp = {}, crippled = [], aspetto, extra = {}, tipi = {}) {
+  /* extra = {ali, braccia, volo, velocita, forza, poteri, stance_poteri} (poteri Ali e 2x2, stance Volo; velocita e forza = rango di Supervelocita' e Super Forza, 0 = spenti;
+     poteri = {id: rango} dei poteri accesi, stance_poteri = id dei poteri con una stance in corso: v. static/poteri.js, es. {poteri: {1: 3, 3: 2}});
+     tipi = {locazione: {fuoco, acido, elettrico: danni subiti}} per le texture delle ferite; arm = {locazione: armatura}: Pelle Invincibile e' in materiale dove arm > 0 */
+  function pg(nome, hp = {}, crippled = [], aspetto, extra = {}, tipi = {}, arm = {}) {
     const o = {nome, hp: {}, extra, aspetto: aspetto || (nome === "Vera Greco" || nome === "Vera" ? ASPETTO.c : ASPETTO.p)};
-    for (const [l, m] of Object.entries(HPMAX)) o.hp[l] = {val: hp[l] ?? m, max: m, protesi: false, crippled: crippled.includes(l), tipi: tipi[l] || {}};
+    for (const [l, m] of Object.entries(HPMAX)) o.hp[l] = {val: hp[l] ?? m, max: m, protesi: false, crippled: crippled.includes(l), tipi: tipi[l] || {}, arm: arm[l] || 0};
     return o;
   }
   const lab = {

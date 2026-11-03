@@ -19,6 +19,7 @@ qualsiasi cosa**: serve a restare coerenti con il corpo base maschile (`maschio`
 | Disegno nel duello (canvas), sangue, ricolorazione, scambi, effetti | `static/arena.js` |
 | Motore fisico a corpi rigidi | `static/fisica.js` |
 | Il combattente come ragdoll attivo (muscoli, passi, colpi, attacchi) | `static/pupazzo.js`, test: `node test_fisica.js` |
+| Aspetto dei poteri (materiali della pelle, orbite, aure, fulmini, campo, neve, onde) e i pezzi che sostituiscono (rinforzati, appuntiti) | `static/poteri.js`; `static/sprites/maschio/poteri.json` + `rinf_*.png`, `app_*.png`; sorgente `tools/sprites/maschio_poteri.px.js` (sez. 18) |
 | Banco di prova della fisica nel browser | `tools/lab/arena.html` (v. sez. 10) |
 | Fasciature (la garza al posto del sangue, in palestra) | `fascia_*.png` (sorgente: fondo di `maschio_aspetto.px.js`), manifest `aspetto.json` -> `fasciature` (v. sez. 16) |
 | Oggetti della palestra (sacco, rack, lavagna...): sorgente, PNG, manifest | `tools/sprites/palestra.px.js`, `static/sprites/palestra/*.png` + `oggetti.json` (v. sez. 15) |
@@ -574,3 +575,80 @@ angolo alto-sinistra della falda nel sistema del busto basso, sempre riga 13; `p
   `trench_strascico` (spolverino che dietro trascina), `trench_aderente` (a matita fino alla caviglia, con spacco), `trench_zigzag` (orlo a dente di sega, piste di circuito).
   Colori fissi nel manifest per i piu' (`colore`). Per un cappotto nuovo: una `falda(...)`, i due overlay del busto, e la voce in `aspetto.json` (con `falda`).
 - Test: `node test_fisica.js` (la falda sta nella tela, a indici, appesa al busto basso). Anteprima: scena `trench_cyber_anteprima`.
+
+## 18. L'aspetto dei poteri (`static/poteri.js`, `poteri.json`, `maschio_poteri.px.js`)
+
+Un potere ACCESO si vede sul corpo e attorno al corpo, e gli aspetti **si sommano**: un eroe con quattro poteri accesi li mostra tutti e quattro. Tutto cio' che e' solo grafica sta in
+`static/poteri.js` (modulo a se', caricato prima di `arena.js` da `duello.html` e dal laboratorio; senza, il duello funziona uguale ma senza effetti); `arena.js` lo chiama in pochi punti
+(`PO.aggiorna` in `applicaPg`, `PO.passo` in `avanzaL`, `PO.dietro` / `PO.davanti` in `disegnaCombattente`, `PO.mossa` negli scambi, `PO.disegnaOnda` nei proiettili).
+
+### Da dove arrivano i dati
+- `pannello().extra.poteri` = `{id del potere: rango}` dei poteri **accesi** (`Personaggio.poteri_attivi_rango`); `extra.stance_poteri` = gli id dei poteri con una stance **in corso**
+  (`poteri_in_stance`: le stance auto-attivate durano quanto il potere, quelle manuali finche' durano i turni). Si usano gli **id** (non i nomi: `Electrocinesi`, `super-urlo`... non sono coerenti);
+  il test di `test_fisica.js` (blocco 4) controlla che gli id di `Poteri.ID` siano ancora i poteri giusti in `powers.json`.
+- Ogni evento `colpo` porta `poteri` = i poteri **accesi** dell'attaccante che hanno quella mossa al rango posseduto (`poteri_di_attacco`); `stance` e `potere` portano i loro. Una mossa che due
+  poteri hanno in comune (Braccio Lama, Scheggie, Frana...) li accende **entrambi**. Per Pelle Invincibile si guarda `hp[loc].arm` (l'armatura della locazione: il motore la consuma prima degli hp).
+- Test: `python test_combat.py` (blocco "aspetto dei poteri": ranghi, mosse condivise, stance permanenti, eventi) e `node test_fisica.js` blocco 4 (stato, materiali, effetti a mossa, neve, teschi, disegno).
+
+### Tabella dei poteri
+| Potere (id) | Cosa si vede | Quando |
+|---|---|---|
+| **Pelle Invincibile (1)** | rango 1 **pietra**, rango 2 **ossidiana** (nera-viola) sulla pelle di sempre; rango 3 **pezzi rinforzati** al posto di quelli normali (circa +5%), ossidiana con **vene di lava**; rango 4 stessi pezzi in **cristalli verde acqua**. Dal rango 3 il potere **sostituisce il livello dei vestiti** | per locazione, **finche' l'armatura di quella locazione e' > 0** (e la locazione ha hp e non e' storpia): a 0 torna la pelle, con i vestiti, solo li' |
+| **Pirocinesi (3)** | una palla di fuoco **orbita** attorno al corpo; r2 piu' grande; r3 due; r4 due **blu** | sempre, a potere acceso |
+| **Idrocinesi (15)** | sfere d'acqua in orbita: r1 una, r2 due, r3 tre; r4 un **flusso continuo** che si avvolge | sempre |
+| **Acidocinesi (17)** | come l'idrocinesi, **verde** | sempre |
+| **Geocinesi (20)** | rocce e detriti in orbita a distanze e velocita' diverse (3 + rango rocce, e polvere) | sempre |
+| **Necromanzia (19)** | un **teschio** segue l'eroe (molla: ritarda); r2 aura verde; r3 corona di fiamme verdi; r4 tre teschi | sempre |
+| **Criocinesi (16)** | **nevica** attorno all'eroe (piu' fitta col rango) | sempre |
+| **Elettrocinesi (5)** | piccole **saette** dalle mani, di continuo | sempre |
+| **Telecinesi (18)** | **aura viola** su mani e testa | sempre |
+| **Campo di forza (13)** | una **bolla** attorno all'eroe (orlo, riflessi che scorrono; si accende quando viene colpito) | sempre |
+| **Assorbi Energia (4)** | **aura blu pallida** dalle mani | con una **mossa o una stance** del potere (`k` sale a 1 e scende dopo) |
+| **Anatema (8)** | **fulmini viola** dagli avambracci | idem |
+| **Super Soldato (14)** | **fulmini rossi/arancio** dal corpo | idem |
+| **Super Urlo (9)** | le mosse sono **onde soniche** (archi che si aprono dalla bocca fino al bersaglio) al posto del proiettile | quando si usa una mossa del potere |
+| **Appendici Affilate (6)** | gli **avambracci appuntiti** (lama con sperone al gomito) | sempre. Se un altro potere cambia il braccio (Pelle Invincibile) la lama **resta**, col materiale di quel potere |
+
+Gli effetti "a mossa" (Assorbi, Anatema, Super Soldato) valgono per le mosse del potere **e per le sue stance in corso**: Super Soldato ha stance permanenti dal rango 2 e Assorbi Energia dal 1, quindi
+a quei ranghi l'effetto resta acceso finche' il potere lo e'. `poteri.js` tiene un'intensita' `po.k[id]` (0..1) che sale in ~0,1 s e scende in ~0,25 s.
+
+### I pezzi nuovi (sorgente `tools/sprites/maschio_poteri.px.js`, manifest `static/sprites/maschio/poteri.json`)
+- `PXL build tools/sprites/maschio_poteri.px.js --out <cartella>` e si copiano `rinf_*.png` e `app_*.png` in `static/sprites/maschio/` (il corpo base e' incluso solo per riusarne le funzioni).
+  Scene di controllo (non esportate nel gioco): `confronto` (corpo base e rinforzato accanto), `galleria` (coppie pezzo per pezzo), `appuntiti`.
+- **Rinforzati** (`rinf_<pezzo>.png`, 11, uno per pezzo): la tela del base con **1 px in piu' a sinistra e in alto** (`margine: [1, 1]`: il perno e' quello del base + (1, 1) e l'arena li posa a
+  `base - 1`) e al massimo 1-2 px in piu' a destra e in basso: ~5% in altezza sui pezzi grandi (spallacci, ginocchiere e nuca spessa spostano la sagoma, con **tacche** dove due piastre si toccano). Indici
+  come il corpo **piu' uno solo, la commessura** (`m`, R = 70, in `poteri.json -> cucitura`): nel gioco e' lava (r3), fessura scura (r4), crepa (r1-2). Le commessure stanno **solo all'interno** della sagoma
+  (la funzione `rinf` le ritaglia da sola; il test lo controlla). Lo stinco taglia il piede alla stessa riga del base: `disegnaVoce` ricalcola la fetta (`t0`, `hh`) col margine.
+- **Appuntiti** (`app_avambraccio_dx/sx.png`): **stessa tela e stesso perno** del base; maschere di strappo, carne, scheletro e maniche si ritagliano sulla sagoma della lama (`sagApp`, `scheletroLama`,
+  `disegnaVestiti`). La mano scompare nella lama.
+- **I materiali** non sono PNG: `Poteri.coloraMateriale` colora lo sprite a indici (l'indice da' la luce, la texture sposta il tono o cambia colore) con rumore calcolato sulle coordinate dello sprite
+  **intero** (le due meta' di un arto sono continue). Pietra: macchie e crepe; ossidiana: vetro con strisce di riflesso; lava: filoni + commessure; cristallo: celle di Voronoi con spigoli chiari.
+  Ritoccare un colore = `RAMPE` e `LAVA` in `poteri.js`; la pelle vera e il sangue non si toccano (`disegnaPelle` ritorna prima, quando c'e' un materiale: la pietra non sanguina).
+- Come decide `arena.js` cosa disegnare: `PO.rangoPelle(L, loc)` (0 = pelle vera), `L.rinfOn[pezzo]` (disegna la tela rinforzata `L.telaR`), `L.vestOff[pezzo]` (dal rango 3 niente maglia, pantaloni e falda),
+  `PO.lama(L, pezzo)`. La **chiave di ridisegno** di un pezzo (`PO.chiave`) cambia quando cambia il materiale o la lama, cosi' `applicaPg` ridisegna solo quando serve.
+
+### Gli effetti attorno al corpo (`poteri.js`)
+- Tutto si disegna nello spazio di `mondo(L)` (pixel dello sprite, +x verso l'avversario): lo specchio della CPU e' gratis. `dietro` prima del corpo (la meta' lontana delle orbite, teschi, neve lontana),
+  `davanti` dopo (campo, meta' vicina delle orbite, aure, fulmini, particelle, neve vicina). Un punto dell'ellisse e' "davanti" quando sta nella meta' bassa.
+- **Orbite**: `orbitanti(L, A)` calcola a ogni disegno posizione e lato di ogni sfera/roccia attorno al centro del busto. Ogni potere ha ellisse, inclinazione e velocita' sue, cosi' due orbite insieme non si
+  sovrappongono. Le braci, le gocce e la polvere nascono dalle sfere (`passo`, particelle locali, massimo 260).
+- **Fulmini**: `fulmine()` disegna una spezzata a pixel pieni da un punto; si rilancia ogni 4 fotogrammi (il seme cambia), quindi guizza. Colori: elettro giallo, anatema viola, super soldato rosso-arancio.
+- **Sprite**: sfere, aloni, teschio, rocce e fiamme sono piccole tele disegnate a pixel una volta sola (`sfera`, `alone`, `griglia`), niente antialiasing, 2-4 toni.
+- **Teschi**: molla smorzata verso un posto dietro la testa (`POSTI_TESCHI`) con un po' di galleggiamento: quando l'eroe si muove i teschi arrivano dopo.
+- **Neve**: fiocchi in coordinate di L che cadono fino a terra (a 110) e si sciolgono; all'accensione sono gia' in aria.
+- **Campo di forza**: righe di pixel per ellisse (riempimento chiaro, orlo piu' forte, brevi riflessi lungo l'orlo); si illumina col lampo del colpo (`L.lamp`).
+- **Onde soniche**: `avviaScambio` riconosce una mossa a distanza con `poteri` che contiene Super Urlo e al posto del proiettile lancia un'onda (`tipo: "onda"`, 0,34 s di volo, parte dalla bocca).
+- Chi cade (`L.ko`) o muore non ha piu' effetti. Nella palestra (`applicaPg(..., inPalestra)`) non ci sono poteri accesi: nessun effetto.
+
+### Per aggiungere o ritoccare
+- Un effetto nuovo: una funzione in `poteri.js` (stato in `L.po`, passo in `passo`, disegno in `dietro`/`davanti`), l'id in `ID` (il test controlla il nome in `powers.json`) e una riga nel test, blocco 4.
+- Provarlo nel laboratorio (`tools/lab/arena.html`, v. sez. 10): `pg(nome, hp, crippled, aspetto, extra, tipi, arm)` con `extra = {poteri: {id: rango}, stance_poteri: [id]}` e `arm = {locazione: armatura}`,
+  poi `Arena.reset({player: ..., cpu: ...}); Arena.passi(100)`. Per le mosse: `Arena.colpo({tipo: "colpo", chi: "c", esito: "colpito", loc: "busto", hp_persi: 20, info: {tags: ["a distanza (non si para)"]}, tipo_danno: "psionico", poteri: [9], colpi: 1, colpo: 1})`.
+  Nel browser di prova lo screenshot puo' mostrare un fotogramma vecchio: aspettare un secondo e rifare.
+- Il server Flask del gioco non ricarica i template: dopo aver toccato `duello.html` va riavviato. In `duello.html` `poteri.js` va **prima** di `arena.js`.
+
+### Scelte non ovvie (dell'implementazione, non della richiesta)
+- Le stance **permanenti** del potere contano come "stance in corso": Assorbi Energia (stance auto-attivata dal rango 1) ha le aure sulle mani finche' e' acceso; Super Soldato dal rango 2.
+- Geocinesi non aveva ranghi nella richiesta: le rocce crescono con il rango (3 + rango). Elettrocinesi: 2 saette per mano, 3 dal rango 3. Criocinesi: la neve si infittisce col rango.
+- Il materiale della pelle **non sanguina**: l'armatura assorbe prima degli hp, quindi dove c'e' pietra non c'e' sangue; quando l'armatura finisce torna la pelle con le ferite di prima.
+- L'armatura e' una riserva sola per locazione (Pelle Invincibile, Assorbi Energia, stance, cuscinetto...): il materiale resta finche' c'e' **qualunque** armatura in quella locazione.

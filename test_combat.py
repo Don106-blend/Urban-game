@@ -1844,13 +1844,68 @@ def overhaul(webapp):
     assert all(pf.danni_tipo[l]["acido"] == 60 // 6 for l in ("testa", "gamba_sx")) and pf.danni_tipo["busto"]["acido"] == 20
     pan = webapp.pannello(pf, False)
     assert pan["hp"]["busto"]["tipi"] == pf.danni_tipo["busto"] and pan["hp"]["gamba_dx"]["tipi"] == {"acido": 10}
-    assert pan["extra"] == {"ali": False, "braccia": False, "volo": False, "velocita": 0, "forza": 0}
+    assert pan["extra"] == {"ali": False, "braccia": False, "volo": False, "velocita": 0, "forza": 0, "poteri": {}, "stance_poteri": []}
     pf.poteri.append({"def": next(x for x in webapp.DB["poteri"] if x["nome"] == "Ali"), "rango": 1, "attivo": False})
     pf.poteri.append({"def": next(x for x in webapp.DB["poteri"] if x["nome"] == "2x2"), "rango": 1, "attivo": True})
     pf.stance_attive.append({"def": next(x for x in webapp.DB["stances"] if x["nome"] == "Volo"), "turni": 3})
-    assert webapp.pannello(pf, False)["extra"] == {"ali": False, "braccia": True, "volo": True, "velocita": 0, "forza": 0}   # solo cio' che e' ATTIVO
+    assert webapp.pannello(pf, False)["extra"] == {"ali": False, "braccia": True, "volo": True, "velocita": 0, "forza": 0,
+                                                   "poteri": {12: 1}, "stance_poteri": []}   # solo cio' che e' ATTIVO (Volo e' di Ali, spento)
     pf.poteri[0]["attivo"] = True
     assert webapp.pannello(pf, False)["extra"]["ali"] is True
+    assert webapp.pannello(pf, False)["extra"]["poteri"] == {11: 1, 12: 1} and webapp.pannello(pf, False)["extra"]["stance_poteri"] == [11]
+
+    # ---- aspetto dei poteri (static/poteri.js): quali poteri sono accesi (con rango), quali hanno una stance in corso e di chi e' una mossa ----
+    def _pot(nome):
+        return next(x for x in webapp.DB["poteri"] if x["nome"] == nome)
+    pv = _P("Visuale")
+    for nome, rango in (("Pelle Invincibile", 4), ("Appendici Affilate", 3), ("Assorbi Energia", 3), ("Pirocinesi", 4), ("Criocinesi", 1)):
+        pv.poteri.append({"def": _pot(nome), "rango": rango, "attivo": False})
+    assert pv.poteri_attivi_rango() == {} and pv.poteri_di_attacco(13) == [] and pv.poteri_in_stance() == []   # niente e' acceso: niente si vede
+    for slot in pv.poteri[:3] + pv.poteri[4:]:
+        slot["attivo"] = True
+    assert pv.poteri_attivi_rango() == {1: 4, 6: 3, 4: 3, 16: 1}, "i poteri spenti non compaiono, il rango e' quello posseduto"
+    assert pv.poteri_di_attacco(13) == [1], "Braccio Lama e' al rango 4 di Pelle Invincibile e di Appendici Affilate, ma Appendici e' a rango 3"
+    assert pv.poteri_di_attacco(7) == [1, 6], "Scheggie: due poteri la danno (rango 3 di entrambi): si accendono tutti e due"
+    assert pv.poteri_di_attacco(11) == [6] and pv.poteri_di_attacco(6) == [1], "una mossa di un solo potere ne accende uno solo"
+    assert pv.poteri_di_attacco(43) == [] and pv.poteri_di_attacco(None) == [], "Eruzione (Pirocinesi) non e' accesa: niente"
+    assert pv.poteri_di_attacco(28) == [16] and pv.poteri_di_attacco(30) == [], "rango oltre quello posseduto non conta (Criocinesi r1: la Scheggia c'e', la Tempesta no)"
+    assert pv.poteri_di_stance(1) == [1] and pv.poteri_di_stance(5) == [4], "stance imparata (Paladino) e auto-attivata (Assorbi Energie)"
+    assert pv.poteri_di_stance(16) == [4], "Resistenza e' di piu' poteri (Super Forza, Campo di forza...): conta solo quello acceso"
+    assert pv.poteri_in_stance() == [], "nessuna stance in corso"
+    # attivando un potere le sue stance auto-attivate partono (permanenti): da li' in poi il potere e' "in stance"
+    pv2 = _P("Visuale2")
+    pv2.poteri.append({"def": _pot("Assorbi Energia"), "rango": 3, "attivo": False})
+    pv2.poteri.append({"def": _pot("Electrocinesi"), "rango": 4, "attivo": False})
+    for slot in pv2.poteri:
+        pv2.attiva_potere(slot, webapp.DB["attacchi"], webapp.DB["stances"], webapp.DB["effetti"])
+    assert pv2.poteri_attivi_rango() == {4: 3, 5: 4}
+    assert pv2.poteri_in_stance() == [4, 5], "Assorbi Energie (rango 3) e Corpo Elettrico (rango 4) sono stance permanenti del potere"
+    assert webapp.pannello(pv2, True)["extra"]["stance_poteri"] == [4, 5]
+    pv2.disattiva_potere(pv2.poteri[0])
+    assert pv2.poteri_attivi_rango() == {5: 4} and pv2.poteri_in_stance() == [5]
+    # gli eventi della scena portano i poteri di chi li produce
+    ev_a, ev_d = _P("EvA"), _P("EvD")
+    for q in (ev_a, ev_d):
+        dotazione_base(q, webapp.DB["attacchi"], webapp.DB["stances"])
+    ev_a.poteri.append({"def": _pot("Pelle Invincibile"), "rango": 4, "attivo": False})
+    d_ev = webapp.DuelloWeb(pg=ev_d, avversario=ev_a)
+    d_ev.attivo, d_ev.altro = ev_a, ev_d
+    ev_a.azioni, ev_a.bonus = 3, 2
+    d_ev.usa_potere(ev_a, ev_a.poteri[0])
+    assert d_ev.eventi[-1]["tipo"] == "potere" and d_ev.eventi[-1]["poteri"] == [1]
+    lama = next(a for a in ev_a.attacchi if a["nome"] == "Braccio Lama")
+    sdef = next(s for s in ev_a.stance_conosciute if s["nome"] == "Paladino")
+    d_ev.usa_stance(ev_a, sdef, ev_d)
+    ev_st = d_ev.eventi[-1]
+    assert ev_st["tipo"] == "stance" and ev_st["poteri"] == [1], "Paladino e' di Pelle Invincibile"
+    pugno = next(a for a in ev_a.attacchi if a["nome"] == "Pugno")
+    ev_d.risposte = 0
+    d_ev.usa_attacco(lama)
+    ev_col = [e for e in d_ev.eventi if e["tipo"] == "colpo"][-1]
+    assert ev_col["poteri"] == [1], "Braccio Lama l'ha dato Pelle Invincibile"
+    ev_a.azioni = 2
+    d_ev.usa_attacco(pugno)
+    assert [e for e in d_ev.eventi if e["tipo"] == "colpo"][-1]["poteri"] == [], "il Pugno e' di tutti: nessun potere"
     # il torneo cura tutto (anche la memoria dei tipi di danno)
     tcura = webapp.TorneoEvo()
     tcura.eroi[0].applica_danno("busto", 30, "fuoco")

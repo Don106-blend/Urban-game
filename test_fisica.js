@@ -621,6 +621,156 @@ for (const forza of [0.1, 0.7, 1.6]) {
   const bianchi = []; for (let x = 0; x < tv.w; x++) if (Math.min(...tv.rgb(x)) > 225 && tv.alfa[x]) bianchi.push(x);
   ok(bianchi.length >= 1 && bianchi.length <= 0.04 * tv.w, `nei vestiti il bianco e' una sezione stretta (${bianchi.length}/${tv.w})`);
   log("aspetto: 16 capigliature, 44 maglie, 23 pantaloni, 15 copricapo; texture", tv.w, "e", tc.w);
+
+  // ---- i pezzi dei poteri (poteri.json, sorgente tools/sprites/maschio_poteri.px.js): i rinforzati di Pelle Invincibile (dal rango 3) e gli
+  // avambracci appuntiti di Appendici Affilate. Stessi nomi dei pezzi, stessi indici di grigio (piu' la commessura, R = 70).
+  const pot = JSON.parse(fs.readFileSync(path.join(__dirname, "static/sprites/maschio/poteri.json"), "utf8"));
+  ok(pot.cucitura === 70, "la commessura dei rinforzati e' il sesto indice (R = 70)");
+  ok(JSON.stringify(Object.keys(pot.rinforzato.pezzi).sort()) === JSON.stringify(Object.keys(man.parti).sort()), "un pezzo rinforzato per ogni pezzo del corpo");
+  const [mrx, mry] = pot.rinforzato.margine;
+  ok(mrx === 1 && mry === 1, "i rinforzati hanno un pixel in piu' a sinistra e in alto (l'arena li posa a base - 1)");
+  let areaBase = 0, areaRinf = 0, altBase = 0, altRinf = 0;
+  for (const [nome, file] of Object.entries(pot.rinforzato.pezzi)) {
+    const r = png(file), b = png(man.parti[nome].file), indici = new Set([...GRIGI, pot.cucitura]);
+    ok(r.alfa.every((a) => a === 0 || a === 255), `${file}: pixel pieni o vuoti`);
+    ok(r.rosso.every((v, i) => !r.alfa[i] || indici.has(v)), `${file}: solo i 5 indici e la commessura`);
+    ok(r.w >= b.w && r.w <= b.w + 2 && r.h >= b.h && r.h <= b.h + 2, `${file}: cresce di 1-2 px sulla tela del pezzo base (${b.w}x${b.h} -> ${r.w}x${r.h})`);
+    let sopra = 0, bas = 0, cucit = 0, cucitFuori = 0;
+    for (let y = 0; y < b.h; y++) for (let x = 0; x < b.w; x++) if (b.alfa[y * b.w + x]) { bas++; if (r.alfa[(y + mry) * r.w + x + mrx]) sopra++; }
+    ok(sopra >= 0.9 * bas, `${file}: contiene il pezzo base (a meno delle tacche tra le piastre: ${sopra}/${bas} px)`);
+    for (let y = 0; y < r.h; y++) for (let x = 0; x < r.w; x++) {
+      if (!(r.alfa[y * r.w + x] && r.rosso[y * r.w + x] === pot.cucitura)) continue;
+      cucit++;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (!r.alfa[(y + dy) * r.w + x + dx]) cucitFuori++;
+    }
+    ok(cucit >= 3 && cucitFuori === 0, `${file}: ha commessure (${cucit} px) e nessuna e' sul bordo della sagoma (${cucitFuori} px sul bordo)`);
+    const q = man.parti[nome].perno;
+    ok(q[0] + mrx < r.w && q[1] + mry < r.h, `${file}: il perno (${q[0] + mrx}, ${q[1] + mry}) sta nella tela`);
+    areaBase += bas; areaRinf += r.alfa.filter((a) => a).length;
+    if (nome === "busto_sup" || nome === "busto_inf" || nome === "testa" || nome === "coscia_dx" || nome === "stinco_dx") { altBase += b.h; altRinf += r.h; }
+  }
+  ok(areaRinf / areaBase > 1.05 && areaRinf / areaBase < 1.3, `i rinforzati sono piu' grandi (area x${(areaRinf / areaBase).toFixed(2)}) ma non di troppo`);
+  ok(altRinf / altBase > 1.03 && altRinf / altBase < 1.08, `in altezza i pezzi grandi crescono di circa il 5% (x${(altRinf / altBase).toFixed(3)})`);
+  for (const [nome, file] of Object.entries(pot.appuntito.pezzi)) {
+    const a = png(file), b = png(man.parti[nome].file);
+    ok(a.w === b.w && a.h === b.h, `${file}: stessa tela del pezzo base (il perno resta quello)`);
+    ok(a.rosso.every((v, i) => !a.alfa[i] || GRIGI.has(v)), `${file}: solo i 5 indici`);
+    const larg = (img, y) => { let n = 0; for (let x = 0; x < img.w; x++) if (img.alfa[y * img.w + x]) n++; return n; };
+    let ultima = img_ultima(a);
+    function img_ultima(img) { for (let y = img.h - 1; y >= 0; y--) if (larg(img, y)) return y; return -1; }
+    ok(larg(a, ultima) <= 2 && larg(b, img_ultima(b)) >= 2 && larg(a, 18) < larg(b, 18), `${file}: si assottiglia fino a una punta (larghezza in fondo ${larg(a, ultima)}, a riga 18 ${larg(a, 18)} contro ${larg(b, 18)})`);
+    ok(a.alfa.filter((v) => v).length < b.alfa.filter((v) => v).length, `${file}: e' piu' sottile del pezzo base`);
+  }
+  log("poteri: 11 pezzi rinforzati (area x" + (areaRinf / areaBase).toFixed(2) + ", altezza x" + (altRinf / altBase).toFixed(3) + ") e 2 avambracci appuntiti");
+}
+
+/* ====================================================================================================================
+   4. L'ASPETTO DEI POTERI (static/poteri.js): stato, materiali della pelle, effetti "a mossa", neve, teschi, disegno senza errori
+   ==================================================================================================================== */
+{
+  // un canvas finto: abbastanza per far girare il codice che disegna (e contare quante volte disegna)
+  let disegni = 0;
+  const ctxFinto = () => new Proxy({}, {
+    get: (t, k) => k in t ? t[k] : k === "createImageData" ? (w, h) => ({data: new Uint8ClampedArray(w * h * 4)}) :
+      k === "fillRect" || k === "drawImage" ? () => { disegni++; } : () => undefined,
+    set: (t, k, v) => { t[k] = v; return true; },
+  });
+  globalThis.document = {createElement: () => { const c = {width: 0, height: 0}; c.ctx = ctxFinto(); c.getContext = () => c.ctx; return c; }};
+  const Poteri = require("./static/poteri.js");
+  const ID = Poteri.ID;
+  ok(Object.keys(ID).length === 15, "i 15 poteri con un aspetto");
+  const potere = JSON.parse(fs.readFileSync(path.join(__dirname, "data/powers.json"), "utf8"));
+  const nomeDi = (id) => (potere.find((x) => x.id === id) || {}).nome;
+  const NOMI = {PELLE: "Pelle Invincibile", PIRO: "Pirocinesi", ASSORBI: "Assorbi Energia", ELETTRO: "Electrocinesi", APPENDICI: "Appendici Affilate", ANATEMA: "Anatema",
+                URLO: "super-urlo", CAMPO: "Campo di forza", SOLDATO: "Supersoldato", HYDRO: "Hydrocinesi", CRIO: "Criocinesi", ACIDO: "Acidocinesi", TELE: "Telecinesi",
+                NECRO: "Necromanzia", GEO: "Geocinesi"};
+  for (const [k, id] of Object.entries(ID)) ok(nomeDi(id) === NOMI[k], `l'id ${id} di ${k} e' il potere "${NOMI[k]}" in powers.json (${nomeDi(id)})`);
+
+  // ---- stato: dove la pelle e' ancora corazzata, chi e' acceso, quando un pezzo va ridisegnato
+  const hp = (o) => Object.fromEntries(Object.entries(o).map(([l, [val, arm, crippled]]) => [l, {val, arm, crippled: !!crippled}]));
+  const L = {};
+  Poteri.aggiorna(L, {extra: {poteri: {"1": 3, "6": 1}, stance_poteri: [4]}, hp: hp({testa: [80, 30], busto: [120, 0], braccio_dx: [50, 5, true], braccio_sx: [0, 9], gamba_dx: [10, 1], gamba_sx: [100, 1]})});
+  ok(L.po.ids[1] === 3 && L.po.ids[6] === 1 && L.po.stance.has(4), "poteri accesi col rango e stance in corso");
+  ok(JSON.stringify(L.po.pelle) === JSON.stringify({testa: 3, gamba_dx: 3, gamba_sx: 3}), "la pelle e' corazzata solo dove c'e' armatura, la locazione ha hp e non e' storpia");
+  ok(Poteri.rangoPelle(L, "testa") === 3 && Poteri.rangoPelle(L, "busto") === 0, "rango del materiale per locazione");
+  ok(Poteri.chiave(L, "testa", "testa") === "P3" && Poteri.chiave(L, "busto", "busto_sup") === "", "la chiave di ridisegno dice se il pezzo e' in materiale");
+  ok(Poteri.chiave(L, "braccio_dx", "avambraccio_dx") === "A" && Poteri.chiave(L, "braccio_dx", "braccio_sup_dx") === "", "Appendici Affilate: solo gli avambracci sono lame");
+  ok(Poteri.lama(L, "avambraccio_sx") && !Poteri.lama(L, "braccio_sup_sx"), "lama() solo sugli avambracci");
+  const k0 = Poteri.chiave(L, "testa", "testa");
+  Poteri.aggiorna(L, {extra: {poteri: {"1": 3}}, hp: hp({testa: [80, 0], busto: [1, 1], braccio_dx: [1, 1], braccio_sx: [1, 1], gamba_dx: [1, 1], gamba_sx: [1, 1]})});
+  ok(Poteri.chiave(L, "testa", "testa") !== k0 && Poteri.rangoPelle(L, "testa") === 0 && Poteri.rangoPelle(L, "busto") === 3, "armatura distrutta in una locazione: solo li' il materiale sparisce e il pezzo va ridisegnato");
+  ok(!Poteri.lama(L, "avambraccio_dx"), "senza Appendici Affilate niente lame");
+  Poteri.aggiorna(L, null);
+  ok(Object.keys(L.po.ids).length === 0 && Object.keys(L.po.pelle).length === 0, "senza stato (la palestra) non c'e' nessun effetto");
+
+  // ---- materiali: ogni rango ha il suo colore; la pietra e' grigia, l'ossidiana scura, la lava arancione, il cristallo verde acqua
+  const img = {w: 24, h: 24, px: new Uint8Array(24 * 24 * 4)};
+  const IND = [38, 106, 142, 178, 216, 70];
+  for (let i = 0; i < 24 * 24; i++) { const v = IND[(i * 7 + (i >> 3)) % IND.length]; img.px.set([v, v, v, i % 17 === 0 ? 0 : 255], i * 4); }
+  const colora = (rango) => {
+    const cv = document.createElement("canvas"); let dati = null;
+    cv.ctx.createImageData = (w, h) => (dati = {data: new Uint8ClampedArray(w * h * 4)});
+    cv.ctx.putImageData = () => {};
+    Poteri.coloraMateriale(cv, img, rango, {y0: 20, seme: 7});
+    let r = 0, g = 0, b = 0, m = 0, lava = 0, vuoti = 0, pieni = 0, trasp = 0;
+    for (let i = 0; i < 24 * 24; i++) {
+      const a = dati.data[i * 4 + 3];
+      if (img.px[i * 4 + 3] === 0) { trasp++; if (a === 0) vuoti++; continue; }
+      if (a === 255) pieni++;
+      const R = dati.data[i * 4], G = dati.data[i * 4 + 1], B = dati.data[i * 4 + 2];
+      r += R; g += G; b += B; m++;
+      if (R > 200 && B < 150 && G > 100) lava++;
+    }
+    return {r: r / m, g: g / m, b: b / m, lava, vuoti, pieni, m, trasp};
+  };
+  const mat = [1, 2, 3, 4].map(colora);
+  ok(mat.every((q) => q.pieni === q.m && q.vuoti === q.trasp), "i materiali riempiono ogni pixel dello sprite (pieno) e lasciano i trasparenti");
+  ok(Math.abs(mat[0].r - mat[0].g) < 14 && Math.abs(mat[0].g - mat[0].b) < 14 && mat[0].g > 70 && mat[0].g < 160, `rango 1: pietra, grigia (${mat[0].r | 0},${mat[0].g | 0},${mat[0].b | 0})`);
+  ok(mat[1].r + mat[1].g + mat[1].b < 3 * 85 && mat[1].b > mat[1].g, `rango 2: ossidiana, scura e violacea (${mat[1].r | 0},${mat[1].g | 0},${mat[1].b | 0})`);
+  ok(mat[2].lava > mat[1].lava + 5 && mat[1].lava === 0, `rango 3: ossidiana con la lava (${mat[2].lava} px di lava, 0 senza)`);
+  ok(mat[3].g > mat[3].r * 1.6 && mat[3].b > mat[3].r * 1.4, `rango 4: cristalli verde acqua (${mat[3].r | 0},${mat[3].g | 0},${mat[3].b | 0})`);
+  ok(JSON.stringify(colora(2)) === JSON.stringify(colora(2)), "il materiale e' deterministico (stesso seme, stessi pixel)");
+
+  // ---- un passo alla volta: le aure "a mossa" salgono con una stance o una mossa e scendono dopo; teschi, neve
+  const A = {ctx: ctxFinto(), pos: () => [20, 50, 0], punto: (_L, _c, _g) => [20, 50]};
+  const nuovoL = (poteri, stance = []) => { const x = {lamp: {}, pup: {morto: false}, ko: false}; Poteri.aggiorna(x, {extra: {poteri, stance_poteri: stance}, hp: hp({})}); return x; };
+  const passi = (x, k) => { for (let i = 0; i < k; i++) Poteri.passo(x, A); };
+  const L2 = nuovoL({"4": 1, "8": 2, "14": 3}, [4]);
+  passi(L2, 60);
+  ok(L2.po.k[4] > 0.99 && L2.po.k[8] < 0.01 && L2.po.k[14] < 0.01, "una stance in corso accende Assorbi Energia; Anatema e Super Soldato aspettano una mossa");
+  Poteri.mossa(L2, [8], 0.5);
+  passi(L2, 20);
+  ok(L2.po.k[8] > 0.4 && L2.po.k[14] < 0.01, `la mossa di Anatema accende solo Anatema (${L2.po.k[8].toFixed(2)})`);
+  passi(L2, 120);
+  ok(L2.po.k[8] < 0.05, "...e si spegne a mossa finita");
+  Poteri.mossa(L2, undefined, 1); Poteri.mossa(L2, [], 1);
+  ok(Object.keys(L2.po.mossa).length === 0, "una mossa senza poteri non accende niente");
+  L2.ko = true; passi(L2, 90);
+  ok(L2.po.k[4] < 0.05 && L2.po.part.length === 0, "chi cade non ha piu' aure ne' particelle");
+
+  const L3 = nuovoL({"16": 3, "19": 4, "3": 4, "15": 4, "17": 4, "20": 4, "5": 4, "18": 2});
+  passi(L3, 400);
+  ok(L3.po.neve && L3.po.neve.length >= 40 && L3.po.neve.every((f) => Number.isFinite(f.x) && f.y <= 110.5), "criocinesi: nevica (fiocchi in aria, mai sotto il pavimento)");
+  ok(L3.po.teschi.length === 3 && L3.po.teschi.every((s) => Math.hypot(s.x - 20, s.y - 50) < 60), "necromanzia rango 4: tre teschi che seguono l'eroe");
+  ok(L3.po.part.length > 0 && L3.po.part.length <= 260, "braci, gocce e polvere ci sono e sono limitate");
+  const L4 = nuovoL({"19": 1}); passi(L4, 60);
+  ok(L4.po.teschi.length === 1 && L4.po.neve === null, "necromanzia rango 1: un teschio, e senza criocinesi niente neve");
+  Poteri.aggiorna(L3, {extra: {poteri: {}}, hp: hp({})}); passi(L3, 2);
+  ok(L3.po.teschi.length === 0 && L3.po.neve === null, "spenti i poteri spariscono teschi e neve");
+
+  // ---- il disegno gira senza errori con tutti i poteri insieme (e non disegna niente senza poteri o da morti)
+  const tutti = Object.fromEntries(Object.values(ID).map((id) => [id, 4]));
+  const L5 = nuovoL(tutti, [4, 8, 14]);
+  passi(L5, 120);
+  disegni = 0; Poteri.dietro(L5, A); Poteri.davanti(L5, A);
+  ok(disegni > 200, `tutti i poteri insieme si disegnano (${disegni} operazioni)`);
+  const L6 = nuovoL({}); passi(L6, 10); disegni = 0; Poteri.dietro(L6, A); Poteri.davanti(L6, A);
+  ok(disegni === 0, "senza poteri non si disegna niente");
+  L5.ko = true; disegni = 0; Poteri.dietro(L5, A); Poteri.davanti(L5, A);
+  ok(disegni === 0, "un caduto non ha effetti");
+  disegni = 0; Poteri.disegnaOnda(A.ctx, {x: 40, y: 50, vx: 200, vy: 0, t: 0.2, t0: 0.34});
+  ok(disegni > 10, "le onde soniche si disegnano");
+  log("poteri: stato, materiali, effetti a mossa, neve, teschi e disegno ok");
 }
 
 console.log(`OK - ${n} check passati`);

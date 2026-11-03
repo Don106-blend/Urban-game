@@ -298,6 +298,33 @@ class Personaggio:
                 r = max(r, cp.get("rango", 1))
         return r
 
+    # ---------- aspetto dei poteri (la scena li disegna: static/poteri.js) ----------
+    def poteri_attivi_rango(self):
+        """{id del potere: rango} dei poteri ACCESI. Gli effetti visivi si sommano: un eroe con quattro poteri accesi li mostra tutti."""
+        return {s["def"]["id"]: s["rango"] for s in self.poteri if s["attivo"] and s["def"].get("id") is not None}
+
+    def poteri_di_attacco(self, att_id):
+        """Gli id dei poteri accesi che danno l'attacco `att_id` (al rango posseduto). Una mossa che due poteri hanno in comune
+        (Braccio Lama, Frana...) li accende entrambi: la scena ne mostra gli effetti tutti e due."""
+        return [s["def"]["id"] for s in self.poteri
+                if s["attivo"] and any(att_id in ids for r, ids in s["def"].get("attacchi", {}).items() if int(r) <= s["rango"])]
+
+    @staticmethod
+    def _stance_del_potere(slot, sid):
+        d, rango = slot["def"], slot["rango"]
+        appresa = any(sid in ids for r, ids in d.get("stance", {}).items() if int(r) <= rango)
+        return appresa or sid in per_rango(d.get("stance_attivate", {}), rango)
+
+    def poteri_di_stance(self, sid):
+        """Gli id dei poteri accesi che danno la stance `sid` (imparata o auto-attivata, al rango posseduto)."""
+        return [s["def"]["id"] for s in self.poteri if s["attivo"] and self._stance_del_potere(s, sid)]
+
+    def poteri_in_stance(self):
+        """Gli id dei poteri accesi con almeno una delle loro stance IN CORSO (quelle auto-attivate durano quanto il potere)."""
+        vive = {x["def"]["id"] for x in self.stance_attive}
+        return [s["def"]["id"] for s in self.poteri
+                if s["attivo"] and any(self._stance_del_potere(s, sid) for sid in vive)]
+
     def malus_bracci(self):
         """-1 a colpire per ogni braccio con hp in negativo (cumulativo)."""
         return -sum(1 for l in self.hp if l.startswith("braccio") and self.hp[l] < 0)

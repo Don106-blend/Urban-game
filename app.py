@@ -407,9 +407,12 @@ def pannello(p, turno, altro=None):
         # cosa mostrare oltre al corpo: ali (potere Ali), braccia extra (2x2), il corpo che fluttua (stance Volo) e, col rango del
         # potere attivo (0 = spento), l'animazione piu' veloce (Supervelocita': +25% per rango) e braccia e busto piu' grandi
         # (Super Forza: +18,75% per rango, +75% al quarto)
+        # (`poteri` = {id: rango} dei poteri accesi e `stance_poteri` = quelli con una stance in corso: gli effetti visivi di
+        # static/poteri.js, che si sommano)
         "extra": {"ali": p.potere_attivo("Ali"), "braccia": p.potere_attivo("2x2"),
                   "volo": any(x["def"]["nome"] == "Volo" for x in p.stance_attive),
-                  "velocita": p.rango_potere_attivo("Supervelocità"), "forza": p.rango_potere_attivo("Super Forza")},
+                  "velocita": p.rango_potere_attivo("Supervelocità"), "forza": p.rango_potere_attivo("Super Forza"),
+                  "poteri": p.poteri_attivi_rango(), "stance_poteri": p.poteri_in_stance()},
         "risorse": {"azioni": p.azioni, "n_azioni": p.n_azioni,
                     "bonus": p.bonus, "n_bonus": p.n_bonus,
                     "risposte": p.risposte, "n_risposte": p.n_risposte,
@@ -1133,7 +1136,8 @@ class DuelloWeb:
         for r in chi.attiva_potere(slot, DB["attacchi"], DB["stances"], DB["effetti"]):
             self.scriv(r)
         self.evento("potere", i0 + 1, titolo=slot["def"]["nome"], rango=slot["rango"],
-                    desc=slot["def"].get("descrizione", ""), righe=[x["t"] for x in self.log[i0:]])
+                    desc=slot["def"].get("descrizione", ""), righe=[x["t"] for x in self.log[i0:]],
+                    poteri=[slot["def"]["id"]] if slot["attivo"] else [])
         if chi is self.p:
             self.usato_potere = True
         self._spettacolo(chi, "potere")
@@ -1161,7 +1165,8 @@ class DuelloWeb:
         for r in chi.attiva_stance(sdef, avversario, DB["effetti"]):
             self.scriv(r)
         self.evento("stance", i0 + 1, titolo=sdef["nome"], desc=sdef.get("descrizione", ""),
-                    righe=[x["t"] for x in self.log[i0:]])
+                    righe=[x["t"] for x in self.log[i0:]],
+                    poteri=chi.poteri_di_stance(sdef["id"]) if any(x["def"]["id"] == sdef["id"] for x in chi.stance_attive) else [])
         self._spettacolo(chi, "stance")
 
     def usa_attacco(self, att):
@@ -1504,6 +1509,7 @@ class DuelloWeb:
         self._traccia_hp_minimo()
         self.evento(
             "colpo", i0, attaccante=a.nome, difensore=d.nome, info=info_attacco(att),
+            poteri=a.poteri_di_attacco(att.get("id")),       # i poteri accesi che hanno questa mossa: la scena ne mostra gli effetti
             loc=loc, loc_att=loc_attacco, mirata=bool(mirata), split=split,
             colpo=att.get("colpi", 1) - colpi_rimasti + 1, colpi=att.get("colpi", 1),
             tiro_att=ta, skill_att=pend.get("skill"), mod_att=pend.get("mod", 0),

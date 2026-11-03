@@ -18,7 +18,9 @@ const Arena = (() => {
   const DIST = 58;                  // distanza a riposo tra i due bacini (px sprite)
   const BORDO = 14;                 // fascia del pavimento in fondo all'arena (px schermo)
 
+  const PO = typeof Poteri !== "undefined" ? Poteri : null;    // l'aspetto dei poteri (static/poteri.js): senza, il duello e' lo stesso ma senza effetti
   let man = null, parti = null;     // parti.json e i pezzi caricati
+  let pot = null;                   // poteri.json: i pezzi che i poteri sostituiscono (rinforzati, appuntiti), in `parti[nome].rinf` / `.app`
   let asp = null;                   // aspetto.json + sprite di capelli e vestiti + texture dei colori (null = non disponibile)
   const locEstesa = {};             // locazione -> {y0, y1}: righe dello sprite intero che occupa
   const lati = {};                  // "p" | "c" -> combattente
@@ -81,6 +83,21 @@ const Arena = (() => {
       l.y0 = Math.min(l.y0, p.y0); l.y1 = Math.max(l.y1, p.y0 + p.h);
     }
     await caricaAspetto();
+    await caricaPoteri();
+  }
+
+  /* i pezzi che i poteri sostituiscono (static/sprites/maschio/poteri.json): rinforzati (Pelle Invincibile dal rango 3) e appuntiti (Appendici Affilate).
+     Facoltativi: senza, restano il corpo e la pelle in materiale (rango 1-2). */
+  async function caricaPoteri() {
+    try {
+      const m = await (await fetch(BASE + "poteri.json")).json();
+      for (const [tipo, chiave] of [["rinforzato", "rinf"], ["appuntito", "app"]])
+        await Promise.all(Object.entries(m[tipo].pezzi).map(async ([nome, f]) => {
+          const r = await leggi(f);
+          if (r && parti[nome]) parti[nome][chiave] = {w: r.tela.width, h: r.tela.height, px: r.px};
+        }));
+      pot = {margine: m.rinforzato.margine};
+    } catch (e) { pot = null; }
   }
 
   /* capigliature, maglie, pantaloni e le due texture dei colori (static/sprites/maschio/aspetto.json). Senza, i combattenti
@@ -266,7 +283,11 @@ const Arena = (() => {
     if (!lista) return;
     const p = parti[nome], seed = p.loc.length * 31 + p.loc.charCodeAt(p.loc.length - 1) + semeLato(lato);
     const r = f > 0 ? rango(lato, nome, 2) : null;
-    for (const v of lista) coloraIndici(v.tela, v.img, v.rp, {far: v.far, r, q: f, sangue: 0.85 * f, y0: p.y0, seed});
+    const lama = !!(PO && p.app && PO.lama(L, nome));              // l'avambraccio appuntito (Appendici Affilate): la manica non esce dalla sua sagoma
+    for (const v of lista) {
+      coloraIndici(v.tela, v.img, v.rp, {far: v.far, r, q: f, sangue: 0.85 * f, y0: p.y0, seed});
+      if (lama) { const cx = v.tela.getContext("2d"); cx.globalCompositeOperation = "destination-in"; cx.drawImage(L.sagApp[nome], 0, 0); cx.globalCompositeOperation = "source-over"; }
+    }
   }
 
   function disegnaCapelli(lato, prof) {
@@ -335,8 +356,17 @@ const Arena = (() => {
      spariscono e il bordo di quelli che restano e' un orlo di ferita. */
   function disegnaPelle(lato, nome, danno, prof) {
     const L = lati[lato], p = parti[nome], cv = L.tele[nome], cx = cv.getContext("2d");
-    const out = cx.createImageData(p.w, p.h);
     const seed = p.loc.length * 31 + p.loc.charCodeAt(p.loc.length - 1) + semeLato(lato);
+    // i poteri: Pelle Invincibile mette un materiale al posto della pelle (e dal rango 3 un pezzo rinforzato), Appendici Affilate un avambraccio appuntito
+    const rp = PO ? PO.rangoPelle(L, p.loc) : 0, lama = !!(PO && p.app && PO.lama(L, nome)), px = lama ? p.app.px : p.px;
+    L.rinfOn[nome] = rp >= 3 && !!p.rinf && !lama;
+    L.vestOff[nome] = rp >= 3;                                                     // dal rango 3 il potere sostituisce il livello dei vestiti (anche sulla lama)
+    if (rp) {                                                                      // pietra e ossidiana sulla forma di sempre, rinforzata dal rango 3 (senza sangue: la pietra non sanguina)
+      if (L.rinfOn[nome]) PO.coloraMateriale(L.telaR[nome], p.rinf, rp, {y0: p.y0, mx: pot.margine[0], my: pot.margine[1], seme: seed});
+      else PO.coloraMateriale(cv, {w: p.w, h: p.h, px}, rp, {y0: p.y0, seme: seed});
+      return;
+    }
+    const out = cx.createImageData(p.w, p.h);
     const soglia = prof > 0 ? 1 - 0.5 * Math.sqrt(prof) : danno > 0 ? 0.1 + 0.9 * danno : 0;   // (continua con il caso sotto: a 0 hp e' 1)
     const r = prof > 0 ? rango(lato, nome, 0) : null, q = quotaPelle(prof);
     const resta = (x, y) => x >= 0 && y >= 0 && x < p.w && y < p.h && r[y * p.w + x] >= q;
@@ -344,9 +374,9 @@ const Arena = (() => {
     const fz = el > 0 ? fulmine(lato, p.loc) : null;
     for (let y = 0; y < p.h; y++) for (let x = 0; x < p.w; x++) {
       const i = (y * p.w + x) * 4;
-      if (!p.px[i + 3]) continue;
+      if (!px[i + 3]) continue;
       if (r && r[y * p.w + x] < q) continue;                                   // strappata: si vede quello che sta sotto
-      const g = GRIGI[p.px[i]] || "b", wy = y + p.y0;
+      const g = GRIGI[px[i]] || "b", wy = y + p.y0;
       let col = PELLI[lato === "c" ? "c" : "p"][g];       // la pelle viola e' quella della CPU; tutti gli altri hanno la pelle normale
       if (g !== "k" && soglia) {
         const v = 0.7 * vn(x / 3, wy / 3, seed) + 0.3 * hash(x, wy, seed + 7);
@@ -360,8 +390,8 @@ const Arena = (() => {
         }
         if (fz) { const o = fz.get(x + "," + wy); if (o !== undefined && o <= 0.12 + el * 1.25) col = FULMINE[g]; }
       }
-      if (r && ((x > 0 && p.px[i - 4 + 3] && !resta(x - 1, y)) || (x < p.w - 1 && p.px[i + 4 + 3] && !resta(x + 1, y)) ||
-                (y > 0 && p.px[i - p.w * 4 + 3] && !resta(x, y - 1)) || (y < p.h - 1 && p.px[i + p.w * 4 + 3] && !resta(x, y + 1))))
+      if (r && ((x > 0 && px[i - 4 + 3] && !resta(x - 1, y)) || (x < p.w - 1 && px[i + 4 + 3] && !resta(x + 1, y)) ||
+                (y > 0 && px[i - p.w * 4 + 3] && !resta(x, y - 1)) || (y < p.h - 1 && px[i + p.w * 4 + 3] && !resta(x, y + 1))))
         col = BORDO_FERITA;
       out.data.set([col[0], col[1], col[2], 255], i);
     }
@@ -375,9 +405,10 @@ const Arena = (() => {
     if (!(prof > 0) || !p.ca) return;
     const out = cx.createImageData(p.w, p.h), r = rango(lato, nome, 1), q = quotaCarne(prof);
     const resta = (x, y) => x >= 0 && y >= 0 && x < p.w && y < p.h && r[y * p.w + x] >= q;
+    const lama = !!(PO && p.app && PO.lama(lati[lato], nome));      // avambraccio appuntito: la carne non esce dalla sua sagoma
     for (let y = 0; y < p.h; y++) for (let x = 0; x < p.w; x++) {
       const i = (y * p.w + x) * 4;
-      if (!p.ca[i + 3] || r[y * p.w + x] < q) continue;
+      if (!p.ca[i + 3] || r[y * p.w + x] < q || (lama && !p.app.px[i + 3])) continue;
       const bordo = (x > 0 && p.ca[i - 4 + 3] && !resta(x - 1, y)) || (x < p.w - 1 && p.ca[i + 4 + 3] && !resta(x + 1, y)) ||
                     (y > 0 && p.ca[i - p.w * 4 + 3] && !resta(x, y - 1)) || (y < p.h - 1 && p.ca[i + p.w * 4 + 3] && !resta(x, y + 1));
       const f = bordo ? 0.62 : 1;
@@ -387,23 +418,27 @@ const Arena = (() => {
   }
 
   /* silhouette bianca di un pezzo (per il lampo del colpo) */
-  function sagoma(nome) {
-    const p = parti[nome], c = document.createElement("canvas");
-    c.width = p.w; c.height = p.h;
-    const cx = c.getContext("2d"), out = cx.createImageData(p.w, p.h);
-    for (let i = 0; i < p.w * p.h; i++) if (p.px[i * 4 + 3]) out.data.set([255, 255, 255, 255], i * 4);
+  function sagomaDa(img) {                              // img = {w, h, px}: il pezzo base, o uno che lo sostituisce (rinforzato, appuntito)
+    const c = document.createElement("canvas");
+    c.width = img.w; c.height = img.h;
+    const cx = c.getContext("2d"), out = cx.createImageData(img.w, img.h);
+    for (let i = 0; i < img.w * img.h; i++) if (img.px[i * 4 + 3]) out.data.set([255, 255, 255, 255], i * 4);
     cx.putImageData(out, 0, 0);
     return c;
   }
+  const sagoma = (nome) => sagomaDa(parti[nome]);
 
   function costruisci(lato) {
     const pup = new Pupazzo.Pupazzo(man);
     const L = {lato, f: lato === "p" ? 1 : -1, O: 0, pup, acidoVel: {}, tele: {}, carne: {}, rk: {}, sag: {}, chiave: {}, prof: {}, lamp: {}, voci: [], nome: "", vest: {}, capelli: null, cop: null, aspKey: null, tip: {}, dati: {}, acidoVis: {}, acidoObj: {}, fulm: {}, ali: null, extra: {}, tAnim: 0, fasce: {},
-               ko: false, ultimo: null, xNome: 0};
+               ko: false, ultimo: null, xNome: 0,
+               po: null, telaR: {}, sagR: {}, sagApp: {}, rinfOn: {}, vestOff: {}};      // i poteri: stato degli effetti, pezzi rinforzati (tela e sagoma), sagoma dell'avambraccio appuntito, quali pezzi sono rinforzati ora
     for (const [nome, p] of Object.entries(parti)) {
       const c = document.createElement("canvas"); c.width = p.w; c.height = p.h;
       L.tele[nome] = c; L.sag[nome] = sagoma(nome);
       L.carne[nome] = c.cloneNode();
+      if (p.rinf) { L.telaR[nome] = Object.assign(document.createElement("canvas"), {width: p.rinf.w, height: p.rinf.h}); L.sagR[nome] = sagomaDa(p.rinf); }
+      if (p.app) L.sagApp[nome] = sagomaDa(p.app);
     }
     // l'elenco dei pezzi da disegnare: ognuno appeso a un corpo, con lo scarto del suo angolo in alto a sinistra dal
     // centro di massa (a riposo). Il piede e' ritagliato dallo stinco, con qualche riga in comune che nasconde la giuntura.
@@ -619,14 +654,22 @@ const Arena = (() => {
     const C = L.pup.corpi, b = C[v.corpo], [x, y, a] = posaCorpo(b);
     ctx.save();
     ctx.translate(x, y); ctx.rotate(a);
-    const tela_ = L.tele[v.nome], pz = parti[v.nome];
-    if (L.prof[pz.loc] > 0) {                                                 // locazione in negativo: l'interno sotto la pelle
-      if (pz.sk) ctx.drawImage(pz.sk, 0, v.y0, tela_.width, v.h, v.ox, v.oy, tela_.width, v.h);
-      ctx.drawImage(L.carne[v.nome], 0, v.y0, tela_.width, v.h, v.ox, v.oy, tela_.width, v.h);
+    const tela_ = L.tele[v.nome], pz = parti[v.nome], R = L.rinfOn[v.nome] ? pz.rinf : null;
+    // Pelle Invincibile dal rango 3: il pezzo rinforzato (un px in piu' a sinistra e in alto: v. poteri.json) prende il posto di pelle e vestiti;
+    // la sua tela parte da `t0` (se il pezzo e' tagliato, come lo stinco dal piede, si taglia alla stessa riga)
+    const [mx, my] = R ? pot.margine : [0, 0], t0 = R && v.y0 ? v.y0 + my : 0, hh = R ? (v.y0 + v.h >= pz.h ? R.h : v.y0 + v.h + my) - t0 : 0;
+    const dyR = v.oy + t0 - my - v.y0;
+    if (R) ctx.drawImage(L.telaR[v.nome], 0, t0, R.w, hh, v.ox - mx, dyR, R.w, hh);
+    else {
+      if (L.prof[pz.loc] > 0) {                                               // locazione in negativo: l'interno sotto la pelle
+        const sk = pz.app && PO && PO.lama(L, v.nome) ? scheletroLama(pz) : pz.sk;
+        if (sk) ctx.drawImage(sk, 0, v.y0, tela_.width, v.h, v.ox, v.oy, tela_.width, v.h);
+        ctx.drawImage(L.carne[v.nome], 0, v.y0, tela_.width, v.h, v.ox, v.oy, tela_.width, v.h);
+      }
+      ctx.drawImage(tela_, 0, v.y0, tela_.width, v.h, v.ox, v.oy, tela_.width, v.h);
+      const vs = L.vestOff[v.nome] ? null : L.vest[v.nome];                   // sopra pelle e ferite: pantaloni, poi maglia (non dal rango 3 di Pelle Invincibile)
+      if (vs) for (const o of vs) ctx.drawImage(o.tela, 0, v.y0, tela_.width, v.h, v.ox, v.oy, tela_.width, v.h);
     }
-    ctx.drawImage(tela_, 0, v.y0, tela_.width, v.h, v.ox, v.oy, tela_.width, v.h);
-    const vs = L.vest[v.nome];                                                // sopra pelle e ferite: pantaloni, poi maglia
-    if (vs) for (const o of vs) ctx.drawImage(o.tela, 0, v.y0, tela_.width, v.h, v.ox, v.oy, tela_.width, v.h);
     if (v.nome === "testa" && L.capelli && !(L.copCoprePelo && !L.copStacc)) ctx.drawImage(L.capelli.tela, v.ox + L.capelli.off[0], v.oy + L.capelli.off[1]);
     if (v.nome === "testa" && L.cop && !L.copStacc) ctx.drawImage(L.cop.tela, v.ox + L.cop.off[0], v.oy + L.cop.off[1]);      // cappelli e maschere: sopra i capelli
     const fa = L.fasce[v.nome];                                               // la fasciatura (palestra): sopra tutto, tranne il lampo del colpo
@@ -634,9 +677,20 @@ const Arena = (() => {
     const lamp = L.lamp[pz.loc];
     if (lamp > 0) {
       ctx.globalAlpha = Math.min(1, lamp * 2.2);
-      ctx.drawImage(L.sag[v.nome], 0, v.y0, tela_.width, v.h, v.ox, v.oy, tela_.width, v.h);
+      if (R) ctx.drawImage(L.sagR[v.nome], 0, t0, R.w, hh, v.ox - mx, dyR, R.w, hh);
+      else ctx.drawImage(pz.app && PO && PO.lama(L, v.nome) ? L.sagApp[v.nome] : L.sag[v.nome], 0, v.y0, tela_.width, v.h, v.ox, v.oy, tela_.width, v.h);
     }
     ctx.restore();
+  }
+  /* lo scheletro dell'avambraccio appuntito: le ossa della mano di sempre, tagliate alla sagoma della lama (si fa una volta sola) */
+  function scheletroLama(pz) {
+    if (!pz.skApp && pz.sk) {
+      const c = Object.assign(document.createElement("canvas"), {width: pz.w, height: pz.h}), cx = c.getContext("2d");
+      cx.drawImage(pz.sk, 0, 0);
+      cx.globalCompositeOperation = "destination-in"; cx.drawImage(sagomaDa(pz.app), 0, 0);
+      pz.skApp = c;
+    }
+    return pz.skApp || pz.sk;
   }
 
   /* un'ala (vicina o lontana): appesa al busto alto nel punto d'attacco, ruota attorno al perno. In volo batte (angolo = riposo + ampiezza
@@ -731,17 +785,27 @@ const Arena = (() => {
     ctx.restore();
   }
 
+  /* quello che `static/poteri.js` chiede all'arena per disegnare: il contesto (gia' nello spazio di `mondo(L)`), la posa interpolata di un corpo e un
+     giunto dello sprite nel sistema di L */
+  const aiuti = {
+    get ctx() { return ctx; },
+    pos: (L, corpo) => posaCorpo(L.pup.corpi[corpo]),
+    punto: (L, corpo, giunto, interp = true) => puntoCorpo(L, corpo, giunto, interp),
+  };
+
   function disegnaCombattente(L) {
     mondo(L);
     const su = (nome, fn) => { ctx.save(); trasformaForza(L, nome); fn(); ctx.restore(); };
+    if (PO && L.po) PO.dietro(L, aiuti);                                   // sfere e detriti che passano dietro, teschi, neve lontana
     if (L.ali && L.extra.ali) su("busto_sup", () => disegnaAla(L, true));
     for (const v of L.voci) {
       if (L.extra.braccia && v.nome === "braccio_sup_sx") su("braccio_sup_sx", () => disegnaBraccioExtra(L, "sx"));
       if (L.ali && L.extra.ali && v.nome === "busto_sup") su("busto_sup", () => disegnaAla(L, false));
       if (L.extra.braccia && v.nome === "braccio_sup_dx") su("braccio_sup_dx", () => disegnaBraccioExtra(L, "dx"));
       su(v.nome, () => disegnaVoce(L, v));
-      if (L.falda && v.nome === L.falda.pezzo) su("busto_inf", () => disegnaFalda(L));
+      if (L.falda && v.nome === L.falda.pezzo && !L.vestOff.busto_inf) su("busto_inf", () => disegnaFalda(L));    // (il cappotto non c'e' sotto la corazza)
     }
+    if (PO && L.po) { mondo(L); PO.davanti(L, aiuti); }                    // campo di forza, sfere davanti, aure, fulmini, neve vicina
   }
 
   /* ombra sul pavimento: sotto i piedi, piu' piccola e chiara quando il corpo si alza; larga da morti */
@@ -769,6 +833,7 @@ const Arena = (() => {
   function disegnaProiettili() {
     ctx.setTransform(S * dpr, 0, 0, S * dpr, (scossa.a > 0.01 ? scossa.x * dpr : 0), (pavY - 111 * S + (scossa.a > 0.01 ? scossa.y : 0)) * dpr);
     for (const q of proiettili) {
+      if (q.tipo === "onda" && PO) { PO.disegnaOnda(ctx, q); continue; }       // super urlo: onde soniche al posto del proiettile
       ctx.fillStyle = q.col;
       q.scia.forEach((p, i) => { ctx.globalAlpha = (i + 1) / (q.scia.length + 2) * 0.55; ctx.fillRect(p[0] - 1, p[1] - 1, 2, 2); });
       ctx.globalAlpha = 0.3; ctx.fillRect(q.x - 3, q.y - 2.5, 6, 5);                   // alone
@@ -890,6 +955,7 @@ const Arena = (() => {
       for (const [b, x, y, a] of prima) { b.px = x; b.py = y; b.pa = a; }
     }
     L.tAnim += DT * (1 + VEL_RANGO * (L.extra.velocita || 0));
+    if (PO && L.po) PO.passo(L, aiuti);                      // i poteri: effetti a mossa, braci, teschi, neve
     // la falda del cappotto e' appesa al busto basso come un pendolo smorzato: quando il corpo va avanti si scosta all'indietro, quando si ferma ondeggia
     if (L.falda) {
       const f = L.falda, b = L.pup.corpi[f.pezzo], vl = b.vx || 0, aw = b.w || 0;
@@ -970,6 +1036,8 @@ const Arena = (() => {
   function avviaScambio(ev) {
     const att = lati[ev.chi === "p" ? "p" : "c"], dif = lati[ev.chi === "p" ? "c" : "p"];
     const par = parametri(ev);
+    if (PO) PO.mossa(att, ev.poteri, 1.2);                                 // una mossa di questi poteri: si accendono le aure "a mossa" (Assorbi, Anatema, Super Soldato)
+    const urlo = !!(PO && par.dist && (ev.poteri || []).includes(PO.ID.URLO));      // le mosse di super urlo sono onde soniche
     const colpito = ev.esito === "colpito", parato = ev.esito === "parato";
     const locB = ev.split ? "busto" : (colpito ? ev.loc : (ev.loc_att || ev.loc || "busto"));
     const forza = colpito ? Math.max(0.06, (ev.hp_persi || 0) / 90) : 0;
@@ -1022,9 +1090,10 @@ const Arena = (() => {
     } else {
       // a distanza: al rilascio parte un proiettile, che arriva dopo un tempo di volo
       o.alColpoInizio = () => {
-        const da = aMondo(att, forzaPunto(att, "braccio_dx", att.pup._polso(o.mano))), a = aMondo(dif, davanti());
-        const dx = a[0] - da[0], dy = a[1] - da[1], d = Math.hypot(dx, dy), vel = 650, tv = Math.max(0.11, d / vel);
-        proiettili.push({x: da[0], y: da[1], vx: dx / tv, vy: dy / tv, t: tv, col: COLORI_PROIETTILE[ev.tipo_danno] || "#cfd6e0", scia: []});
+        const bocca = att.pup.corpi.testa;                      // il grido parte dalla bocca, il resto dalla mano
+        const da = urlo ? aMondo(att, [bocca.x + 7, bocca.y + 2]) : aMondo(att, forzaPunto(att, "braccio_dx", att.pup._polso(o.mano))), a = aMondo(dif, davanti());
+        const dx = a[0] - da[0], dy = a[1] - da[1], d = Math.hypot(dx, dy), vel = urlo ? 230 : 650, tv = Math.max(urlo ? 0.34 : 0.11, d / vel);   // (le onde viaggiano piano: si vedono)
+        proiettili.push({x: da[0], y: da[1], vx: dx / tv, vy: dy / tv, t: tv, t0: tv, tipo: urlo ? "onda" : null, col: COLORI_PROIETTILE[ev.tipo_danno] || "#cfd6e0", scia: []});
         att.pup.spingiTutto(-45, 0);
         for (let i = 0; i < 5; i++) particella({x: da[0], y: da[1], vx: att.f * (60 + Math.random() * 160), vy: (Math.random() - 0.5) * 120, s: 1,
                                                 vita: 0.2, fade: 0.1, col: COLORI_PROIETTILE[ev.tipo_danno] || "#fff", g: 0});
@@ -1071,6 +1140,7 @@ const Arena = (() => {
     L.nome = pg.nome;
     const chiaveAsp = JSON.stringify(pg.aspetto || null);
     if (L.aspKey !== chiaveAsp) { L.aspKey = chiaveAsp; applicaAspetto(lato, pg.aspetto); L.chiave = {}; }
+    if (PO) PO.aggiorna(L, inPalestra ? null : pg);                // i poteri accesi (e dove la pelle e' ancora corazzata): prima dei pezzi, che ne dipendono
     for (const [nome, p] of Object.entries(parti)) {
       const h = pg.hp[p.loc];
       if (inPalestra) {                                                     // niente sangue: si vede la fasciatura (le protesi non hanno ferite)
@@ -1089,7 +1159,7 @@ const Arena = (() => {
       // texture per tipo di danno: frazione degli hp massimi tolta da fuoco, acido, fulmine (il sangue rosso e' il resto)
       const ti = (h && h.tipi) || {}, fr = (t) => h && !h.protesi ? Math.min(1, (ti[t] || 0) / h.max) : 0;
       const fu = fr("fuoco"), ac = fr("acido"), el = fr("elettrico"), rosso = prof > 0 ? danno : Math.max(0, danno - fu - ac - el);
-      const chiave = rosso + "|" + prof + "|" + fu + "|" + ac + "|" + el;
+      const chiave = rosso + "|" + prof + "|" + fu + "|" + ac + "|" + el + "|" + (PO ? PO.chiave(L, p.loc, nome) : "");
       if (L.chiave[nome] !== chiave) {
         L.chiave[nome] = chiave; L.prof[p.loc] = prof; L.dati[nome] = [rosso, prof];
         if (L.acidoObj[p.loc] !== ac) {
@@ -1171,6 +1241,7 @@ const Arena = (() => {
       att.pup.gesto("mira", {bersaglio: davanti});
     } else if (ev.tipo === "potere" || ev.tipo === "stance") {
       att.pup.gesto(ev.tipo);
+      if (PO) PO.mossa(att, ev.poteri, 1.6);                      // la stance (o il potere) si vede subito: aure "a mossa" accese un po'
       const c = ev.tipo === "potere" ? "#b86bff" : "#7be0ff";
       futuro(0.3, () => {
         const x = att.O + att.f * att.pup.corpi.busto_sup.x;

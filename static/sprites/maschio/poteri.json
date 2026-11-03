@@ -1,0 +1,29 @@
+{
+  "nota": "Pezzi che i poteri sostituiscono (sorgente: tools/sprites/maschio_poteri.px.js, doc: STILE_SPRITE.md sez. 18). Si leggono in static/arena.js.",
+  "cucitura": 70,
+  "rinforzato": {
+    "potere": "Pelle Invincibile, dal rango 3",
+    "margine": [1, 1],
+    "pezzi": {
+      "testa": "rinf_testa.png",
+      "busto_sup": "rinf_busto_sup.png",
+      "busto_inf": "rinf_busto_inf.png",
+      "braccio_sup_dx": "rinf_braccio_sup_dx.png",
+      "braccio_sup_sx": "rinf_braccio_sup_sx.png",
+      "avambraccio_dx": "rinf_avambraccio_dx.png",
+      "avambraccio_sx": "rinf_avambraccio_sx.png",
+      "coscia_dx": "rinf_coscia_dx.png",
+      "coscia_sx": "rinf_coscia_sx.png",
+      "stinco_dx": "rinf_stinco_dx.png",
+      "stinco_sx": "rinf_stinco_sx.png"
+    }
+  },
+  "appuntito": {
+    "potere": "Appendici Affilate",
+    "margine": [0, 0],
+    "pezzi": {
+      "avambraccio_dx": "app_avambraccio_dx.png",
+      "avambraccio_sx": "app_avambraccio_sx.png"
+    }
+  }
+}
