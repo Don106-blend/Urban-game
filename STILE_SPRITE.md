@@ -640,6 +640,17 @@ a quei ranghi l'effetto resta acceso finche' il potere lo e'. `poteri.js` tiene 
 - **Onde soniche**: `avviaScambio` riconosce una mossa a distanza con `poteri` che contiene Super Urlo e al posto del proiettile lancia un'onda (`tipo: "onda"`, 0,34 s di volo, parte dalla bocca).
 - Chi cade (`L.ko`) o muore non ha piu' effetti. Nella palestra (`applicaPg(..., inPalestra)`) non ci sono poteri accesi: nessun effetto.
 
+### Rifiniture (regole di mestiere, da non perdere)
+- **Luce additiva.** Aloni e aure si disegnano con `globalCompositeOperation = "lighter"` (`disegnaSprite(..., luce = true)`): un alone semitrasparente "normale" su fondo scuro sporca, quello additivo illumina. Gli aloni hanno 5 gradini che
+  calano piano (niente bordo netto).
+- **Dissolvenze.** Un potere appena acceso compare in ~0,3 s (le orbite partono strette e si allargano), uno spento svanisce in ~0,2 s: `po.vis[id]` (0..1), `po.eff` = acceso + in uscita (e' quello che leggono gli effetti; `po.ids` resta
+  lo stato vero). A inizio duello i poteri gia' accesi ci sono subito. Un effetto disegna con `FADE` (la moltiplicano tutte le primitive).
+- **Sfere.** Il fuoco ha una lingua di fiamma che ondeggia su 3 fotogrammi e una scia di braci che si spengono salendo; acqua e acido hanno fondo scuro, riflesso a mezzaluna e una scia di gocce. Il flusso di rango 4 ha perle luminose ogni tanto.
+  Quello che passa dietro al corpo e' piu' scuro (0,68).
+- **Rocce.** 8 forme con contorno, luce in alto a sinistra e ombra in basso a destra, dalla grossa al sassolino.
+- **Materiali vivi.** Lava (rango 3) e cristalli (rango 4) si ridisegnano ogni 8 passi con una `fase` nuova (`aiuti.rinfresca` in `arena.js`): la lava respira lungo le vene, i cristalli scintillano. Pietra e ossidiana restano fisse.
+- **Campo di forza.** Oltre all'orlo e ai riflessi ha un reticolo a nido d'ape che si accende a caso e un anello a terra.
+
 ### Per aggiungere o ritoccare
 - Un effetto nuovo: una funzione in `poteri.js` (stato in `L.po`, passo in `passo`, disegno in `dietro`/`davanti`), l'id in `ID` (il test controlla il nome in `powers.json`) e una riga nel test, blocco 4.
 - Provarlo nel laboratorio (`tools/lab/arena.html`, v. sez. 10): `pg(nome, hp, crippled, aspetto, extra, tipi, arm)` con `extra = {poteri: {id: rango}, stance_poteri: [id]}` e `arm = {locazione: armatura}`,

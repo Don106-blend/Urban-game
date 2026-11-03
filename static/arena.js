@@ -362,8 +362,8 @@ const Arena = (() => {
     L.rinfOn[nome] = rp >= 3 && !!p.rinf && !lama;
     L.vestOff[nome] = rp >= 3;                                                     // dal rango 3 il potere sostituisce il livello dei vestiti (anche sulla lama)
     if (rp) {                                                                      // pietra e ossidiana sulla forma di sempre, rinforzata dal rango 3 (senza sangue: la pietra non sanguina)
-      if (L.rinfOn[nome]) PO.coloraMateriale(L.telaR[nome], p.rinf, rp, {y0: p.y0, mx: pot.margine[0], my: pot.margine[1], seme: seed});
-      else PO.coloraMateriale(cv, {w: p.w, h: p.h, px}, rp, {y0: p.y0, seme: seed});
+      if (L.rinfOn[nome]) PO.coloraMateriale(L.telaR[nome], p.rinf, rp, {y0: p.y0, mx: pot.margine[0], my: pot.margine[1], seme: seed, fase: L.faseMat || 0});
+      else PO.coloraMateriale(cv, {w: p.w, h: p.h, px}, rp, {y0: p.y0, seme: seed, fase: L.faseMat || 0});
       return;
     }
     const out = cx.createImageData(p.w, p.h);
@@ -791,6 +791,10 @@ const Arena = (() => {
     get ctx() { return ctx; },
     pos: (L, corpo) => posaCorpo(L.pup.corpi[corpo]),
     punto: (L, corpo, giunto, interp = true) => puntoCorpo(L, corpo, giunto, interp),
+    rinfresca(L, fase) {                                    // lava che pulsa e cristalli che scintillano: i pezzi di rango 3-4 si ridisegnano con una fase nuova
+      L.faseMat = fase;
+      for (const [nome, p] of Object.entries(parti)) if (L.dati[nome] && PO.rangoPelle(L, p.loc) >= 3) disegnaPelle(L.lato, nome, L.dati[nome][0], L.dati[nome][1]);
+    },
   };
 
   function disegnaCombattente(L) {

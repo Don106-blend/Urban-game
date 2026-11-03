@@ -756,7 +756,16 @@ for (const forza of [0.1, 0.7, 1.6]) {
   const L4 = nuovoL({"19": 1}); passi(L4, 60);
   ok(L4.po.teschi.length === 1 && L4.po.neve === null, "necromanzia rango 1: un teschio, e senza criocinesi niente neve");
   Poteri.aggiorna(L3, {extra: {poteri: {}}, hp: hp({})}); passi(L3, 2);
-  ok(L3.po.teschi.length === 0 && L3.po.neve === null, "spenti i poteri spariscono teschi e neve");
+  ok(L3.po.teschi.length === 3 && L3.po.vis[19] < 1 && L3.po.vis[19] > 0.5, "spenti, i poteri non spariscono di colpo: svaniscono");
+  passi(L3, 90);
+  ok(L3.po.teschi.length === 0 && L3.po.neve === null && Object.keys(L3.po.eff).length === 0, "...e dopo un attimo spariscono teschi e neve");
+  Poteri.aggiorna(L3, {extra: {poteri: {"3": 2}}, hp: hp({})});
+  ok(L3.po.vis[3] === 0, "un potere appena acceso parte da zero");
+  passi(L3, 6);
+  ok(L3.po.vis[3] > 0.1 && L3.po.vis[3] < 0.7, "...e compare piano");
+  passi(L3, 120);
+  ok(L3.po.vis[3] > 0.97, "...fino a pieno");
+  const L7 = nuovoL({"3": 2}); ok(L7.po.vis[3] === 1, "all'inizio del duello i poteri gia' accesi ci sono subito");
 
   // ---- il disegno gira senza errori con tutti i poteri insieme (e non disegna niente senza poteri o da morti)
   const tutti = Object.fromEntries(Object.values(ID).map((id) => [id, 4]));
