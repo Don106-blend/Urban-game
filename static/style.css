@@ -282,6 +282,12 @@ a.fighter-card:hover { transform: translateY(-3px); border-color: var(--volt); }
                   border-radius: 6px; background: rgba(215, 255, 62, .08); }
 .corner-player .pan-loc.mirato { outline-color: var(--danger);
                                  background: rgba(255, 70, 85, .08); }
+/* la riga della parte del corpo sotto il mirino (si accende mentre si mira sull'arena) */
+.pan-loc.sotto-mirino { outline: 2px solid var(--danger); outline-offset: 2px; border-radius: 6px; background: rgba(255, 70, 85, .16); }
+.mira-guida { grid-column: 1 / -1; display: flex; gap: 12px; align-items: center; padding: 12px 14px; border: 1px dashed var(--danger); border-radius: 10px; }
+.mira-guida .mira-icona { font-size: 28px; line-height: 1; color: var(--danger); }
+.mira-guida b { display: block; font-size: 14px; }
+.mira-guida .muted { display: block; font-size: 12px; margin-top: 2px; }
 .pan-loc .val { text-align: right; font-variant-numeric: tabular-nums; }
 .pan-risorse { display: flex; gap: 10px; font-size: 12px; margin-top: 10px; flex-wrap: wrap; }
 .pan-risorse span { background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; }

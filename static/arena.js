@@ -20,6 +20,7 @@ const Arena = (() => {
 
   const PO = typeof Poteri !== "undefined" ? Poteri : null;    // l'aspetto dei poteri (static/poteri.js): senza, il duello e' lo stesso ma senza effetti
   let man = null, parti = null;     // parti.json e i pezzi caricati
+  let ring = null;                  // lo sfondo del ring (static/sprites/ring): {sfondo, luci} = immagini, null = non disponibile (resta il fondale a gradiente)
   let pot = null;                   // poteri.json: i pezzi che i poteri sostituiscono (rinforzati, appuntiti), in `parti[nome].rinf` / `.app`
   let asp = null;                   // aspetto.json + sprite di capelli e vestiti + texture dei colori (null = non disponibile)
   const locEstesa = {};             // locazione -> {y0, y1}: righe dello sprite intero che occupa
@@ -38,6 +39,8 @@ const Arena = (() => {
   let vittoria = null;              // fine del duello: {lato, tipo, avviata}; chi vince esulta quando gli scambi sono finiti
   let colori = {};
   let ultimoStato = null;
+  let sagome = null, locSag = null; // "modo sagome": disegnaCombattente disegna sagome piatte al posto del corpo (per il mirino); locSag = locazione forzata (braccia extra)
+  const mira = {attiva: false, lato: "c", cb: null, mx: 0, my: 0, dentro: false, hover: null, locs: [], pick: null, pickCtx: null};
   let luogo = null;                 // lo sfondo del duello (St.luogo): null = l'arena con la folla, "vicolo" = l'imboscata
 
   const hash = (x, y, s) => {
@@ -84,6 +87,14 @@ const Arena = (() => {
     }
     await caricaAspetto();
     await caricaPoteri();
+    await caricaRing();
+  }
+
+  /* lo sfondo del ring: due immagini (v. tools/sprites/ring_sfondo.px.js): il muro con corde, tribune e neon, e le luci (additive) */
+  async function caricaRing() {
+    const img = (f) => new Promise(res => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = "/static/sprites/ring/" + f; });
+    const [sfondo, luci] = await Promise.all([img("ring_sfondo.png"), img("ring_luci.png")]);
+    ring = sfondo ? {sfondo, luci} : null;
   }
 
   /* i pezzi che i poteri sostituiscono (static/sprites/maschio/poteri.json): rinforzati (Pelle Invincibile dal rango 3) e appuntiti (Appendici Affilate).
@@ -432,7 +443,7 @@ const Arena = (() => {
     const pup = new Pupazzo.Pupazzo(man);
     const L = {lato, f: lato === "p" ? 1 : -1, O: 0, pup, acidoVel: {}, tele: {}, carne: {}, rk: {}, sag: {}, chiave: {}, prof: {}, lamp: {}, voci: [], nome: "", vest: {}, capelli: null, cop: null, aspKey: null, tip: {}, dati: {}, acidoVis: {}, acidoObj: {}, fulm: {}, ali: null, extra: {}, tAnim: 0, fasce: {},
                ko: false, ultimo: null, xNome: 0,
-               po: null, telaR: {}, sagR: {}, sagApp: {}, rinfOn: {}, vestOff: {}};      // i poteri: stato degli effetti, pezzi rinforzati (tela e sagoma), sagoma dell'avambraccio appuntito, quali pezzi sono rinforzati ora
+               po: null, telaR: {}, sagR: {}, sagApp: {}, rinfOn: {}, vestOff: {}, locEx: {}};      // i poteri: stato degli effetti, pezzi rinforzati (tela e sagoma), sagoma dell'avambraccio appuntito, quali pezzi sono rinforzati ora
     for (const [nome, p] of Object.entries(parti)) {
       const c = document.createElement("canvas"); c.width = p.w; c.height = p.h;
       L.tele[nome] = c; L.sag[nome] = sagoma(nome);
@@ -499,13 +510,74 @@ const Arena = (() => {
   /* disegno */
   const lerp = (a, b, k) => a + (b - a) * k;
 
+  /* Il fondale del ring: l'immagine posata col bordo basso sulla linea dei piedi a scala intera (ripetuta specchiata se l'arena e' piu' larga),
+     poi il pavimento (il tappeto del ring) sotto la linea. Le luci si disegnano dopo la folla (`disegnaLuciRing`). Senza immagini: il vecchio
+     gradiente. */
   function disegnaFondale() {
-    const g = ctx.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, "#1a1e27"); g.addColorStop(0.7, "#0e1013");
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = "#08090b"; ctx.fillRect(0, pavY, W, H - pavY);
-    ctx.fillStyle = colori.line; ctx.fillRect(0, pavY, W, 1);
+    if (!ring) {
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, "#1a1e27"); g.addColorStop(0.7, "#0e1013");
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = "#08090b"; ctx.fillRect(0, pavY, W, H - pavY);
+      ctx.fillStyle = colori.line; ctx.fillRect(0, pavY, W, 1);
+      return;
+    }
+    const im = ring.sfondo, w = im.width * S, h = im.height * S, y0 = pavY - h;
+    if (y0 > 0) { ctx.fillStyle = "#080a0f"; ctx.fillRect(0, 0, W, Math.ceil(y0)); }                 // piu' alto dell'immagine: il buio del soffitto
+    const x0 = Math.round((W - w) / 2), m = Math.ceil(Math.max(0, x0) / w);
+    for (let t = -m; t <= m; t++) {                                                                   // la tela centrale, poi le copie specchiate a destra e a sinistra
+      const x = x0 + t * w;
+      if (x >= W || x + w <= 0) continue;
+      if (t % 2) { ctx.save(); ctx.translate(x + w, 0); ctx.scale(-1, 1); ctx.drawImage(im, 0, y0, w, h); ctx.restore(); }
+      else ctx.drawImage(im, x, y0, w, h);
+    }
+    // il pavimento: il tappeto del ring, con una riga chiara al bordo e le assi
+    const u = Math.max(1, Math.round(S)), fh = H - pavY;
+    ctx.fillStyle = "#0b0d13"; ctx.fillRect(0, pavY, W, fh);
+    ctx.fillStyle = "#2a3350"; ctx.fillRect(0, pavY, W, u);
+    ctx.fillStyle = "#151a28"; ctx.fillRect(0, pavY + u, W, Math.max(1, Math.floor(fh / 3)));
+    ctx.fillStyle = "#10131c";
+    for (let x = 0; x < W; x += 14 * u) ctx.fillRect(x, pavY + u, u, fh - u);
+    ctx.fillStyle = "#7a1f2c"; ctx.fillRect(0, H - Math.max(2, u), W, Math.max(2, u));                // il bordo rosso del tappeto
+  }
+
+  /* le luci del ring (coni delle lampade, aloni dei neon): additive, sfarfallano piano e ogni tanto un neon salta */
+  function disegnaLuciRing() {
+    if (!ring || !ring.luci) return;
+    const im = ring.luci, w = im.width * S, h = im.height * S, y0 = pavY - h, t = performance.now() / 1000;
+    const x0 = Math.round((W - w) / 2), m = Math.ceil(Math.max(0, x0) / w);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.globalCompositeOperation = "lighter";
+    ctx.globalAlpha = 0.2 + 0.025 * Math.sin(t * 6.3) + 0.015 * Math.sin(t * 17) - (hash(Math.floor(t * 9), 7, 19) > 0.965 ? 0.1 : 0);
+    for (let k = -m; k <= m; k++) {
+      const x = x0 + k * w;
+      if (x >= W || x + w <= 0) continue;
+      if (k % 2) { ctx.save(); ctx.translate(x + w, 0); ctx.scale(-1, 1); ctx.drawImage(im, 0, y0, w, h); ctx.restore(); }
+      else ctx.drawImage(im, x, y0, w, h);
+    }
+    ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
+  }
+
+  /* i montanti degli angoli del ring: due pali imbottiti ai bordi dell'arena, dietro ai combattenti (le corde dello sfondo ci passano davanti) */
+  function disegnaPali() {
+    if (!ring) return;
+    const u = Math.max(1, Math.round(S)), h = 104 * S, w = 7 * u;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    for (const x of [1 * u, W - 8 * u]) {
+      ctx.fillStyle = "#0a0c12"; ctx.fillRect(x - u, pavY - h - u, w + 2 * u, h + u);
+      ctx.fillStyle = "#3a4258"; ctx.fillRect(x, pavY - h, w, h);                                     // il palo d'acciaio
+      ctx.fillStyle = "#586079"; ctx.fillRect(x, pavY - h, u, h);
+      ctx.fillStyle = "#262c3f"; ctx.fillRect(x + w - u, pavY - h, u, h);
+      for (const yy of [86, 112, 138]) {                                                              // le fascette dove si attaccano le corde (stesse quote dello sfondo)
+        const y = pavY - (160 - yy) * S - u;
+        ctx.fillStyle = "#b82e3c"; ctx.fillRect(x - u, y, w + 2 * u, 5 * u);
+        ctx.fillStyle = "#ff4655"; ctx.fillRect(x - u, y, w + 2 * u, u);
+        ctx.fillStyle = "#681c26"; ctx.fillRect(x - u, y + 4 * u, w + 2 * u, u);
+      }
+      ctx.fillStyle = "#681c26"; ctx.fillRect(x - u, pavY - 26 * S, w + 2 * u, 26 * S);              // il cuscino imbottito in basso
+      ctx.fillStyle = "#b82e3c"; ctx.fillRect(x - u, pavY - 26 * S, u, 26 * S);
+    }
   }
 
   /* La folla, in alto e dietro i combattenti: due file di sagome. Tifano (braccia alzate, saltelli) per chi il tifo premia, siedono
@@ -653,12 +725,23 @@ const Arena = (() => {
   function disegnaVoce(L, v) {
     const C = L.pup.corpi, b = C[v.corpo], [x, y, a] = posaCorpo(b);
     ctx.save();
+    if (sagome && sagome.off) ctx.translate(sagome.off[0], sagome.off[1]);
     ctx.translate(x, y); ctx.rotate(a);
     const tela_ = L.tele[v.nome], pz = parti[v.nome], R = L.rinfOn[v.nome] ? pz.rinf : null;
     // Pelle Invincibile dal rango 3: il pezzo rinforzato (un px in piu' a sinistra e in alto: v. poteri.json) prende il posto di pelle e vestiti;
     // la sua tela parte da `t0` (se il pezzo e' tagliato, come lo stinco dal piede, si taglia alla stessa riga)
     const [mx, my] = R ? pot.margine : [0, 0], t0 = R && v.y0 ? v.y0 + my : 0, hh = R ? (v.y0 + v.h >= pz.h ? R.h : v.y0 + v.h + my) - t0 : 0;
     const dyR = v.oy + t0 - my - v.y0;
+    if (sagome) {                                                               // mirino: la sagoma piatta della locazione (stessa forma di quello che si vede), niente vestiti ne' ferite
+      const col = sagome.col(locSag || pz.loc);
+      if (col) {
+        const sg = tinta(R ? L.sagR[v.nome] : pz.app && PO && PO.lama(L, v.nome) ? L.sagApp[v.nome] : L.sag[v.nome], col);
+        if (R) ctx.drawImage(sg, 0, t0, R.w, hh, v.ox - mx, dyR, R.w, hh);
+        else ctx.drawImage(sg, 0, v.y0, tela_.width, v.h, v.ox, v.oy, tela_.width, v.h);
+      }
+      ctx.restore();
+      return;
+    }
     if (R) ctx.drawImage(L.telaR[v.nome], 0, t0, R.w, hh, v.ox - mx, dyR, R.w, hh);
     else {
       if (L.prof[pz.loc] > 0) {                                               // locazione in negativo: l'interno sotto la pelle
@@ -706,10 +789,13 @@ const Arena = (() => {
     const batte = -0.75 + 0.62 * Math.sin(t) + (lontana ? 0.18 : 0);
     const ang = riposo + (batte - riposo) * vola;
     ctx.save();
+    if (sagome && sagome.off) ctx.translate(sagome.off[0], sagome.off[1]);
     ctx.translate(x, y); ctx.rotate(a);
     ctx.translate(v.ox + al.att.punto[0] + (lontana ? 1 : 0), v.oy + al.att.punto[1] + (lontana ? -1 : 0));
     ctx.rotate(ang);
-    ctx.drawImage(lontana ? al.lontana : al.vicina, -al.perno[0], -al.perno[1]);
+    const img = lontana ? al.lontana : al.vicina, col = sagome && sagome.col(lontana ? L.locEx.alaSx : L.locEx.alaDx);
+    if (!sagome) ctx.drawImage(img, -al.perno[0], -al.perno[1]);
+    else if (col) ctx.drawImage(tinta(img, col), -al.perno[0], -al.perno[1]);        // (le ali sono locazioni a se': ala_dx e ala_sx)
     ctx.restore();
   }
 
@@ -724,7 +810,10 @@ const Arena = (() => {
     const lontana = lato === "sx";
     ctx.save();
     ctx.translate(Sx, Sy + (lontana ? 7 : 9)); ctx.rotate(lontana ? 0.5 : 0.62); ctx.translate(-Sx, -Sy);
+    const prima = locSag;
+    locSag = lontana ? L.locEx.brSx : L.locEx.brDx;                              // nel mirino le braccia extra sono la loro locazione ("Secondo braccio ...")
     disegnaVoce(L, vs); disegnaVoce(L, va);
+    locSag = prima;
     ctx.restore();
   }
 
@@ -800,16 +889,16 @@ const Arena = (() => {
   function disegnaCombattente(L) {
     mondo(L);
     const su = (nome, fn) => { ctx.save(); trasformaForza(L, nome); fn(); ctx.restore(); };
-    if (PO && L.po) PO.dietro(L, aiuti);                                   // sfere e detriti che passano dietro, teschi, neve lontana
+    if (!sagome && PO && L.po) PO.dietro(L, aiuti);                        // sfere e detriti che passano dietro, teschi, neve lontana
     if (L.ali && L.extra.ali) su("busto_sup", () => disegnaAla(L, true));
     for (const v of L.voci) {
       if (L.extra.braccia && v.nome === "braccio_sup_sx") su("braccio_sup_sx", () => disegnaBraccioExtra(L, "sx"));
       if (L.ali && L.extra.ali && v.nome === "busto_sup") su("busto_sup", () => disegnaAla(L, false));
       if (L.extra.braccia && v.nome === "braccio_sup_dx") su("braccio_sup_dx", () => disegnaBraccioExtra(L, "dx"));
       su(v.nome, () => disegnaVoce(L, v));
-      if (L.falda && v.nome === L.falda.pezzo && !L.vestOff.busto_inf) su("busto_inf", () => disegnaFalda(L));    // (il cappotto non c'e' sotto la corazza)
+      if (L.falda && v.nome === L.falda.pezzo && !L.vestOff.busto_inf && !sagome) su("busto_inf", () => disegnaFalda(L));    // (il cappotto non c'e' sotto la corazza)
     }
-    if (PO && L.po) { mondo(L); PO.davanti(L, aiuti); }                    // campo di forza, sfere davanti, aure, fulmini, neve vicina
+    if (!sagome && PO && L.po) { mondo(L); PO.davanti(L, aiuti); }         // campo di forza, sfere davanti, aure, fulmini, neve vicina
   }
 
   /* ombra sul pavimento: sotto i piedi, piu' piccola e chiara quando il corpo si alza; larga da morti */
@@ -863,16 +952,138 @@ const Arena = (() => {
   function disegna() {
     if (!ctx || !lati.p) return;
     if (luogo === "vicolo") disegnaVicolo();      // il duello mortale: un vicolo, senza pubblico
-    else { disegnaFondale(); disegnaFolla(); }
+    else { disegnaFondale(); disegnaPali(); disegnaFolla(); disegnaLuciRing(); }
     for (const L of Object.values(lati)) disegnaOmbra(L);
     disegnaParticelle();
-    // chi e' in piedi dietro, chi e' caduto davanti non conta: si disegna prima la CPU, poi il giocatore
-    disegnaCombattente(lati.c); disegnaCombattente(lati.p);
+    if (mira.attiva && lati[mira.lato]) disegnaConMirino();
+    else {
+      // chi e' in piedi dietro, chi e' caduto davanti non conta: si disegna prima la CPU, poi il giocatore
+      disegnaCombattente(lati.c); disegnaCombattente(lati.p);
+    }
     for (const L of Object.values(lati)) disegnaCopStacc(L);
     disegnaProiettili();
     for (const L of Object.values(lati)) L.xNome = L.pup.corpi.busto_inf.x;
     disegnaNomi();
+    if (mira.attiva) disegnaMirino();
   }
+
+  /* ---------------------------------------------------------------------------------------------------- */
+  /* IL MIRINO (alla Fallout VATS): con "Mira" il cursore diventa un mirino, la scena si scurisce tranne l'avversario (contorno ambra) e la parte del
+     suo corpo sotto il mirino si accende di rosso; un clic la sceglie. Per sapere cosa c'e' sotto il cursore si ridisegna il bersaglio su una tela
+     nascosta in "modo sagome" (lo stesso disegno del corpo, con Super Forza, ali e braccia extra, ma ogni locazione di un colore) e si legge il
+     pixel: niente geometria da rifare. */
+  const tinte = new WeakMap();
+  function tinta(cv, col) {                                      // una copia piatta di una sagoma bianca, nel colore `col` (in cache)
+    let m = tinte.get(cv);
+    if (!m) tinte.set(cv, m = {});
+    if (!m[col]) {
+      const c = Object.assign(document.createElement("canvas"), {width: cv.width, height: cv.height}), x = c.getContext("2d");
+      x.drawImage(cv, 0, 0);
+      x.globalCompositeOperation = "source-in"; x.fillStyle = col; x.fillRect(0, 0, c.width, c.height);
+      m[col] = c;
+    }
+    return m[col];
+  }
+  function renderSagome(L, col, dest, off) {                    // disegna le sagome di L su `dest` (un contesto): col(loc) = colore o null
+    const c0 = ctx;
+    ctx = dest; sagome = {col, off};
+    try { disegnaCombattente(L); } finally { ctx = c0; sagome = null; }
+  }
+  const locMira = () => { const st = ultimoStato && (mira.lato === "c" ? ultimoStato.cpu : ultimoStato.player); return st ? Object.keys(st.hp) : []; };
+
+  /* quale locazione del bersaglio sta sotto il cursore (null = nessuna): il pixel esatto, altrimenti la sagoma piu' vicina entro ~1,2 pixel di sprite
+     (gli arti sono sottili: il mirino perdona) */
+  function sottoMirino() {
+    const L = lati[mira.lato];
+    if (!L || !mira.dentro || !tela) return null;
+    if (!mira.pick || mira.pick.width !== tela.width || mira.pick.height !== tela.height) {
+      mira.pick = Object.assign(document.createElement("canvas"), {width: tela.width, height: tela.height});
+      mira.pickCtx = mira.pick.getContext("2d", {willReadFrequently: true});
+    }
+    const pc = mira.pickCtx;
+    pc.setTransform(1, 0, 0, 1, 0, 0); pc.imageSmoothingEnabled = false; pc.clearRect(0, 0, mira.pick.width, mira.pick.height);
+    mira.locs = locMira();
+    renderSagome(L, (loc) => { const i = mira.locs.indexOf(loc); return i < 0 ? null : `rgb(${(i + 1) * 16},0,0)`; }, pc);
+    const r = Math.max(2, Math.round(1.2 * S * dpr)), cx = Math.round(mira.mx * dpr), cy = Math.round(mira.my * dpr);
+    const x0 = Math.max(0, cx - r), y0 = Math.max(0, cy - r), w = Math.min(mira.pick.width, cx + r + 1) - x0, h = Math.min(mira.pick.height, cy + r + 1) - y0;
+    if (w <= 0 || h <= 0) return null;
+    const d = pc.getImageData(x0, y0, w, h).data;
+    let meglio = null, dmin = 1e9;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      if (d[i + 3] < 250) continue;
+      const dist = (x0 + x - cx) ** 2 + (y0 + y - cy) ** 2, idx = Math.round(d[i] / 16) - 1;
+      if (dist < dmin && mira.locs[idx]) { dmin = dist; meglio = mira.locs[idx]; }
+    }
+    return meglio;
+  }
+  function aggiornaMira() {
+    const h = sottoMirino();
+    if (h !== mira.hover) { mira.hover = h; if (mira.cb && mira.cb.sopra) mira.cb.sopra(h); }
+  }
+
+  function disegnaConMirino() {
+    const T = lati[mira.lato], A = lati[mira.lato === "c" ? "p" : "c"];
+    disegnaCombattente(A);                                       // chi mira, scurito
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = "rgba(3,5,9,0.6)"; ctx.fillRect(0, 0, tela.width, tela.height);
+    for (const o of [[1, 0], [-1, 0], [0, 1], [0, -1]]) renderSagome(T, () => "#ffd34d", ctx, o);       // il contorno dell'avversario, a pixel di sprite
+    disegnaCombattente(T);
+    if (mira.hover) {                                            // la parte sotto il mirino: rossa, pulsa
+      ctx.globalAlpha = 0.5 + 0.18 * Math.sin(performance.now() / 110);
+      renderSagome(T, (loc) => loc === mira.hover ? "#ff2a3c" : null, ctx);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function disegnaMirino() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.textBaseline = "alphabetic";
+    ctx.font = "800 11px system-ui, sans-serif"; ctx.textAlign = "center";
+    ctx.fillStyle = "rgba(255,211,77,0.95)";
+    ctx.fillText("MIRINO · scegli la parte del corpo · Esc per annullare", W / 2, 14);
+    if (!mira.dentro) return;
+    const x = Math.round(mira.mx), y = Math.round(mira.my), rosso = !!mira.hover, col = rosso ? "#ff2a3c" : "#ffd34d", r = 11;
+    ctx.strokeStyle = "rgba(0,0,0,0.55)"; ctx.lineWidth = 4;
+    const mirino = () => {
+      ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.stroke();
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { ctx.beginPath(); ctx.moveTo(x + dx * (r - 3), y + dy * (r - 3)); ctx.lineTo(x + dx * (r + 7), y + dy * (r + 7)); ctx.stroke(); }
+    };
+    mirino();                                                    // l'ombra scura sotto, per leggerlo su qualunque sfondo
+    ctx.strokeStyle = col; ctx.lineWidth = 2; mirino();
+    ctx.fillStyle = col; ctx.fillRect(x - 1, y - 1, 2, 2);
+    if (rosso) {                                                 // il nome della parte e i suoi hp, accanto al mirino
+      const st = ultimoStato && (mira.lato === "c" ? ultimoStato.cpu : ultimoStato.player), h = st && st.hp[mira.hover];
+      const testo = mira.hover.replace(/_/g, " ").toUpperCase() + (h ? `  ${Math.max(0, h.val)}/${h.max}` : "");
+      ctx.font = "800 11px ui-monospace, Consolas, monospace";
+      const w = ctx.measureText(testo).width + 10, lx = x + r + 12 + w > W ? x - r - 12 - w : x + r + 12, ly = Math.max(18, y - 16);
+      ctx.fillStyle = "rgba(8,10,14,0.82)"; ctx.fillRect(lx, ly - 12, w, 17);
+      ctx.fillStyle = "#ff2a3c"; ctx.fillRect(lx, ly - 12, 2, 17);
+      ctx.fillStyle = "#ffffff"; ctx.textAlign = "left"; ctx.fillText(testo, lx + 6, ly);
+    }
+  }
+
+  /* `Arena.mira({scegli(loc), sopra(loc)})` accende il mirino sull'avversario del giocatore (la CPU); `Arena.mira(null)` lo spegne */
+  function collegaMira(el) {
+    const pos = (e) => { const b = el.getBoundingClientRect(); mira.mx = (e.clientX - b.left) * (W / Math.max(1, b.width)); mira.my = (e.clientY - b.top) * (H / Math.max(1, b.height)); mira.dentro = true; };
+    el.addEventListener("pointermove", (e) => { if (!mira.attiva) return; pos(e); aggiornaMira(); });
+    el.addEventListener("pointerdown", (e) => { if (!mira.attiva) return; pos(e); aggiornaMira(); });        // (al tocco non c'e' hover: il tocco sceglie)
+    el.addEventListener("pointerleave", () => { if (!mira.attiva) return; mira.dentro = false; aggiornaMira(); });
+    el.addEventListener("click", (e) => {
+      if (!mira.attiva) return;
+      pos(e); aggiornaMira();
+      if (mira.hover && mira.cb && mira.cb.scegli) { const loc = mira.hover; mira.cb.scegli(loc); }
+    });
+  }
+  function accendiMira(cb) {
+    const cambia = !!cb !== mira.attiva;
+    mira.attiva = !!cb; mira.cb = cb || null;
+    if (cambia) { mira.hover = null; if (!cb) mira.dentro = false; }
+    if (tela) tela.style.cursor = mira.attiva ? "none" : "";
+  }
+  const statoMira = () => ({attiva: mira.attiva, hover: mira.hover, dentro: mira.dentro});
+  /* per il laboratorio e i test: porta il mirino in un punto dell'arena (px dello schermo) e dice cosa c'e' sotto */
+  function puntaMira(x, y) { mira.mx = x; mira.my = y; mira.dentro = true; aggiornaMira(); return mira.hover; }
 
   /* ---------------------------------------------------------------------------------------------------- */
   /* simulazione */
@@ -1142,6 +1353,8 @@ const Arena = (() => {
   function applicaPg(lato, pg, primo, inPalestra = false) {
     const L = lati[lato];
     L.nome = pg.nome;
+    const ks = Object.keys(pg.hp || {}), trova = (re) => ks.find((k) => re.test(k));
+    L.locEx = {alaDx: trova(/^ala_?dx/i), alaSx: trova(/^ala_?sx/i), brDx: trova(/secondo braccio dx/i), brSx: trova(/secondo braccio sx/i)};      // (per il mirino)
     const chiaveAsp = JSON.stringify(pg.aspetto || null);
     if (L.aspKey !== chiaveAsp) { L.aspKey = chiaveAsp; applicaAspetto(lato, pg.aspetto); L.chiave = {}; }
     if (PO) PO.aggiorna(L, inPalestra ? null : pg);                // i poteri accesi (e dove la pelle e' ancora corazzata): prima dei pezzi, che ne dipendono
@@ -1212,6 +1425,7 @@ const Arena = (() => {
       arenaEl.innerHTML = "";
       tela = document.createElement("canvas"); tela.className = "tela";
       arenaEl.appendChild(tela);
+      collegaMira(tela);
       costruisci("p"); costruisci("c");
       new ResizeObserver(adatta).observe(arenaEl);
       adatta(); piazza(); muri();
@@ -1354,5 +1568,5 @@ const Arena = (() => {
   /* per il laboratorio: fa esultare un combattente a comando ("salti" o "braccio") */
   const festeggia = (lato, tipo) => lati[lato] && lati[lato].pup.esulta(tipo);
 
-  return {update, reset, anteprima, colpo, evento, passi, disegna, stato, festeggia, lati: () => lati, particella, scuoti: a => { scossa.a = Math.max(scossa.a, a); }, kit};
+  return {update, reset, anteprima, colpo, evento, passi, disegna, stato, festeggia, mira: accendiMira, statoMira, puntaMira, lati: () => lati, particella, scuoti: a => { scossa.a = Math.max(scossa.a, a); }, kit};
 })();

@@ -20,6 +20,7 @@ qualsiasi cosa**: serve a restare coerenti con il corpo base maschile (`maschio`
 | Motore fisico a corpi rigidi | `static/fisica.js` |
 | Il combattente come ragdoll attivo (muscoli, passi, colpi, attacchi) | `static/pupazzo.js`, test: `node test_fisica.js` |
 | Aspetto dei poteri (materiali della pelle, orbite, aure, fulmini, campo, neve, onde) e i pezzi che sostituiscono (rinforzati, appuntiti) | `static/poteri.js`; `static/sprites/maschio/poteri.json` + `rinf_*.png`, `app_*.png`; sorgente `tools/sprites/maschio_poteri.px.js` (sez. 18) |
+| Lo sfondo del ring (muro, corde, tribune, neon) e le sue luci; il mirino | `static/sprites/ring/ring_sfondo.png` + `ring_luci.png` (sorgente `tools/sprites/ring_sfondo.px.js`); `static/arena.js` (`disegnaFondale`, mirino); `static/duello.js` (sez. 19) |
 | Banco di prova della fisica nel browser | `tools/lab/arena.html` (v. sez. 10) |
 | Fasciature (la garza al posto del sangue, in palestra) | `fascia_*.png` (sorgente: fondo di `maschio_aspetto.px.js`), manifest `aspetto.json` -> `fasciature` (v. sez. 16) |
 | Oggetti della palestra (sacco, rack, lavagna...): sorgente, PNG, manifest | `tools/sprites/palestra.px.js`, `static/sprites/palestra/*.png` + `oggetti.json` (v. sez. 15) |
@@ -663,3 +664,30 @@ a quei ranghi l'effetto resta acceso finche' il potere lo e'. `poteri.js` tiene 
 - Geocinesi non aveva ranghi nella richiesta: le rocce crescono con il rango (3 + rango). Elettrocinesi: 2 saette per mano, 3 dal rango 3. Criocinesi: la neve si infittisce col rango.
 - Il materiale della pelle **non sanguina**: l'armatura assorbe prima degli hp, quindi dove c'e' pietra non c'e' sangue; quando l'armatura finisce torna la pelle con le ferite di prima.
 - L'armatura e' una riserva sola per locazione (Pelle Invincibile, Assorbi Energia, stance, cuscinetto...): il materiale resta finche' c'e' **qualunque** armatura in quella locazione.
+
+## 19. Lo sfondo del ring e il mirino (`ring_sfondo.px.js`, `arena.js`, `duello.js`)
+
+### Lo sfondo
+Il duello si svolge in un'arena sotterranea con un ring: **muro di cemento con tre corde (rossa, bianca, rossa)**, due pali imbottiti agli angoli, **balaustra con striscia LED volt**, due gradini di tribuna sotto la folla,
+travi e lampade industriali in alto, un neon (cerchio volt col fulmine rosso), due frecce neon e due poster senza scritte. Colori: la famiglia dell'interfaccia (blu notte, volt `#d7ff3e`, rosso `#ff4655`); le corde sono volutamente un po'
+spente: **lo sfondo non deve competere con i combattenti**.
+- Due immagini, **560x160**, in `static/sprites/ring/` (sorgente `tools/sprites/ring_sfondo.px.js`, `PXL build ... --out <cartella>` e si copiano `sprites/ring_*.png`): `ring_sfondo.png` (opaca) e `ring_luci.png` (coni delle lampade a puntini
+  di Bayer e aloni dei neon, a pixel pieni su trasparente).
+- **Posa** (`arena.js: disegnaFondale`): il bordo basso dell'immagine sta sulla linea dei piedi (`pavY`), a scala intera `S`; se l'arena e' piu' larga la copia si ripete **specchiata** (niente scritte nell'immagine, le estremita' non devono
+  combaciare); se e' piu' alta resta il buio del soffitto. Sotto la linea il pavimento e' il tappeto del ring (disegnato dal codice). I **pali** degli angoli (`disegnaPali`) e le **luci** (`disegnaLuciRing`, additive, alpha ~0,2 con sfarfallio e ogni tanto un neon che salta)
+  sono del codice. Senza le immagini resta il vecchio gradiente.
+- **La folla** non e' nell'immagine: la disegna il codice (`disegnaFolla`) in piedi a circa la riga 44 dell'immagine (teste a ~35). Per questo la sala e' piu' chiara tra le righe 18 e 52: le sagome scure della folla devono spiccare. Se si sposta la folla, spostare
+  anche la foschia (`picco`) e i gradini nel sorgente.
+- Quote da tenere d'accordo tra immagine e codice: le corde stanno alle righe **86, 112, 138** (`Y_CORDE`, e le fascette dei pali in `disegnaPali`), il bordo basso e' il pavimento.
+- Test: `node test_fisica.js` (dimensioni, muro opaco, luci su trasparente, sala piu' chiara dietro alla folla).
+
+### Il mirino (alla Fallout VATS)
+Con "Mira" (Attacchi → Prendi la mira) la locazione **non si sceglie piu' coi tasti**: il cursore sull'arena diventa un mirino, la scena si scurisce e l'avversario ha un **contorno ambra**; passando sulle parti del suo corpo quella sotto il
+mirino si accende di **rosso** (pulsa) con nome e hp accanto al mirino ("GAMBA DX  100/100"), e la sua riga nella scheda dell'avversario si evidenzia (`.sotto-mirino`). **Un clic sceglie** (`invia({tipo: "mira", loc})`, il server e' quello di prima);
+`Esc` o "Indietro" annullano. Al tocco il tocco sceglie (niente hover).
+- **Come si sa cosa c'e' sotto il cursore** (`arena.js: sottoMirino`): il bersaglio si ridisegna su una tela nascosta in **modo sagome** (`sagome`: `disegnaCombattente` con la stessa pipeline, quindi stesse trasformazioni di Super Forza, ali, braccia extra, pezzi
+  rinforzati e lame, ma sagome piatte, ogni locazione di un colore) e si legge il pixel. Se il pixel e' vuoto vince la sagoma piu' vicina entro ~1,2 pixel di sprite (gli arti sono sottili). Niente geometria da rifare: **un pezzo nuovo che si disegna con `disegnaVoce`
+  e' gia' mirabile**.
+- Le **ali** (`ala_dx`, `ala_sx`) e le **braccia extra** ("Secondo braccio DX/Sx") sono locazioni a se': `L.locEx` le ricava dai nomi delle locazioni dello stato (`applicaPg`); `disegnaAla` e `disegnaBraccioExtra` le disegnano col loro colore.
+- API: `Arena.mira({scegli(loc), sopra(loc)})` accende il mirino sulla CPU, `Arena.mira(null)` lo spegne; `Arena.statoMira()` e `Arena.puntaMira(x, y)` (px dello schermo) servono al laboratorio e ai test. `duello.js: sincronizzaMira` lo tiene allineato al menu.
+- **Non cambiato**: la scelta di *dove parare* (menu "parata") resta coi tasti. Si potrebbe fare uguale, sul corpo del giocatore.

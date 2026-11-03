@@ -51,6 +51,21 @@ function pianificaCpu() {
   }
 }
 
+/* ---------- il mirino ---------- */
+/* col menu "mira" aperto il cursore e' un mirino sull'arena: la parte del corpo cliccata e' la mira; mentre ci si passa sopra si evidenzia anche
+   la sua riga nella scheda dell'avversario */
+function sincronizzaMira() {
+  const on = menu === "mira" && S && S.fase === "player" && !S.finito;
+  Arena.mira(on ? {scegli: loc => invia({tipo: "mira", loc}), sopra: evidenziaLoc} : null);
+  if (!on) evidenziaLoc(null);
+}
+function evidenziaLoc(loc) {
+  document.querySelectorAll("#pan-cpu .pan-loc").forEach(r => r.classList.toggle("sotto-mirino", !!loc && r.dataset.loc === loc));
+}
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && menu === "mira") { menu = "attacchi"; render(); }
+});
+
 /* ---------- render ---------- */
 function render() {
   el("d-round").textContent = "ROUND " + S.round;
@@ -58,6 +73,7 @@ function render() {
   renderPannello("pan-player", S.player, S.cpu.mira);
   renderPannello("pan-cpu", S.cpu, S.player.mira);
   Arena.update(S);
+  sincronizzaMira();
   renderFolla();
   renderScena();
   renderLog();
@@ -236,7 +252,7 @@ function renderPannello(dove, p, mira_su) {
     // il colore non segue la tiera hi/mid/low come per la carne)
     const cls = h.protesi ? "pct-protesi" : pct > 60 ? "pct-hi" : pct > 30 ? "pct-mid" : "pct-low";
     const mirato = loc === mira_su;
-    return `<div class="pan-loc${mirato ? " mirato" : ""}">
+    return `<div class="pan-loc${mirato ? " mirato" : ""}" data-loc="${loc}">
       <span>${mirato ? "🎯 " : ""}${h.protesi ? "⚙ " : ""}${loc.replace(/_/g, " ")}${h.crippled ? ' <span class="chip-crip">CR</span>' : ""}</span>
       <div class="hpbar"><div class="hpbar-fill ${cls}" style="width:${pct}%"></div></div>
       <span class="val">${h.val}${h.arm ? `<span class="chip-arm">+${h.arm}</span>` : ""}</span>
@@ -671,10 +687,11 @@ function renderAzioni() {
       }).join("") +
       bottone("← Indietro", "menu=null;render()", "btn-ghost");
   } else if (menu === "mira") {
-    box.innerHTML = testaMenu(`Mira: scegli la locazione (+${S.mira_pen} alla difficoltà, ${S.mira_dura_turno ? "i colpi mirabili di questo turno puntano lì" : "il prossimo colpo punta lì"})`) +
-      Object.keys(S.cpu.hp).map(l => bottone(l.replace(/_/g, " "),
-        `invia({tipo:"mira",loc:"${l}"})`)).join("") +
-      bottone("← Indietro", 'menu="attacchi";render()', "btn-ghost");
+    // la locazione non si sceglie coi tasti: il cursore e' un mirino sull'arena (Arena.mira, v. sincronizzaMira) e si clicca la parte del corpo
+    box.innerHTML = testaMenu(`Mira (+${S.mira_pen} alla difficoltà, ${S.mira_dura_turno ? "i colpi mirabili di questo turno puntano lì" : "il prossimo colpo punta lì"})`) +
+      `<div class="mira-guida"><span class="mira-icona">⌖</span><div><b>Clicca sulla parte del corpo dell'avversario</b>
+        <span class="muted">Passa il mirino sull'arena: la parte sotto il mirino si accende di rosso.</span></div></div>` +
+      bottone("← Indietro (Esc)", 'menu="attacchi";render()', "btn-ghost");
   } else if (menu === "azzardo") {
     box.innerHTML = testaMenu("Azzardo — il banco non regala", bannerRilancio() + erroreMenu()) + menuAzzardo(m.azzardi) +
       bottone("← Indietro", "menu=null;render()", "btn-ghost");

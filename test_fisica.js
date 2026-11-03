@@ -662,6 +662,18 @@ for (const forza of [0.1, 0.7, 1.6]) {
     ok(a.alfa.filter((v) => v).length < b.alfa.filter((v) => v).length, `${file}: e' piu' sottile del pezzo base`);
   }
   log("poteri: 11 pezzi rinforzati (area x" + (areaRinf / areaBase).toFixed(2) + ", altezza x" + (altRinf / altBase).toFixed(3) + ") e 2 avambracci appuntiti");
+
+  // ---- lo sfondo del ring (tools/sprites/ring_sfondo.px.js -> static/sprites/ring/): il muro, opaco, e le luci, a pixel pieni su trasparente; stessa tela
+  const muro = png("../ring/ring_sfondo.png"), luci = png("../ring/ring_luci.png");
+  ok(muro.w === 560 && muro.h === 160 && luci.w === muro.w && luci.h === muro.h, `lo sfondo del ring e' 560x160 e le luci hanno la stessa tela (${muro.w}x${muro.h})`);
+  ok(muro.alfa.every((a) => a === 255), "il muro del ring e' opaco: nessun buco sul fondale");
+  ok(luci.alfa.every((a) => a === 0 || a === 255) && luci.alfa.filter((a) => a).length > 2000 && luci.alfa.filter((a) => !a).length > muro.w * muro.h * 0.5, "le luci sono a pixel pieni e lasciano libera piu' di meta' della tela");
+  const riga = (y) => { const r = []; for (let x = 0; x < muro.w; x++) r.push(muro.rgb(y * muro.w + x)); return r; };
+  const luminosita = (c) => 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2];
+  const media = (y0, y1) => { let t = 0, n = 0; for (let y = y0; y < y1; y++) for (const c of riga(y)) { t += luminosita(c); n++; } return t / n; };
+  // la folla del codice (arena.js) e' fatta di sagome scure (#171b22 e #212733, luminosita' 26 e 37): dietro di loro lo sfondo deve essere nettamente piu' chiaro
+  ok(media(30, 50) > 37 + 22, `dietro alla folla (righe 30-50) la sala e' molto piu' chiara delle sagome della folla (${media(30, 50).toFixed(0)} contro 37)`);
+  log("ring: sfondo 560x160, luci", luci.alfa.filter((a) => a).length, "px");
 }
 
 /* ====================================================================================================================
