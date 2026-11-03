@@ -791,7 +791,37 @@ for (const forza of [0.1, 0.7, 1.6]) {
   ok(disegni === 0, "un caduto non ha effetti");
   disegni = 0; Poteri.disegnaOnda(A.ctx, {x: 40, y: 50, vx: 200, vy: 0, t: 0.2, t0: 0.34});
   ok(disegni > 10, "le onde soniche si disegnano");
-  log("poteri: stato, materiali, effetti a mossa, neve, teschi e disegno ok");
+  // ---- Forma d'acqua: il corpo diventa acqua semitrasparente (Poteri.acqua ricolora i pixel di un corpo disegnato su una tela nascosta)
+  {
+    const w = 24, h = 30, buf = (f) => { const d = new Uint8ClampedArray(w * h * 4); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const c = f(x, y); if (c) d.set([...c, 255], (y * w + x) * 4); } return d; };
+    const PELLE = [[42, 26, 20], [168, 105, 63], [201, 138, 91], [224, 169, 121], [243, 201, 160]], SANGUE = [163, 17, 31];
+    const corpo = buf((x, y) => x < 3 || x > 20 || y < 3 ? null : (x === 3 || x === 20 || y === 3 ? PELLE[0] : y > 24 ? SANGUE : y < 10 ? [40, 90, 180] : PELLE[1 + ((x + y) % 4)]));
+    const prima = Uint8ClampedArray.from(corpo);
+    Poteri.acqua(corpo, w, h, {cell: 2, ox: 0, oy: 0, t: 1.3, seme: 5});
+    let vuoti = 0, pieni = 0, bluastri = 0, semi = 0, bordoA = 0, internoA = 0, nBordo = 0, nInt = 0, sangue = 0;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      if (!prima[i + 3]) { if (corpo[i + 3] === 0) vuoti++; continue; }
+      pieni++;
+      const [r, g, b, a] = [corpo[i], corpo[i + 1], corpo[i + 2], corpo[i + 3]];
+      if (b > r) bluastri++;
+      if (a < 255 && a > 60) semi++;
+      if (x === 3 || x === 20 || y === 3) { bordoA += a; nBordo++; } else if (y < 24) { internoA += a; nInt++; }
+      if (y > 24 && r > g) sangue++;                                  // (l'acqua pulita ha sempre il verde sopra il rosso)
+    }
+    const attesi = prima.filter((v, i) => i % 4 === 3 && v).length;
+    ok(vuoti === w * h - attesi, "l'acqua non tocca i pixel vuoti");
+    ok(bluastri >= pieni * 0.75, `pelle, vestiti e capelli (ogni livello) diventano blu (${bluastri}/${pieni} pixel)`);
+    ok(semi === pieni, "tutti i pixel sono semitrasparenti (si vede cio' che sta dietro)");
+    ok(internoA / nInt < 225 && internoA / nInt > 110, `l'interno e' trasparente a meta' (alpha medio ${(internoA / nInt).toFixed(0)})`);
+    ok(bordoA / nBordo > internoA / nInt + 20, "il contorno e' piu' denso dell'interno (la sagoma si legge)");
+    ok(sangue > 0, "le ferite virano al rosa nell'acqua torbida");
+    const uguale = Uint8ClampedArray.from(prima); Poteri.acqua(uguale, w, h, {cell: 2, ox: 0, oy: 0, t: 1.3, seme: 5});
+    ok(uguale.every((v, i) => v === corpo[i]), "l'acqua e' deterministica (stesso tempo, stessi pixel)");
+    const dopo = Uint8ClampedArray.from(prima); Poteri.acqua(dopo, w, h, {cell: 2, ox: 0, oy: 0, t: 4.1, seme: 5});
+    ok(dopo.some((v, i) => v !== corpo[i]), "...e scorre col tempo (le caustiche si muovono)");
+  }
+  log("poteri: stato, materiali, effetti a mossa, neve, teschi, acqua e disegno ok");
 }
 
 console.log(`OK - ${n} check passati`);

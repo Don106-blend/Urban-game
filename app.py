@@ -396,6 +396,9 @@ def aggiungi_aspirante():
 
 
 # ---------------------------------------------------------------- duello web
+STANCE_FORMA_ACQUA = 18       # id della stance "Forma d'acqua" in stances.json (il test controlla il nome)
+
+
 def pannello(p, turno, altro=None):
     return {
         "nome": p.nome, "turno": turno, "sconfitto": p.sconfitto(),
@@ -411,6 +414,7 @@ def pannello(p, turno, altro=None):
         # static/poteri.js, che si sommano)
         "extra": {"ali": p.potere_attivo("Ali"), "braccia": p.potere_attivo("2x2"),
                   "volo": any(x["def"]["nome"] == "Volo" for x in p.stance_attive),
+                  "acqua": any(x["def"]["id"] == STANCE_FORMA_ACQUA for x in p.stance_attive),     # stance Forma d'acqua: il corpo e' acqua (static/arena.js)
                   "velocita": p.rango_potere_attivo("Supervelocità"), "forza": p.rango_potere_attivo("Super Forza"),
                   "poteri": p.poteri_attivi_rango(), "stance_poteri": p.poteri_in_stance()},
         "risorse": {"azioni": p.azioni, "n_azioni": p.n_azioni,

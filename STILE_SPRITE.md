@@ -690,4 +690,16 @@ mirino si accende di **rosso** (pulsa) con nome e hp accanto al mirino ("GAMBA D
   e' gia' mirabile**.
 - Le **ali** (`ala_dx`, `ala_sx`) e le **braccia extra** ("Secondo braccio DX/Sx") sono locazioni a se': `L.locEx` le ricava dai nomi delle locazioni dello stato (`applicaPg`); `disegnaAla` e `disegnaBraccioExtra` le disegnano col loro colore.
 - API: `Arena.mira({scegli(loc), sopra(loc)})` accende il mirino sulla CPU, `Arena.mira(null)` lo spegne; `Arena.statoMira()` e `Arena.puntaMira(x, y)` (px dello schermo) servono al laboratorio e ai test. `duello.js: sincronizzaMira` lo tiene allineato al menu.
-- **Non cambiato**: la scelta di *dove parare* (menu "parata") resta coi tasti. Si potrebbe fare uguale, sul corpo del giocatore.
+- **La parata ha lo stesso mirino, in azzurro e blu.** Quando l'avversario attacca e si sceglie "Parata", il cursore e' un mirino sul **proprio** corpo: contorno e titolo azzurri ("PARATA · scegli dove incassare il colpo"),
+  la parte sotto il mirino si accende di **blu**, la sua riga nella scheda del giocatore e' blu, e la parte dove punta il colpo in arrivo ha un **velo rosso** che pulsa (nell'etichetta: "COLPO QUI"). Un clic manda
+  `{tipo: "risposta", scelta: "parata", loc}`. Stesso codice della mira: `Arena.mira({lato: "p", stile: "parata", segna: loc, scegli, sopra})` (`STILI_MIRA` in `arena.js` ha i colori dei due stili; `duello.js: sincronizzaMira`).
+  Esc annulla (si torna alla scelta della risposta).
+
+### Forma d'acqua (stance, `Poteri.acqua`, `arena.js: disegnaAcqua`)
+Con la stance **Forma d'acqua** (id 18, `STANCE_FORMA_ACQUA` in `app.py`; `pannello().extra.acqua`) **ogni livello del corpo** (pelle, vestiti, capelli, cappelli, ali, braccia extra) diventa **acqua semitrasparente**: si vede cio' che sta dietro
+(corde, LED, avversario). Come funziona: il corpo si disegna di sempre su una tela nascosta (opaco, cosi' i livelli non si sommano), i pixel passano da `Poteri.acqua` (funzione pura, testata in Node) e il risultato si stampa sull'arena.
+- **Ricolorazione**: la luminosita' di ogni pixel sceglie il tono dell'acqua (5 toni, dal blu profondo alla schiuma), cosi' restano contorno, pieghe e ombre; una texture di **caustiche** animata (linee di luce dove il rumore passa per 0,5, correnti piu' chiare e scure) e'
+  ancorata al **bacino** del combattente, quindi scorre con lui. Le **ferite** (rosso saturo) virano al rosa: acqua torbida. Il contorno resta quasi pieno (alpha 235), l'interno e' a meta' (~100-200).
+- **Dissolvenza**: `L.acq` (0..1, ~0,5 s) fa una dissolvenza incrociata col corpo vero in entrata e in uscita; a duello gia' avviato non c'e' transizione. Dal corpo d'acqua cadono ogni tanto **gocce** (particelle).
+- Costo: una tela della dimensione dell'arena, e `getImageData` solo sul riquadro attorno al corpo. Gli effetti dei poteri (orbite, aure...) restano normali, disegnati prima e dopo.
+- La descrizione della stance (visibile nel menu Stance) dice cosa fa: 3 turni, immune a fuoco e perforanti, +50% dai danni elettrici e contundenti, ricarica 2 turni (`data/stances.json`).

@@ -596,6 +596,39 @@ const Poteri = (() => {
     ctx.globalAlpha = 1;
   }
 
-  return {ID, aggiorna, chiave, rangoPelle, lama, coloraMateriale, mossa, passo, dietro, davanti, disegnaOnda, CUCITURA};
+  /* ---------------------------------------------------------------------------------------------------------------------------------- */
+  /* FORMA D'ACQUA (stance): il corpo intero (pelle, vestiti, capelli, cappelli, ali...) diventa acqua semitrasparente. `arena.js` disegna il
+     combattente su una tela nascosta e passa qui i pixel (RGBA, a blocchi di `cell` px dello schermo per ogni pixel di sprite): la luminosita' di
+     ogni pixel sceglie il tono dell'acqua (cosi' restano le forme: contorno, pieghe dei vestiti, ombre), una texture di caustiche animata
+     sposta il tono e fa le striature di luce, le ferite virano al rosa (acqua torbida) e l'alpha cala: il contorno resta quasi pieno, l'interno
+     lascia vedere dietro. La texture e' ancorata al corpo (`ox`, `oy` = offset del suo punto di riferimento): scorre con lui. */
+  const ACQUA = [[8, 34, 84], [22, 92, 166], [64, 170, 220], [160, 230, 248], [238, 253, 255]];      // dal fondo scuro alla schiuma
+  function acqua(dati, w, h, {cell = 2, ox = 0, oy = 0, t = 0, seme = 0} = {}) {
+    const gw = Math.ceil(w / cell) + 3, gh = Math.ceil(h / cell) + 3, ca = new Float32Array(gw * gh), cb = new Float32Array(gw * gh);
+    const gx0 = Math.floor(ox / cell), gy0 = Math.floor(oy / cell);                                      // celle (pixel di sprite) ancorate al corpo
+    for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) {
+      const X = gx0 + i, Y = gy0 + j;
+      ca[j * gw + i] = vn(X * 0.26 + t * 0.9, Y * 0.26 - t * 0.7, seme + 71);                            // le caustiche: linee di luce dove il rumore passa per 0,5
+      cb[j * gw + i] = vn(X * 0.5 - t * 1.3, Y * 0.5 + t * 1.0, seme + 83);                            // le correnti: zone piu' chiare e piu' scure
+    }
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4, a = dati[i + 3];
+      if (!a) continue;
+      const r = dati[i], g = dati[i + 1], b = dati[i + 2], lum = (0.3 * r + 0.59 * g + 0.11 * b) / 255;
+      const ci = Math.floor((x + ox) / cell) - gx0, cj = Math.floor((y + oy) / cell) - gy0, k = cj * gw + ci;
+      const na = ca[k], nb = cb[k], ridge = 1 - Math.min(1, Math.abs(na - 0.5) / 0.045);
+      let tono = lum < 0.12 ? 0 : lum < 0.26 ? 1 : lum < 0.72 ? 2 : lum < 0.9 ? 3 : 4;        // pochi toni: l'acqua e' liscia, le forme restano
+      const contorno = tono === 0 && lum < 0.2;
+      if (!contorno) { if (ridge > 0.5) tono++; else if (nb < 0.2) tono--; else if (nb > 0.82) tono++; }
+      tono = Math.max(contorno ? 0 : 1, Math.min(4, tono));
+      let c = ACQUA[tono];
+      if (r > 70 && r > g * 2.6) c = [c[0] + (200 - c[0]) * 0.5, c[1] + (88 - c[1]) * 0.5, c[2] + (118 - c[2]) * 0.4];     // sangue: acqua torbida, rosata
+      dati[i] = c[0]; dati[i + 1] = c[1]; dati[i + 2] = c[2];
+      dati[i + 3] = contorno ? 235 : Math.min(235, 104 + tono * 22 + (ridge > 0.5 ? 36 : 0) + (nb - 0.5) * 24);                // semitrasparente: piu' denso dove e' scuro o brilla
+    }
+    return dati;
+  }
+
+  return {ID, acqua, aggiorna, chiave, rangoPelle, lama, coloraMateriale, mossa, passo, dietro, davanti, disegnaOnda, CUCITURA};
 })();
 if (typeof module !== "undefined") module.exports = Poteri;

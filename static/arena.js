@@ -40,7 +40,12 @@ const Arena = (() => {
   let colori = {};
   let ultimoStato = null;
   let sagome = null, locSag = null; // "modo sagome": disegnaCombattente disegna sagome piatte al posto del corpo (per il mirino); locSag = locazione forzata (braccia extra)
-  const mira = {attiva: false, lato: "c", cb: null, mx: 0, my: 0, dentro: false, hover: null, locs: [], pick: null, pickCtx: null};
+  const mira = {attiva: false, lato: "c", stile: "mira", segna: null, cb: null, mx: 0, my: 0, dentro: false, hover: null, locs: [], pick: null, pickCtx: null};
+  /* due mirini: "mira" (si sceglie dove colpire l'avversario: ambra e rosso) e "parata" (si sceglie con quale parte del PROPRIO corpo incassare: azzurro e blu) */
+  const STILI_MIRA = {
+    mira: {contorno: "#ffd34d", hover: "#ff2a3c", titolo: "MIRINO · scegli la parte del corpo · Esc per annullare", testo: "rgba(255,211,77,0.95)"},
+    parata: {contorno: "#5ec8ff", hover: "#2f7bff", titolo: "PARATA · scegli dove incassare il colpo · Esc per annullare", testo: "rgba(130,205,255,0.97)"},
+  };
   let luogo = null;                 // lo sfondo del duello (St.luogo): null = l'arena con la folla, "vicolo" = l'imboscata
 
   const hash = (x, y, s) => {
@@ -443,7 +448,7 @@ const Arena = (() => {
     const pup = new Pupazzo.Pupazzo(man);
     const L = {lato, f: lato === "p" ? 1 : -1, O: 0, pup, acidoVel: {}, tele: {}, carne: {}, rk: {}, sag: {}, chiave: {}, prof: {}, lamp: {}, voci: [], nome: "", vest: {}, capelli: null, cop: null, aspKey: null, tip: {}, dati: {}, acidoVis: {}, acidoObj: {}, fulm: {}, ali: null, extra: {}, tAnim: 0, fasce: {},
                ko: false, ultimo: null, xNome: 0,
-               po: null, telaR: {}, sagR: {}, sagApp: {}, rinfOn: {}, vestOff: {}, locEx: {}};      // i poteri: stato degli effetti, pezzi rinforzati (tela e sagoma), sagoma dell'avambraccio appuntito, quali pezzi sono rinforzati ora
+               po: null, telaR: {}, sagR: {}, sagApp: {}, rinfOn: {}, vestOff: {}, locEx: {}, acq: 0};      // i poteri: stato degli effetti, pezzi rinforzati (tela e sagoma), sagoma dell'avambraccio appuntito, quali pezzi sono rinforzati ora
     for (const [nome, p] of Object.entries(parti)) {
       const c = document.createElement("canvas"); c.width = p.w; c.height = p.h;
       L.tele[nome] = c; L.sag[nome] = sagoma(nome);
@@ -886,10 +891,9 @@ const Arena = (() => {
     },
   };
 
-  function disegnaCombattente(L) {
-    mondo(L);
+  /* il corpo (senza gli effetti dei poteri): ali, braccia extra, pezzi con i loro livelli, falda del cappotto */
+  function disegnaCorpo(L) {
     const su = (nome, fn) => { ctx.save(); trasformaForza(L, nome); fn(); ctx.restore(); };
-    if (!sagome && PO && L.po) PO.dietro(L, aiuti);                        // sfere e detriti che passano dietro, teschi, neve lontana
     if (L.ali && L.extra.ali) su("busto_sup", () => disegnaAla(L, true));
     for (const v of L.voci) {
       if (L.extra.braccia && v.nome === "braccio_sup_sx") su("braccio_sup_sx", () => disegnaBraccioExtra(L, "sx"));
@@ -898,7 +902,50 @@ const Arena = (() => {
       su(v.nome, () => disegnaVoce(L, v));
       if (L.falda && v.nome === L.falda.pezzo && !L.vestOff.busto_inf && !sagome) su("busto_inf", () => disegnaFalda(L));    // (il cappotto non c'e' sotto la corazza)
     }
+  }
+
+  function disegnaCombattente(L) {
+    mondo(L);
+    if (!sagome && PO && L.po) PO.dietro(L, aiuti);                        // sfere e detriti che passano dietro, teschi, neve lontana
+    if (!sagome && L.acq > 0.02) disegnaAcqua(L);                          // stance Forma d'acqua
+    else disegnaCorpo(L);
     if (!sagome && PO && L.po) { mondo(L); PO.davanti(L, aiuti); }         // campo di forza, sfere davanti, aure, fulmini, neve vicina
+  }
+
+  /* ---- Forma d'acqua: il corpo intero (ogni livello: pelle, vestiti, capelli, cappelli, ali) diventa acqua semitrasparente. Si disegna il corpo
+     di sempre su una tela nascosta (opaco, cosi' i livelli non si sommano) e i pixel passano da `Poteri.acqua`, che li ricolora e li rende
+     trasparenti; poi si stampa il risultato. Dentro e fuori dalla stance `L.acq` (0..1) fa una dissolvenza incrociata col corpo vero. ---- */
+  const acq = {cv: null, cx: null, out: null, ox: null};
+  function disegnaAcqua(L) {
+    if (!PO || !PO.acqua) { disegnaCorpo(L); return; }
+    // il riquadro attorno al corpo (px dello schermo, a risoluzione del dispositivo)
+    let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+    for (const b of Object.values(L.pup.corpi)) {
+      const X = (L.O + L.f * b.x) * S, Y = pavY - 111 * S + b.y * S;
+      x0 = Math.min(x0, X); x1 = Math.max(x1, X); y0 = Math.min(y0, Y); y1 = Math.max(y1, Y);
+    }
+    const m = 36 * S;
+    const dx0 = Math.max(0, Math.floor((x0 - m) * dpr)), dy0 = Math.max(0, Math.floor((y0 - m) * dpr));
+    const dw = Math.min(tela.width, Math.ceil((x1 + m) * dpr)) - dx0, dh = Math.min(tela.height, Math.ceil((y1 + m) * dpr)) - dy0;
+    if (dw <= 0 || dh <= 0) return;
+    if (!acq.cv || acq.cv.width !== tela.width || acq.cv.height !== tela.height) {
+      acq.cv = Object.assign(document.createElement("canvas"), {width: tela.width, height: tela.height});
+      acq.cx = acq.cv.getContext("2d", {willReadFrequently: true});
+    }
+    if (!acq.out || acq.out.width < dw || acq.out.height < dh) acq.out = Object.assign(document.createElement("canvas"), {width: dw, height: dh});
+    const c0 = ctx, k = L.acq;
+    if (k < 0.98) { ctx.globalAlpha = 1 - k; disegnaCorpo(L); ctx.globalAlpha = 1; }          // il corpo vero svanisce mentre l'acqua arriva
+    const a = acq.cx;
+    a.setTransform(1, 0, 0, 1, 0, 0); a.imageSmoothingEnabled = false; a.clearRect(dx0, dy0, dw, dh);
+    ctx = a; mondo(L);
+    try { disegnaCorpo(L); } finally { ctx = c0; }
+    const img = a.getImageData(dx0, dy0, dw, dh), pel = L.pup.corpi.busto_inf;
+    PO.acqua(img.data, dw, dh, {cell: S * dpr, ox: dx0 - (L.O + L.f * pel.x) * S * dpr, oy: dy0 - (pavY - 111 * S + pel.y * S) * dpr, t: L.tAnim, seme: semeLato(L.lato)});
+    const o = acq.out.getContext("2d");
+    o.clearRect(0, 0, acq.out.width, acq.out.height); o.putImageData(img, 0, 0);
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = k;
+    ctx.drawImage(acq.out, 0, 0, dw, dh, dx0, dy0, dw, dh);
+    ctx.globalAlpha = 1;
   }
 
   /* ombra sul pavimento: sotto i piedi, piu' piccola e chiara quando il corpo si alza; larga da morti */
@@ -1027,11 +1074,17 @@ const Arena = (() => {
     disegnaCombattente(A);                                       // chi mira, scurito
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = "rgba(3,5,9,0.6)"; ctx.fillRect(0, 0, tela.width, tela.height);
-    for (const o of [[1, 0], [-1, 0], [0, 1], [0, -1]]) renderSagome(T, () => "#ffd34d", ctx, o);       // il contorno dell'avversario, a pixel di sprite
+    const st = STILI_MIRA[mira.stile] || STILI_MIRA.mira;
+    for (const o of [[1, 0], [-1, 0], [0, 1], [0, -1]]) renderSagome(T, () => st.contorno, ctx, o);       // il contorno del bersaglio, a pixel di sprite
     disegnaCombattente(T);
-    if (mira.hover) {                                            // la parte sotto il mirino: rossa, pulsa
+    if (mira.segna && mira.segna !== mira.hover) {               // (parata) dove punta il colpo in arrivo: un velo rosso che pulsa piano
+      ctx.globalAlpha = 0.26 + 0.1 * Math.sin(performance.now() / 160);
+      renderSagome(T, (loc) => loc === mira.segna ? "#ff2a3c" : null, ctx);
+      ctx.globalAlpha = 1;
+    }
+    if (mira.hover) {                                            // la parte sotto il mirino: accesa, pulsa
       ctx.globalAlpha = 0.5 + 0.18 * Math.sin(performance.now() / 110);
-      renderSagome(T, (loc) => loc === mira.hover ? "#ff2a3c" : null, ctx);
+      renderSagome(T, (loc) => loc === mira.hover ? st.hover : null, ctx);
       ctx.globalAlpha = 1;
     }
   }
@@ -1039,11 +1092,12 @@ const Arena = (() => {
   function disegnaMirino() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.textBaseline = "alphabetic";
+    const st = STILI_MIRA[mira.stile] || STILI_MIRA.mira;
     ctx.font = "800 11px system-ui, sans-serif"; ctx.textAlign = "center";
-    ctx.fillStyle = "rgba(255,211,77,0.95)";
-    ctx.fillText("MIRINO · scegli la parte del corpo · Esc per annullare", W / 2, 14);
+    ctx.fillStyle = st.testo;
+    ctx.fillText(st.titolo, W / 2, 14);
     if (!mira.dentro) return;
-    const x = Math.round(mira.mx), y = Math.round(mira.my), rosso = !!mira.hover, col = rosso ? "#ff2a3c" : "#ffd34d", r = 11;
+    const x = Math.round(mira.mx), y = Math.round(mira.my), rosso = !!mira.hover, col = rosso ? st.hover : st.contorno, r = 11;
     ctx.strokeStyle = "rgba(0,0,0,0.55)"; ctx.lineWidth = 4;
     const mirino = () => {
       ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.stroke();
@@ -1054,16 +1108,17 @@ const Arena = (() => {
     ctx.fillStyle = col; ctx.fillRect(x - 1, y - 1, 2, 2);
     if (rosso) {                                                 // il nome della parte e i suoi hp, accanto al mirino
       const st = ultimoStato && (mira.lato === "c" ? ultimoStato.cpu : ultimoStato.player), h = st && st.hp[mira.hover];
-      const testo = mira.hover.replace(/_/g, " ").toUpperCase() + (h ? `  ${Math.max(0, h.val)}/${h.max}` : "");
+      const testo = mira.hover.replace(/_/g, " ").toUpperCase() + (h ? `  ${Math.max(0, h.val)}/${h.max}` : "") + (mira.hover === mira.segna ? "  · COLPO QUI" : "");
       ctx.font = "800 11px ui-monospace, Consolas, monospace";
       const w = ctx.measureText(testo).width + 10, lx = x + r + 12 + w > W ? x - r - 12 - w : x + r + 12, ly = Math.max(18, y - 16);
       ctx.fillStyle = "rgba(8,10,14,0.82)"; ctx.fillRect(lx, ly - 12, w, 17);
-      ctx.fillStyle = "#ff2a3c"; ctx.fillRect(lx, ly - 12, 2, 17);
+      ctx.fillStyle = st.hover; ctx.fillRect(lx, ly - 12, 2, 17);
       ctx.fillStyle = "#ffffff"; ctx.textAlign = "left"; ctx.fillText(testo, lx + 6, ly);
     }
   }
 
-  /* `Arena.mira({scegli(loc), sopra(loc)})` accende il mirino sull'avversario del giocatore (la CPU); `Arena.mira(null)` lo spegne */
+  /* `Arena.mira({scegli(loc), sopra(loc), lato, stile, segna})` accende il mirino. Di norma e' sull'avversario del giocatore (`lato` "c", stile "mira"); per la
+     parata e' sul giocatore (`lato: "p"`, stile "parata", azzurro e blu) e `segna` = la locazione dove punta il colpo in arrivo. `Arena.mira(null)` lo spegne */
   function collegaMira(el) {
     const pos = (e) => { const b = el.getBoundingClientRect(); mira.mx = (e.clientX - b.left) * (W / Math.max(1, b.width)); mira.my = (e.clientY - b.top) * (H / Math.max(1, b.height)); mira.dentro = true; };
     el.addEventListener("pointermove", (e) => { if (!mira.attiva) return; pos(e); aggiornaMira(); });
@@ -1076,8 +1131,9 @@ const Arena = (() => {
     });
   }
   function accendiMira(cb) {
-    const cambia = !!cb !== mira.attiva;
-    mira.attiva = !!cb; mira.cb = cb || null;
+    const lato = cb && cb.lato || "c", stile = cb && cb.stile || "mira";
+    const cambia = !!cb !== mira.attiva || lato !== mira.lato || stile !== mira.stile;
+    mira.attiva = !!cb; mira.cb = cb || null; mira.lato = lato; mira.stile = stile; mira.segna = cb && cb.segna || null;
     if (cambia) { mira.hover = null; if (!cb) mira.dentro = false; }
     if (tela) tela.style.cursor = mira.attiva ? "none" : "";
   }
@@ -1170,6 +1226,14 @@ const Arena = (() => {
       for (const [b, x, y, a] of prima) { b.px = x; b.py = y; b.pa = a; }
     }
     L.tAnim += DT * (1 + VEL_RANGO * (L.extra.velocita || 0));
+    {                                                        // Forma d'acqua: dissolvenza dentro e fuori, e gocce che cadono dal corpo
+      const su = L.extra.acqua ? 1 : 0, v = L.acq || 0;
+      L.acq = Math.abs(su - v) < 0.004 ? su : v + (su - v) * (1 - Math.exp(-DT * 4));
+      if (L.acq > 0.5 && Math.random() < 0.07) {
+        const b = L.pup.corpi[["busto_sup", "avambraccio_dx", "avambraccio_sx", "coscia_dx", "stinco_sx", "testa"][Math.floor(Math.random() * 6)]];
+        particella({x: L.O + L.f * (b.x + (Math.random() - 0.5) * 5), y: b.y + (Math.random() - 0.3) * 6, vx: 0, vy: 8 + Math.random() * 14, s: 1, vita: 0.55, fade: 0.25, col: Math.random() < 0.5 ? "#7fd0f5" : "#c4eeff", g: 700});
+      }
+    }
     if (PO && L.po) PO.passo(L, aiuti);                      // i poteri: effetti a mossa, braci, teschi, neve
     // la falda del cappotto e' appesa al busto basso come un pendolo smorzato: quando il corpo va avanti si scosta all'indietro, quando si ferma ondeggia
     if (L.falda) {
@@ -1399,6 +1463,7 @@ const Arena = (() => {
     if (sotto && L.cop && !L.copStacc) staccaCopricapo(L, primo);
     else if (!sotto && L.copStacc) L.copStacc = null;
     L.extra = pg.extra || {};                                    // ali (potere Ali), braccia extra (2x2), volo (stance): spariscono con loro
+    if (primo) L.acq = L.extra.acqua ? 1 : 0;                    // (Forma d'acqua: a duello gia' avviato niente dissolvenza)
     if (primo) L.fk = 1 + FORZA_RANGO * (L.extra.forza || 0);    // (a duello gia' avviato niente crescita: e' gia' cosi')
     L.pup.volo(!!L.extra.volo);
     const morto = !inPalestra && (pg.hp.testa.val <= 0 || pg.hp.busto.val <= 0);

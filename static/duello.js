@@ -55,15 +55,22 @@ function pianificaCpu() {
 /* col menu "mira" aperto il cursore e' un mirino sull'arena: la parte del corpo cliccata e' la mira; mentre ci si passa sopra si evidenzia anche
    la sua riga nella scheda dell'avversario */
 function sincronizzaMira() {
-  const on = menu === "mira" && S && S.fase === "player" && !S.finito;
-  Arena.mira(on ? {scegli: loc => invia({tipo: "mira", loc}), sopra: evidenziaLoc} : null);
-  if (!on) evidenziaLoc(null);
+  const mirando = menu === "mira" && S && S.fase === "player" && !S.finito;
+  const parando = menu === "parata" && S && S.fase === "risposta" && !S.finito;
+  if (mirando) Arena.mira({lato: "c", stile: "mira", scegli: loc => invia({tipo: "mira", loc}), sopra: loc => evidenziaLoc("pan-cpu", loc)});
+  else if (parando) Arena.mira({lato: "p", stile: "parata", segna: S.in_corso && S.in_corso.locazione,
+                                scegli: loc => invia({tipo: "risposta", scelta: "parata", loc}), sopra: loc => evidenziaLoc("pan-player", loc)});
+  else { Arena.mira(null); evidenziaLoc(null, null); }
 }
-function evidenziaLoc(loc) {
-  document.querySelectorAll("#pan-cpu .pan-loc").forEach(r => r.classList.toggle("sotto-mirino", !!loc && r.dataset.loc === loc));
+/* la riga della parte sotto il mirino nella scheda di chi e' bersaglio: rossa per la mira, blu per la parata */
+function evidenziaLoc(dove, loc) {
+  document.querySelectorAll("#pan-cpu .pan-loc, #pan-player .pan-loc").forEach(r =>
+    r.classList.toggle("sotto-mirino", !!loc && r.dataset.loc === loc && r.closest("#" + dove) !== null));
 }
 document.addEventListener("keydown", e => {
-  if (e.key === "Escape" && menu === "mira") { menu = "attacchi"; render(); }
+  if (e.key !== "Escape") return;
+  if (menu === "mira") { menu = "attacchi"; render(); }
+  else if (menu === "parata") { menu = null; render(); }
 });
 
 /* ---------- render ---------- */
@@ -643,12 +650,11 @@ function renderAzioni() {
   if (S.fase === "risposta") {
     const c = S.in_corso;
     if (menu === "parata") {
-      box.innerHTML = `<div class="titolo-menu">Dove incassi il colpo?</div>` +
-        Object.entries(S.player.hp).map(([l, h]) => bottone(
-          `${l.replace(/_/g, " ")} <span class="muted">(${h.val}/${h.max}${h.arm ? ` +${h.arm}` : ""})</span>` +
-          (c && l === c.locazione ? " ⚠ <span class=\"muted\">dove punta il colpo</span>" : ""),
-          `invia({tipo:"risposta",scelta:"parata",loc:"${l}"})`)).join("") +
-        bottone("← Indietro", "menu=null;render()", "btn-ghost");
+      // come la mira: non si sceglie coi tasti, il cursore e' un mirino sul PROPRIO corpo (Arena.mira, v. sincronizzaMira) e si clicca la parte che incassa
+      box.innerHTML = `<div class="titolo-menu">Parata: dove incassi il colpo?</div>` +
+        `<div class="mira-guida parata"><span class="mira-icona">⛨</span><div><b>Clicca sulla parte del tuo corpo che incassa il colpo</b>
+          <span class="muted">${c ? `Il colpo punta su <strong>${nomeLoc(c.locazione)}</strong> (velo rosso sul corpo). ` : ""}Se la parata riesce non subisci niente; se fallisce il danno si dimezza e lo prende la parte che scegli.</span></div></div>` +
+        bottone("← Indietro (Esc)", "menu=null;render()", "btn-ghost");
       return;
     }
     // l'attacco in arrivo: il tiro e' gia' noto, la risposta e' UNA per round

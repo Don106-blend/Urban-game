@@ -288,6 +288,10 @@ a.fighter-card:hover { transform: translateY(-3px); border-color: var(--volt); }
 .mira-guida .mira-icona { font-size: 28px; line-height: 1; color: var(--danger); }
 .mira-guida b { display: block; font-size: 14px; }
 .mira-guida .muted { display: block; font-size: 12px; margin-top: 2px; }
+/* la parata e' azzurra/blu, come il suo mirino sull'arena */
+.mira-guida.parata { border-color: #4aa3ff; }
+.mira-guida.parata .mira-icona { color: #4aa3ff; }
+#pan-player .pan-loc.sotto-mirino { outline-color: #4aa3ff; background: rgba(74, 163, 255, .18); }
 .pan-loc .val { text-align: right; font-variant-numeric: tabular-nums; }
 .pan-risorse { display: flex; gap: 10px; font-size: 12px; margin-top: 10px; flex-wrap: wrap; }
 .pan-risorse span { background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; }

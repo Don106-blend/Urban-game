@@ -1844,14 +1844,22 @@ def overhaul(webapp):
     assert all(pf.danni_tipo[l]["acido"] == 60 // 6 for l in ("testa", "gamba_sx")) and pf.danni_tipo["busto"]["acido"] == 20
     pan = webapp.pannello(pf, False)
     assert pan["hp"]["busto"]["tipi"] == pf.danni_tipo["busto"] and pan["hp"]["gamba_dx"]["tipi"] == {"acido": 10}
-    assert pan["extra"] == {"ali": False, "braccia": False, "volo": False, "velocita": 0, "forza": 0, "poteri": {}, "stance_poteri": []}
+    assert pan["extra"] == {"ali": False, "braccia": False, "volo": False, "acqua": False, "velocita": 0, "forza": 0, "poteri": {}, "stance_poteri": []}
     pf.poteri.append({"def": next(x for x in webapp.DB["poteri"] if x["nome"] == "Ali"), "rango": 1, "attivo": False})
     pf.poteri.append({"def": next(x for x in webapp.DB["poteri"] if x["nome"] == "2x2"), "rango": 1, "attivo": True})
     pf.stance_attive.append({"def": next(x for x in webapp.DB["stances"] if x["nome"] == "Volo"), "turni": 3})
-    assert webapp.pannello(pf, False)["extra"] == {"ali": False, "braccia": True, "volo": True, "velocita": 0, "forza": 0,
+    assert webapp.pannello(pf, False)["extra"] == {"ali": False, "braccia": True, "volo": True, "acqua": False, "velocita": 0, "forza": 0,
                                                    "poteri": {12: 1}, "stance_poteri": []}   # solo cio' che e' ATTIVO (Volo e' di Ali, spento)
     pf.poteri[0]["attivo"] = True
     assert webapp.pannello(pf, False)["extra"]["ali"] is True
+    # stance Forma d'acqua: il corpo si vede acqua finche' la stance e' in corso, e la descrizione dice cosa fa
+    sd_acqua = next(x for x in webapp.DB["stances"] if x["id"] == webapp.STANCE_FORMA_ACQUA)
+    assert sd_acqua["nome"] == "Forma d'acqua", "STANCE_FORMA_ACQUA e' ancora la stance giusta"
+    d_ac = sd_acqua["descrizione"].lower()
+    assert all(w in d_ac for w in ("3 turni", "fuoco", "perforanti", "elettrici", "contundenti", "50%", "2 turni")), "la descrizione dice durata, immunita', debolezze e ricarica"
+    assert webapp.pannello(pf, False)["extra"]["acqua"] is False
+    pf.stance_attive.append({"def": sd_acqua, "turni": 3})
+    assert webapp.pannello(pf, False)["extra"]["acqua"] is True
     assert webapp.pannello(pf, False)["extra"]["poteri"] == {11: 1, 12: 1} and webapp.pannello(pf, False)["extra"]["stance_poteri"] == [11]
 
     # ---- aspetto dei poteri (static/poteri.js): quali poteri sono accesi (con rango), quali hanno una stance in corso e di chi e' una mossa ----

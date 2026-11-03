@@ -390,7 +390,7 @@
   },
   {
     "nome": "Forma d'acqua",
-    "descrizione": "",
+    "descrizione": "Il corpo diventa acqua per 3 turni: sei immune ai danni di fuoco e perforanti (i colpi ti attraversano), ma subisci il 50% in più dai danni elettrici e contundenti. Ricarica: 2 turni.",
     "attivo_default": false,
     "durata": {
       "tipo": "fissa",
