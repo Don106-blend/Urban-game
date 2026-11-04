@@ -22,7 +22,11 @@ function prova(id, esito) {
     particella: () => { reg.particelle++; },
     futuro: (s, fn) => futuri.push({t: t + s, fn}),
     // il pupazzo: il colpo parte dopo la carica, e la mossa finisce da se' (i test dell'arena non ci sono: qui si simula)
-    attacca: (o) => { futuri.push({t: t + (o.carica || 0.2), fn: () => o.alColpoInizio && o.alColpoInizio()}); futuri.push({t: t + 1.6, fn: () => o.alFine && o.alFine()}); },
+    // (i colpi in mischia: il contatto del pugno arriva da arena.js con `alContatto`; qui lo simuliamo a meta' della mossa)
+    attacca: (o) => { futuri.push({t: t + (o.carica || 0.2), fn: () => o.alColpoInizio && o.alColpoInizio()});
+                      if (o.alContatto) futuri.push({t: t + 0.5, fn: () => o.alContatto({loc: "busto", esito})});
+                      futuri.push({t: t + 1.6, fn: () => o.alFine && o.alFine()}); },
+    largo: 400, impatto: () => [160, 55], giunto: () => [100, 50], pugno() {},
     gesto: () => { reg.gesti++; }, reazione: () => { reg.reazioni++; }, scuoti() {},
     contatto: () => { reg.contatto++; reg.tContatto = t; }, fine: () => { reg.fine++; reg.tFine = t; },
     base: {},
@@ -38,7 +42,9 @@ function prova(id, esito) {
   return reg;
 }
 
-const IDS = {9: "scintilla", 4: "palla di fuoco", 5: "lanciafiamme", 43: "eruzione", 7: "scheggie", 28: "scheggia di ghiaccio"};
+const IDS = {9: "scintilla", 4: "palla di fuoco", 5: "lanciafiamme", 43: "eruzione", 7: "scheggie", 28: "scheggia di ghiaccio",
+              45: "getto d'acqua", 46: "onda anomala", 47: "maremoto", 3: "colpo devastante", 41: "ondata sismica", 42: "frana",
+              52: "raffica controllata", 53: "tiro di precisione", 37: "tocco debilitante", 38: "dreno vitale", 39: "falce delle anime", 40: "pugno di roccia"};
 ok(JSON.stringify(Mosse.ids().sort((a, b) => a - b)) === JSON.stringify(Object.keys(IDS).map(Number).sort((a, b) => a - b)), "le animazioni sono quelle del Compendio dei poteri");
 ok(Mosse.ha({att_id: 9}) && !Mosse.ha({att_id: 1}) && !Mosse.ha({}) && !Mosse.ha(null), "ha() riconosce solo gli attacchi con la loro animazione");
 
@@ -48,7 +54,7 @@ for (const [id, nome] of Object.entries(IDS)) {
     ok(r.contatto === 1, `${nome}/${esito}: il colpo arriva una volta sola (contatto = ${r.contatto})`);
     ok(r.fine === 1 && r.tFine >= r.tContatto, `${nome}/${esito}: finisce dopo il contatto (${r.tContatto.toFixed(2)} -> ${r.tFine.toFixed(2)})`);
     ok(r.tContatto > 0.3 && r.tContatto < 3, `${nome}/${esito}: il contatto ha una sua durata di animazione (${r.tContatto.toFixed(2)} s)`);
-    if (+id !== 7) ok(r.particelle >= 1, `${nome}/${esito}: ci sono effetti (${r.particelle} particelle)`);      // (le Scheggie mancate filano via e basta)
+    if (+id !== 7 && !(+id === 3 && (esito === "schivato" || esito === "retto"))) ok(r.particelle >= 1, `${nome}/${esito}: ci sono effetti (${r.particelle} particelle)`);      // (le Scheggie mancate filano via e basta, e il pugno devastante a vuoto non scuote niente)
   }
 }
 // le animazioni a tempo: l'eruzione e' la piu' lunga, la scintilla la piu' breve tra i proiettili (la palombella vola piano: si vede)

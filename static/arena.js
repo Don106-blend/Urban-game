@@ -375,9 +375,9 @@ const Arena = (() => {
     const L = lati[lato], p = parti[nome], cv = L.tele[nome], cx = cv.getContext("2d");
     const seed = p.loc.length * 31 + p.loc.charCodeAt(p.loc.length - 1) + semeLato(lato);
     // i poteri: Pelle Invincibile mette un materiale al posto della pelle (e dal rango 3 un pezzo rinforzato), Appendici Affilate un avambraccio appuntito
-    const rp = PO ? PO.rangoPelle(L, p.loc) : 0, lama = !!(PO && p.app && PO.lama(L, nome)), px = lama ? p.app.px : p.px;
+    const rp = PO ? PO.rangoPelle(L, p.loc, nome) : 0, lama = !!(PO && p.app && PO.lama(L, nome)), px = lama ? p.app.px : p.px;
     L.rinfOn[nome] = rp >= 3 && !!p.rinf && !lama;
-    L.vestOff[nome] = rp >= 3;                                                     // dal rango 3 il potere sostituisce il livello dei vestiti (anche sulla lama)
+    L.vestOff[nome] = rp >= 3 || !!(PO && PO.pugnoSu(L, nome));                    // dal rango 3 il potere sostituisce il livello dei vestiti (anche sulla lama); il Pugno di Roccia lascia l'avambraccio nudo
     if (rp) {                                                                      // pietra e ossidiana sulla forma di sempre, rinforzata dal rango 3 (senza sangue: la pietra non sanguina)
       if (L.rinfOn[nome]) PO.coloraMateriale(L.telaR[nome], p.rinf, rp, {y0: p.y0, mx: pot.margine[0], my: pot.margine[1], seme: seed, fase: L.faseMat || 0});
       else PO.coloraMateriale(cv, {w: p.w, h: p.h, px}, rp, {y0: p.y0, seme: seed, fase: L.faseMat || 0});
@@ -763,6 +763,15 @@ const Arena = (() => {
     if (v.nome === "testa" && L.cop && !L.copStacc) ctx.drawImage(L.cop.tela, v.ox + L.cop.off[0], v.oy + L.cop.off[1]);      // cappelli e maschere: sopra i capelli
     const fa = L.fasce[v.nome];                                               // la fasciatura (palestra): sopra tutto, tranne il lampo del colpo
     if (fa) ctx.drawImage(fa, 0, v.y0, tela_.width, v.h, v.ox, v.oy, tela_.width, v.h);
+    if (PO && L.po && !R && pz.sk) {                                          // Maledizione: lo scheletro traspare verde da sotto pelle e vestiti, e pulsa
+      const m = PO.maledizione(L);
+      if (m.k > 0.02) {
+        const sv = scheletroVerde(pz);
+        ctx.globalAlpha = m.k * (0.3 + 0.65 * m.pulsa); ctx.drawImage(sv, 0, v.y0, tela_.width, v.h, v.ox, v.oy, tela_.width, v.h);
+        ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = m.k * 0.45 * m.pulsa; ctx.drawImage(sv, 0, v.y0, tela_.width, v.h, v.ox, v.oy, tela_.width, v.h);
+        ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
+      }
+    }
     const lamp = L.lamp[pz.loc];
     if (lamp > 0) {
       ctx.globalAlpha = Math.min(1, lamp * 2.2);
@@ -770,6 +779,24 @@ const Arena = (() => {
       else ctx.drawImage(pz.app && PO && PO.lama(L, v.nome) ? L.sagApp[v.nome] : L.sag[v.nome], 0, v.y0, tela_.width, v.h, v.ox, v.oy, tela_.width, v.h);
     }
     ctx.restore();
+  }
+  /* lo scheletro di un pezzo ricolorato di verde (Maledizione): ogni tono d'osso passa a un tono di verde (luce -> verde chiaro, ombra -> verde scuro) e
+     le ossa restano leggibili; si fa una volta sola */
+  const OSSO_VERDE = [[8, 52, 28, 150], [34, 160, 72, 200], [110, 240, 120, 235], [214, 255, 196, 255]];        // contorno, ombra, luce, riflesso
+  function scheletroVerde(pz) {
+    if (!pz.skVerde) {
+      const c = Object.assign(document.createElement("canvas"), {width: pz.w, height: pz.h}), cx = c.getContext("2d");
+      cx.drawImage(pz.sk, 0, 0);
+      const im = cx.getImageData(0, 0, pz.w, pz.h), d = im.data;
+      for (let i = 0; i < d.length; i += 4) {
+        if (!d[i + 3]) continue;
+        const r = d[i], k = OSSO_VERDE[r >= 225 ? 3 : r >= 185 ? 2 : r >= 110 ? 1 : 0];
+        d[i] = k[0]; d[i + 1] = k[1]; d[i + 2] = k[2]; d[i + 3] = k[3];
+      }
+      cx.putImageData(im, 0, 0);
+      pz.skVerde = c;
+    }
+    return pz.skVerde;
   }
   /* lo scheletro dell'avambraccio appuntito: le ossa della mano di sempre, tagliate alla sagoma della lama (si fa una volta sola) */
   function scheletroLama(pz) {
@@ -886,6 +913,10 @@ const Arena = (() => {
     get ctx() { return ctx; },
     pos: (L, corpo) => posaCorpo(L.pup.corpi[corpo]),
     punto: (L, corpo, giunto, interp = true) => puntoCorpo(L, corpo, giunto, interp),
+    ridisegna(L, nome) {                                    // un pezzo la cui pelle e' cambiata (Pugno di Roccia comincia o finisce)
+      const d = L.dati[nome];
+      if (d) disegnaPelle(L.lato, nome, d[0], d[1]);
+    },
     rinfresca(L, fase) {                                    // lava che pulsa e cristalli che scintillano: i pezzi di rango 3-4 si ridisegnano con una fase nuova
       L.faseMat = fase;
       for (const [nome, p] of Object.entries(parti)) if (L.dati[nome] && PO.rangoPelle(L, p.loc) >= 3) disegnaPelle(L.lato, nome, L.dati[nome][0], L.dati[nome][1]);
@@ -987,6 +1018,14 @@ const Arena = (() => {
     ctx.globalAlpha = 1;
   }
 
+  /* la parte degli effetti che sta DIETRO ai combattenti (l'onda che corre, le ombre dei massi) */
+  function disegnaFxDietro() {
+    if (!MO || !MO.dietro) return;
+    ctx.setTransform(S * dpr, 0, 0, S * dpr, (scossa.a > 0.01 ? scossa.x * dpr : 0), (pavY - 111 * S + (scossa.a > 0.01 ? scossa.y : 0)) * dpr);
+    MO.dietro(ctx);
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+  }
+
   /* gli effetti delle animazioni degli attacchi (proiettili, scintille, schegge conficcate...): nello stesso spazio delle particelle */
   function disegnaFx() {
     if (!MO) return;
@@ -1027,6 +1066,7 @@ const Arena = (() => {
     else { disegnaFondale(); disegnaPali(); disegnaFolla(); disegnaLuciRing(); }
     for (const L of Object.values(lati)) disegnaOmbra(L);
     disegnaParticelle(false);
+    disegnaFxDietro();
     if (mira.attiva && lati[mira.lato]) disegnaConMirino();
     else {
       // chi e' in piedi dietro, chi e' caduto davanti non conta: si disegna prima la CPU, poi il giocatore
@@ -1446,9 +1486,12 @@ const Arena = (() => {
       scambio.max = 7;
       const fine = () => { if (scambio && scambio.ev === ev) scambio.fine = true; };
       const mano = (l) => aMondo(att, forzaPunto(att, "braccio_" + l, att.pup._polso(l)));
-      MO.avvia(ev, {ev, att, dif, colpito, parato, locB, forza, base: o, davanti, punto, reazione, contatto, fine, mano,
+      const impatto = (info) => info && info.mondo ? info.mondo : info ? aMondo(att, forzaPunto(att, "braccio_dx", [info.x, info.y])) : aMondo(dif, davanti());      // dove si vede l'impatto (come in contatto)
+      MO.avvia(ev, {ev, att, dif, colpito, parato, locB, forza, base: o, davanti, punto, reazione, contatto, fine, mano, impatto, largo: Wp,
                     bersaglio: () => aMondo(dif, parato ? [davanti()[0] + 8, davanti()[1]] : davanti()),
                     pose: (L, nome) => posaCorpo(L.pup.corpi[nome]), aMondo, daMondo, particella, futuro,
+                    giunto: (L, corpo, nome) => aMondo(L, puntoCorpo(L, corpo, nome, true)),                         // un giunto del corpo, nel mondo (la direzione di un avambraccio: le armi in mano)
+                    pugno: (lato, durata) => { if (PO) PO.pugno(att, lato, durata, aiuti); },                       // l'avambraccio diventa pietra (Pugno di Roccia)
                     attacca: (extra) => att.pup.attacca({...o, ...extra}), gesto: (tipo, opz) => att.pup.gesto(tipo, opz),
                     scuoti: (a) => { scossa.a = Math.max(scossa.a, a); }});
       return;

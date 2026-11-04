@@ -420,7 +420,8 @@ def pannello(p, turno, altro=None):
                   "acqua": any(x["def"]["id"] == STANCE_FORMA_ACQUA for x in p.stance_attive),     # stance Forma d'acqua: il corpo e' acqua (static/arena.js)
                   "fuoco": any(x["def"]["id"] == STANCE_CORPO_FIAMMA for x in p.stance_attive),    # stance Corpo di Fiamma: il corpo e' fuoco luminoso
                   "velocita": p.rango_potere_attivo("Supervelocità"), "forza": p.rango_potere_attivo("Super Forza"),
-                  "poteri": p.poteri_attivi_rango(), "stance_poteri": p.poteri_in_stance()},
+                  "poteri": p.poteri_attivi_rango(), "stance_poteri": p.poteri_in_stance(),
+                  "stance_ids": [x["def"]["id"] for x in p.stance_attive]},      # (id delle stance in corso: Manto d'Ombra, Pelle di Pietra...)
         "risorse": {"azioni": p.azioni, "n_azioni": p.n_azioni,
                     "bonus": p.bonus, "n_bonus": p.n_bonus,
                     "risposte": p.risposte, "n_risposte": p.n_risposte,

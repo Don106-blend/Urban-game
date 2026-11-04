@@ -12,6 +12,7 @@ const Poteri = (() => {
   const DT = 1 / 60;
   const ID = {PELLE: 1, PIRO: 3, ASSORBI: 4, ELETTRO: 5, APPENDICI: 6, ANATEMA: 8, URLO: 9, CAMPO: 13, SOLDATO: 14, HYDRO: 15, CRIO: 16, ACIDO: 17,
               TELE: 18, NECRO: 19, GEO: 20};
+  const STANCE = {MANTO: 25, PIETRA: 27};                               // le stance che hanno un aspetto loro (id in data/stances.json): Manto d'Ombra, Pelle di Pietra
   const GRIGI = {38: "k", 106: "a", 142: "b", 178: "c", 216: "d"};     // gli indici dello sprite base (canale R), come in arena.js
   const CUCITURA = 70;                                                  // il sesto indice dei pezzi rinforzati: la commessura tra le piastre
   const TONI = ["k", "a", "b", "c", "d"], IDX = {k: 0, a: 1, b: 2, c: 3, d: 4};
@@ -110,7 +111,7 @@ const Poteri = (() => {
 
   /* ---------------------------------------------------------------------------------------------------------------------------------- */
   /* STATO DI UN COMBATTENTE */
-  const nuovo = () => ({ids: {}, eff: {}, vis: {}, fuori: {}, pronto: false, fase: 0, stance: new Set(), pelle: {}, app: false, mossa: {}, k: {}, t: Math.random() * 10, part: [], neve: null, teschi: [], fulm: 0});
+  const nuovo = () => ({ids: {}, eff: {}, vis: {}, fuori: {}, pronto: false, fase: 0, stance: new Set(), pelle: {}, app: false, mossa: {}, k: {}, stanceIds: new Set(), maledetto: false, pugno: null, t: Math.random() * 10, part: [], neve: null, teschi: [], fulm: 0});
 
   /* dallo stato del duello (`pg.extra`, `pg.hp`): quali poteri sono accesi e a che rango, quali hanno una stance in corso, dove la pelle e' ancora
      corazzata (armatura > 0 in quella locazione, e la locazione non e' storpia ne' a zero) */
@@ -131,6 +132,12 @@ const Poteri = (() => {
       if (h && h.arm > 0 && h.val > 0 && !h.crippled) po.pelle[loc] = rp;
     }
     po.app = !!po.ids[ID.APPENDICI];
+    po.stanceIds = new Set((ex.stance_ids || []).map(Number));
+    po.maledetto = !!(pg && (pg.effetti || []).some((e) => e.nome === "Maledizione"));         // l'effetto Maledizione: lo scheletro pulsa di verde
+    if (pg && po.stanceIds.has(STANCE.PIETRA)) for (const loc of LOCS) {                          // stance Pelle di Pietra: la pelle (solo la pelle, i vestiti restano) e' pietra
+      const h = pg.hp && pg.hp[loc];
+      if (h && h.val > 0 && !h.crippled && !h.protesi) po.pelle[loc] = Math.max(po.pelle[loc] || 0, 1);
+    }
     for (const id of Object.keys(po.ids)) if (!(id in po.k)) po.k[id] = 0;
   }
 
@@ -138,9 +145,19 @@ const Poteri = (() => {
   function chiave(L, loc, nome) {
     const po = L.po;
     if (!po) return "";
-    return (po.pelle[loc] ? "P" + po.pelle[loc] : "") + (po.app && /^avambraccio_/.test(nome) ? "A" : "");
+    return (po.pelle[loc] ? "P" + po.pelle[loc] : "") + (po.app && /^avambraccio_/.test(nome) ? "A" : "") + (pugnoSu(L, nome) ? "R" : "");
   }
-  const rangoPelle = (L, loc) => (L.po && L.po.pelle[loc]) || 0;
+  /* Pugno di Roccia: l'avambraccio di chi colpisce diventa pietra per la durata della mossa (e lascia i vestiti) */
+  const pugnoSu = (L, nome) => !!(L.po && L.po.pugno && nome === "avambraccio_" + L.po.pugno.lato);
+  function pugno(L, lato, durata, A) {
+    const po = L.po || (L.po = nuovo());
+    po.pugno = {lato, t: durata};
+    if (A && A.ridisegna) A.ridisegna(L, "avambraccio_" + lato);
+  }
+  const rangoPelle = (L, loc, nome) => {
+    const r = (L.po && L.po.pelle[loc]) || 0;
+    return r || (nome && pugnoSu(L, nome) ? 1 : 0);
+  };
   const lama = (L, nome) => !!(L.po && L.po.app && /^avambraccio_/.test(nome));
 
   /* una mossa o una stance di questi poteri e' in uso: gli effetti "quando usi..." si accendono per `durata` secondi */
@@ -425,7 +442,10 @@ const Poteri = (() => {
     // la lava pulsa e i cristalli scintillano: ogni 8 passi l'arena ridisegna i pezzi di rango 3 e 4 con una fase nuova (si salta se non serve)
     if (Math.round(po.t / DT) % 8 === 0 && A.rinfresca && Object.values(po.pelle).some((r) => r >= 3)) { po.fase++; A.rinfresca(L, po.fase); }
     for (const id of Object.keys(po.mossa)) { po.mossa[id] -= DT; if (po.mossa[id] <= 0) delete po.mossa[id]; }
+    if (po.pugno) { po.pugno.t -= DT; if (po.pugno.t <= 0) { const nome = "avambraccio_" + po.pugno.lato; po.pugno = null; if (A.ridisegna) A.ridisegna(L, nome); } }
     const vivo = !L.ko && !(L.pup && L.pup.morto);
+    for (const [chiave, on] of [["mal", po.maledetto], ["manto", po.stanceIds.has(STANCE.MANTO)]])         // Maledizione e Manto d'Ombra: salgono e scendono piano
+      po.k[chiave] = (po.k[chiave] || 0) + ((vivo && on ? 1 : 0) - (po.k[chiave] || 0)) * (1 - Math.exp(-DT * (vivo && on ? 3.5 : 5)));
     for (const id of [ID.ASSORBI, ID.ANATEMA, ID.SOLDATO]) {                      // si accendono con una mossa o con una stance in corso
       const on = vivo && po.eff[id] && (po.stance.has(id) || po.mossa[id] > 0) ? 1 : 0;
       po.k[id] += (on - (po.k[id] || 0)) * (1 - Math.exp(-DT * (on ? 12 : 4)));
@@ -518,10 +538,38 @@ const Poteri = (() => {
   function disegnaAura(ctx, x, y, r, col, a) { disegnaSprite(ctx, alone(r, col), x, y, a, true); }
   const vis = (po, id) => po.vis[id] == null ? 1 : po.vis[id];
 
+  /* MANTO D'OMBRA (stance di Necromanzia): un'aura di fuoco verde pervade il corpo finche' la stance dura. Dietro il corpo un grande bagliore che pulsa,
+     davanti lingue di fiamma verde (le stesse dei teschi, ingrandite) che salgono da tutti i pezzi del corpo e si spengono in alto. */
+  const PEZZI_MANTO = ["busto_sup", "testa", "coscia_dx", "avambraccio_sx", "busto_inf", "stinco_sx", "avambraccio_dx", "coscia_sx", "stinco_dx"];
+  function manto(ctx, L, A, davanti) {
+    const po = L.po, k = po.k.manto || 0;
+    if (k < 0.02) return;
+    const t = po.t;
+    if (!davanti) {                                                       // il bagliore dietro: una nube verde attorno al corpo
+      const c = centro(L, A);
+      FADE = k;
+      disegnaSprite(ctx, alone(40, [28, 190, 78]), c[0], c[1] + 2, 0.55 + 0.12 * Math.sin(t * 3.1), true);
+      disegnaSprite(ctx, alone(22, [96, 255, 120]), c[0], c[1] - 2, 0.3 + 0.1 * Math.sin(t * 4.7 + 1), true);
+      FADE = 1;
+      return;
+    }
+    const N = 26;
+    for (let i = 0; i < N; i++) {
+      const b = A.pos(L, PEZZI_MANTO[i % PEZZI_MANTO.length]), ciclo = t * 0.9 + i * 0.381, u = ciclo - Math.floor(ciclo), cy = Math.floor(ciclo);
+      const x = b[0] + (hash(i, cy, 31) - 0.5) * 11 + Math.sin(t * 6 + i * 2) * 1.3 * u, y = b[1] + (hash(i, cy, 37) - 0.5) * 9 - 16 * u * (0.6 + 0.6 * hash(i, cy, 41));
+      const a = Math.sin(Math.PI * Math.min(1, u * 1.1)) * k, fi = fiamma(Math.floor(t * 12 + i * 1.7) % 3);
+      disegnaSprite(ctx, alone(3, [60, 230, 100]), x, y, 0.4 * a, true);
+      ctx.globalAlpha = a * 0.92;
+      ctx.drawImage(fi, Math.round(x - 3), Math.round(y - 5), 6, 8);
+      ctx.globalAlpha = 1;
+    }
+  }
+
   function dietro(L, A) {
     const po = L.po;
     if (!po || L.ko || (L.pup && L.pup.morto)) return;
     const ctx = A.ctx;
+    manto(ctx, L, A, false);
     FADE = vis(po, ID.CRIO); disegnaNeve(ctx, po, true);
     FADE = vis(po, ID.NECRO); if (po.eff[ID.NECRO]) disegnaTeschi(ctx, L);
     FADE = 1;
@@ -578,6 +626,7 @@ const Poteri = (() => {
         fulmine(ctx, p[0] + (rnd(b, i, 8, 7) - 0.5) * 8, p[1] + (rnd(b, i, 8, 8) - 0.5) * 12, 6.28 * rnd(b, i, 8, 9), 8 + 10 * rnd(b, i, 8, 10), b * 13 + i, FULM.soldato);
       }
     }
+    manto(ctx, L, A, true);
     FADE = 1; disegnaParticelle(ctx, po);
     FADE = vis(po, ID.CRIO); disegnaNeve(ctx, po, false);
     FADE = 1; ctx.globalAlpha = 1;
@@ -659,6 +708,14 @@ const Poteri = (() => {
     return dati;
   }
 
-  return {ID, acqua, fuoco, aggiorna, chiave, rangoPelle, lama, coloraMateriale, mossa, passo, dietro, davanti, disegnaOnda, CUCITURA};
+  /* Maledizione: com'e' lo scheletro verde che traspare (k = intensita' 0..1, pulsa = il battito: due colpi e una pausa) */
+  function maledizione(L) {
+    const po = L.po, k = po ? po.k.mal || 0 : 0;
+    if (k < 0.02) return {k: 0, pulsa: 0};
+    const f = (po.t * 0.9) % 1, colpo = (c, w) => Math.exp(-(((f - c) / w) ** 2));
+    return {k, pulsa: Math.min(1, 0.22 + colpo(0.12, 0.07) + 0.75 * colpo(0.34, 0.07))};      // due battiti ravvicinati e una pausa
+  }
+
+  return {ID, STANCE, acqua, fuoco, aggiorna, chiave, rangoPelle, pugno, pugnoSu, maledizione, lama, coloraMateriale, mossa, passo, dietro, davanti, disegnaOnda, CUCITURA};
 })();
 if (typeof module !== "undefined") module.exports = Poteri;

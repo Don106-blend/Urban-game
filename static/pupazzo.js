@@ -298,7 +298,7 @@ const Pupazzo = (() => {
 
   /* un gesto che non e' un colpo: puntare l'avversario (mira), caricare un potere, assumere una stance */
   class Gesto {
-    constructor(pup, tipo, o = {}) { this.pup = pup; this.tipo = tipo; this.o = o; this.t = 0; this.dur = o.durata ?? (tipo === "mira" ? 0.7 : tipo === "potere" ? 0.85 : tipo === "cielo" ? 1.2 : tipo === "arco" ? 0.62 : 0.5); }
+    constructor(pup, tipo, o = {}) { this.pup = pup; this.tipo = tipo; this.o = o; this.t = 0; this.dur = o.durata ?? (tipo === "mira" ? 0.7 : tipo === "potere" ? 0.85 : tipo === "cielo" ? 1.2 : tipo === "arco" ? 0.62 : tipo === "evoca" ? 1.4 : tipo === "sbatte" ? 1.1 : tipo === "imbraccia" ? 1.6 : 0.5); }
     passo(dt, p) {
       const pup = this.pup, u = lim(this.t / this.dur, 0, 1), b = bump(u), k = Math.min(1, u / 0.25) * (u > 0.75 ? Math.max(0, (1 - u) / 0.25) : 1);
       this.t += dt;
@@ -324,6 +324,43 @@ const Pupazzo = (() => {
           p.scalaBraccio[l] = 1.9;
         }
         p.busto += lerp(0.16, -0.1, s) * (1 - ritorno); p.sprofonda += lerp(2.6, 0, s) * (1 - ritorno);
+      } else if (this.tipo === "evoca") {                      // le braccia al cielo (si evoca qualcosa) e, a `punta` secondi, si abbassano e puntano l'avversario; poi si rilasciano
+        const lun = pup.L.braccio_dx[0] + pup.L.braccio_dx[1], tp = this.o.punta ?? 0.6, t = this.t;
+        const su = liscio(Math.min(1, t / 0.34)), m = liscio((t - tp) / 0.24), k = Math.min(1, t / 0.2) * Math.min(1, Math.max(0, (this.dur - t) / 0.3));
+        const B = this.o.bersaglio ? this.o.bersaglio() : [pup._spalla("dx")[0] + 40, pup._spalla("dx")[1]];
+        for (const l of LATI) {
+          const S = pup._spalla(l), gW = [S[0] + p.mani[l][0], S[1] + p.mani[l][1]];
+          const alto = [S[0] + 3 + (l === "sx" ? -2 : 0) + Math.sin(t * 38) * 0.6 * (1 - m), S[1] - lun * 0.94];                 // in alto, con il tremito dello sforzo
+          const dx = B[0] - S[0], dy = B[1] - S[1], d = Math.hypot(dx, dy) || 1, r = lun * 0.97;
+          const punta = [S[0] + dx / d * r, S[1] + dy / d * r];                                                                      // puntate sul bersaglio
+          const meta = [lerp(alto[0], punta[0], m), lerp(alto[1], punta[1], m)];
+          p.manoMondo[l] = [lerp(gW[0], lerp(gW[0], meta[0], su), k), lerp(gW[1], lerp(gW[1], meta[1], su), k)];
+          p.scalaBraccio[l] = 1.8;
+        }
+        p.busto += (-0.14 * su * (1 - m) + 0.1 * m) * k; p.sprofonda += (1.2 * su + 1.6 * m) * k;
+      } else if (this.tipo === "sbatte") {                     // pugni a terra: braccia su e indietro, poi giu' di colpo sul pavimento davanti ai piedi, il corpo accovacciato
+        const lun = pup.L.braccio_dx[0] + pup.L.braccio_dx[1], tU = this.o.alza ?? 0.36, tS = this.o.sbatte ?? 0.5, t = this.t;
+        const su = liscio(Math.min(1, t / tU)), giu = easeIn(lim((t - tU) / (tS - tU), 0, 1)), k = Math.min(1, t / 0.16) * Math.min(1, Math.max(0, (this.dur - t) / 0.28));
+        for (const l of LATI) {
+          const S = pup._spalla(l), gW = [S[0] + p.mani[l][0], S[1] + p.mani[l][1]];
+          const alto = [S[0] - 2 + (l === "sx" ? -2 : 0), S[1] - lun * 0.9], terra = [S[0] + 17 + (l === "sx" ? -3 : 0), 108];
+          const meta = [lerp(alto[0], terra[0], giu), lerp(alto[1], terra[1], giu)];
+          p.manoMondo[l] = [lerp(gW[0], lerp(gW[0], meta[0], su), k), lerp(gW[1], lerp(gW[1], meta[1], su), k)];
+          p.scalaBraccio[l] = 1.7;
+        }
+        p.busto += (-0.2 * su * (1 - giu) + 0.5 * giu) * k; p.sprofonda += (4 * su + 14 * giu) * k;
+        if (!this.sbattuto && t >= tS) { this.sbattuto = true; if (this.o.alSbatte) this.o.alSbatte(); }
+      } else if (this.tipo === "imbraccia") {                  // un fucile a due mani: si porta davanti e si punta. La destra sull'impugnatura (vicina), la sinistra sul fusto
+        const lun = pup.L.braccio_dx[0] + pup.L.braccio_dx[1], t = this.t, k = liscio(Math.min(1, t / 0.32)) * Math.min(1, Math.max(0, (this.dur - t) / 0.3));
+        const S0 = pup._spalla("dx"), B = this.o.bersaglio ? this.o.bersaglio() : [S0[0] + 40, S0[1]];
+        const dx = B[0] - S0[0], dy = B[1] - S0[1], d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d, rd = lun * 0.45, rs = rd + (this.o.presa ?? 11);
+        for (const l of LATI) {
+          const S = pup._spalla(l), gW = [S[0] + p.mani[l][0], S[1] + p.mani[l][1]], r = l === "dx" ? rd : rs;
+          const T = [S0[0] + ux * r, S0[1] + uy * r + (l === "dx" ? 1 : 0)];
+          p.manoMondo[l] = [lerp(gW[0], T[0], k), lerp(gW[1], T[1], k)];
+          p.scalaBraccio[l] = 1.9;
+        }
+        p.busto += 0.12 * k; p.sprofonda += 1.6 * k;
       } else if (this.tipo === "potere") {                     // si raccoglie e si espande: pugni al petto, poi braccia aperte
         p.sprofonda += 2.5 * Math.sin(PI * Math.min(1, u * 1.4)); p.busto += -0.12 * k;
         const chiuso = Math.min(1, u / 0.45), aperto = Math.max(0, (u - 0.45) / 0.3) * (u > 0.8 ? Math.max(0, (1 - u) / 0.2) : 1);
