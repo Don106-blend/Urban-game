@@ -149,6 +149,7 @@ def main():
     ok(r0["soprannome"] is None or r0["soprannome"] in N.soprannomi_disponibili(r0), "e viene dai suoi poteri")
     ok(d.cpu.nome == N.nome_completo(r0) and d.cpu.aspetto == r0["aspetto"], "stesso volto e stesso nome ogni volta")
     json.dumps(S)
+    a["fiducia"], a["stress"] = 100, 0     # (con random() forzato a 0 un atleta che non si fida farebbe sempre di testa sua: v. iniziativa.py)
     # tornano: costringo il ritorno e lo stesso rivale si ripresenta, piu' forte
     liv0, xp0 = r0["livello"], r0["xp"]
     orig = random.random

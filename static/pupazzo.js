@@ -159,7 +159,7 @@ const Pupazzo = (() => {
         if (o.alAnticipo && !this.anticipato && this.t >= this.Tc - (o.anticipo || 0)) { this.anticipato = true; o.alAnticipo(); }
         // la mano si ritrae di poco (il braccio e' lungo: un gomito troppo piegato sporgerebbe come un'ala di pollo)
         let m;
-        if (this.dist) m = [guardia[0] - 4, guardia[1] + 2];
+        if (this.dist) m = this.stile === "palombella" ? [guardia[0] - 8, guardia[1] + 13] : [guardia[0] - 4, guardia[1] + 2];   // (palombella: la mano scende per lanciare dal basso)
         else if (this.stile === "fendente") m = [-1, -19];                  // la mano sale sopra la spalla
         else if (this.stile === "affondo") m = [guardia[0] - 9, guardia[1] + 5];
         else m = [guardia[0] - 7, guardia[1] + 4];
@@ -225,9 +225,10 @@ const Pupazzo = (() => {
       if (this.stile === "affondo") this.avanti = Math.min(T_MAX_AVANZATA, this.avanti + 2);
     }
     /* dove mirare con la mano: dalla posizione a inizio colpo al bersaglio (a distanza: il braccio si punta e basta) */
-    _mano(pup, u, T, p) {
+    _mano(pup, u, T, p) {          // (T puo' essere ritoccato: palombella)
       if (this.dist) {
         const S = pup._spalla(this.mano), [l1, l2] = pup.L["braccio_" + this.mano];
+        if (this.stile === "palombella") T = [T[0], T[1] - 38];          // si punta sopra il bersaglio: la palla scende dall'alto
         const dx = T[0] - S[0], dy = T[1] - S[1], d = Math.hypot(dx, dy) || 1, r = (l1 + l2) * 0.97;
         const P = [S[0] + dx / d * r, S[1] + dy / d * r];
         const e = easeOut(u);
@@ -297,7 +298,7 @@ const Pupazzo = (() => {
 
   /* un gesto che non e' un colpo: puntare l'avversario (mira), caricare un potere, assumere una stance */
   class Gesto {
-    constructor(pup, tipo, o = {}) { this.pup = pup; this.tipo = tipo; this.o = o; this.t = 0; this.dur = tipo === "mira" ? 0.7 : tipo === "potere" ? 0.85 : 0.5; }
+    constructor(pup, tipo, o = {}) { this.pup = pup; this.tipo = tipo; this.o = o; this.t = 0; this.dur = o.durata ?? (tipo === "mira" ? 0.7 : tipo === "potere" ? 0.85 : tipo === "cielo" ? 1.2 : tipo === "arco" ? 0.62 : 0.5); }
     passo(dt, p) {
       const pup = this.pup, u = lim(this.t / this.dur, 0, 1), b = bump(u), k = Math.min(1, u / 0.25) * (u > 0.75 ? Math.max(0, (1 - u) / 0.25) : 1);
       this.t += dt;
@@ -307,6 +308,22 @@ const Pupazzo = (() => {
         const gW = [S[0] + p.mani.dx[0], S[1] + p.mani.dx[1]];
         p.manoMondo.dx = [lerp(gW[0], S[0] + dx / d * r, k), lerp(gW[1], S[1] + dy / d * r, k)];
         p.busto += 0.1 * k; p.sprofonda += 1.5 * k; p.scalaBraccio.dx = 1.6;
+      } else if (this.tipo === "cielo") {                      // le braccia al cielo (un tremito di sforzo), il busto un poco indietro: poi si abbassano
+        const lun = pup.L.braccio_dx[0] + pup.L.braccio_dx[1], su = liscio(Math.min(1, u / 0.32)) * (u > 0.8 ? Math.max(0, (1 - u) / 0.2) : 1);
+        for (const l of LATI) {
+          p.mani[l] = [lerp(p.mani[l][0], 3 + (l === "sx" ? -2 : 0) + Math.sin(this.t * 38) * 0.6 * su, su), lerp(p.mani[l][1], -lun * 0.94, su)];
+          p.scalaBraccio[l] = 1.8;
+        }
+        p.busto += -0.12 * su; p.sprofonda += 1.2 * su;
+      } else if (this.tipo === "arco") {                       // le braccia (tutte e due) fanno un arco dal basso verso l'alto: bassa e indietro, poi in avanti e su
+        const lun = pup.L.braccio_dx[0] + pup.L.braccio_dx[1], s = lim(u / 0.78, 0, 1), ritorno = u > 0.84 ? (u - 0.84) / 0.16 : 0;
+        for (const l of LATI) {
+          const fin = [lerp(-4, 20, easeOut(s)), lerp(lun * 0.55, -lun * 0.72, easeIn(s) * 0.55 + liscio(s) * 0.45)];
+          const g = p.mani[l];
+          p.mani[l] = [lerp(fin[0], g[0], liscio(ritorno)), lerp(fin[1], g[1], liscio(ritorno))];
+          p.scalaBraccio[l] = 1.9;
+        }
+        p.busto += lerp(0.16, -0.1, s) * (1 - ritorno); p.sprofonda += lerp(2.6, 0, s) * (1 - ritorno);
       } else if (this.tipo === "potere") {                     // si raccoglie e si espande: pugni al petto, poi braccia aperte
         p.sprofonda += 2.5 * Math.sin(PI * Math.min(1, u * 1.4)); p.busto += -0.12 * k;
         const chiuso = Math.min(1, u / 0.45), aperto = Math.max(0, (u - 0.45) / 0.3) * (u > 0.8 ? Math.max(0, (1 - u) / 0.2) : 1);

@@ -26,16 +26,18 @@ DADI_FISSI = {"d4": 4, "d6": 6, "d8": 8, "d10": 10, "d12": 12, "d20": 20}
 # 16-33 round, a 3 dura 6-7. A 3 azioni il Colpo pesante (2) + una mira o un colpo (1) chiudono
 # esattamente il turno.
 AZIONI_BASE = 3
-# mirare costa un'azione e dà +MIRA_PENALITA al tiro del difensore (consumata dal primo attacco):
-# a 4 era una trappola (28% di vittorie mirando sempre alla testa); a 1 con difesa competente
-# la mira alla testa vale ~60% e quella al busto ~38%: un'opzione vera, non obbligata
+# mirare costa un'azione e dà +MIRA_PENALITA al tiro del difensore: a 4 era una trappola (28% di vittorie mirando
+# sempre alla testa); a 1 con difesa competente la mira alla testa vale ~60% e quella al busto ~38%.
+# La mira sceglie dove andra' il PROSSIMO colpo e vale nel turno in cui la si prende e in quello dopo (mirare come ultima
+# azione non e' sprecato: il primo colpo del turno seguente e' li'); poi si scioglie. Si scioglie anche dopo QUALUNQUE colpo, pure
+# uno che non si mira (il Colpo pesante la spreca). Il conto dei turni e' in `Personaggio.mira` (v. MIRA_TURNI).
 MIRA_PENALITA = 1
-# la mira vale per TUTTI i colpi mirabili del turno, non solo per il primo: con 3 azioni "mira +
-# due colpi" e' un turno (con la mira consumata dal primo colpo valeva meno di tre Pugni: 20-30%
-# di vittorie mirando al busto, qualunque penalita'). Il Colpo pesante non e' mirabile: con la
-# mira consumata e il pesante mirabile, "mira + pesante" riempiva un turno e batteva ogni altra
-# strategia (76% di media, 84% contro chi spamma Pugni) perche' il pesante non si para.
-MIRA_DURA_TURNO = True
+# Un colpo MIRATO va dove e' mirato: la schivata (che di norma riesce sempre) li' si tira, e la parata lo attutisce ma non lo sposta. Con la
+# mira valida per un solo colpo la risposta del round (una sola) andava sempre su quel colpo e lo annullava o lo spostava su un arto
+# (a segno il 7%, e mirare alla testa valeva il 44%: una trappola); cosi' vale ~57% (v. balance.py mira, M4).
+MIRA_SCHIVATA_SICURA = False
+MIRA_PARATA_SPOSTA = False
+MIRA_TURNI = 2          # turni propri in cui una mira presa e' ancora valida (quello in cui la si prende e il successivo)
 # le resistenze sono percentuali del danno (tetto): flat contro danni flat era un interruttore,
 # un casco da 50¤ che azzerava il Pugno sulla sola locazione che uccide
 RESISTENZA_MAX = 75
@@ -154,6 +156,19 @@ def _valore_mod(m, proprietario, altro):
     return v
 
 
+def valore_provocazione(m, provocatore, bersaglio):
+    """Quanto la Provocazione (stance Taunt) toglie al tiro per colpire di chi attacca il provocatore: la sfida
+    e' tra i due dadi (di default il sociale), e conta solo se la vince il provocatore (mai un regalo a chi
+    attacca). Prima il Taunt sommava lo stesso valore (dado proprio - dado avversario) ai tiri di ENTRAMBI i lati:
+    si annullava, e a ranghi pari valeva zero."""
+    return max(0, m.get("flat", 0) + _dado_sfida(m, "dado_proprio", provocatore)
+               - _dado_sfida(m, "dado_avversario", bersaglio))
+
+
+def _dado_sfida(m, chiave, chi):
+    return chi.tira(m[chiave]) if m.get(chiave) else 0
+
+
 def bonus_colpire(attaccante, difensore):
     """Somma dei modificatori al tiro per colpire dell'attaccante: dalle proprie stance,
     dai propri effetti attivi (es. stordimento), dalle stance del difensore
@@ -171,6 +186,8 @@ def bonus_colpire(attaccante, difensore):
         for m in st["def"].get("modificatori", []):
             if m["tipo"] == "colpire_avversario":
                 tot += _valore_mod(m, difensore, attaccante)
+            elif m["tipo"] == "provocazione":
+                tot -= valore_provocazione(m, difensore, attaccante)
     return tot
 
 
@@ -208,7 +225,7 @@ class Personaggio:
         self.locazione_potere = {}  # nome_loc -> slot potere che l'ha creata (Ali, 2x2...)
         # risorse del round corrente
         self.azioni = self.bonus = self.risposte = 0
-        self.mira = None       # locazione mirata per il prossimo attacco
+        self.mira = None       # locazione mirata per il prossimo attacco (property: prenderla azzera il conto dei turni, v. sotto)
         self.mira_bonus = False  # True (es. Supersoldato): mirare costa 1 bonus invece di 1 azione
         self.stamina = None    # inizializzata a inizio combattimento (init_stamina)
         # protesi/augment/EMP
@@ -222,6 +239,24 @@ class Personaggio:
         self.ddos_turni = 0            # >0: nessun augment si puo' accendere (Modulo DDOS); quelli gia' accesi restano accesi
         self.reazioni_bloccate = False  # True nel turno di chi usa il Modulo di IA predittiva: niente schivata
         self.cuscinetto_usato = False  # il Cuscinetto di emergenza scatta una volta sola per combattimento
+
+    # ---------- la mira ----------
+    @property
+    def mira(self):
+        return self._mira
+
+    @mira.setter
+    def mira(self, loc):
+        """Prendere (o sciogliere) la mira: il conto dei turni riparte, v. `fine_turno_mira`."""
+        self._mira = loc
+        self.mira_turni = 0
+
+    def fine_turno_mira(self):
+        """Alla fine di un proprio turno la mira invecchia: valeva per quel turno e per il successivo, dopo si scioglie da sola."""
+        if self._mira:
+            self.mira_turni += 1
+            if self.mira_turni >= MIRA_TURNI:
+                self.mira = None
 
     # ---------- dadi ----------
     def _mod_rango(self, tipo, target):
@@ -375,6 +410,8 @@ class Personaggio:
                                  st["def"]["nome"] + " (avversario)", dado=bool(m.get("dado_proprio") or m.get("dado_avversario")))
                     elif m["tipo"] == "mod_rango" and m.get("target") == "avversario":
                         aggiungi(nome(m["statistica"]), m.get("delta", 0), st["def"]["nome"] + " (avversario)", "rango")
+                    elif m["tipo"] == "provocazione":     # un malus che dipende da una sfida di dadi: si mostra come tale
+                        aggiungi("colpire", 0, st["def"]["nome"] + " (avversario)", "se perde la sfida", dado=True)
         return out
 
     def locazione_casuale(self):
@@ -389,7 +426,7 @@ class Personaggio:
 
     def puo_mirare(self):
         risorsa = self.bonus if self.mira_bonus else self.azioni
-        if risorsa <= 0 or self.mira or not any(att.get("can_aim") for att in self.attacchi):
+        if risorsa <= 0 or not any(att.get("can_aim") for att in self.attacchi):
             return False
         # un braccio CRIPPLED toglie la mira (il potere 2x2 compensa con gli arti extra)
         braccio_rotto = any(l in self.crippled for l in self.hp if l.startswith("braccio"))
@@ -793,6 +830,8 @@ class Personaggio:
             return False  # EMP: la protesi che sblocca questa stance è fuori uso
         if self.stance_manuale_attiva() is not None:
             return False  # una sola stance attiva per volta
+        if sdef.get("richiede_azioni") and self.azioni <= 0:
+            return False  # vale nel turno in corso (Aggressivo): senza azioni da giocare sarebbe sprecata
         stato = self.stato_stance(sdef)
         if stato["cooldown"] > 0:
             return False

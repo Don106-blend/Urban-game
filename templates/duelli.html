@@ -45,7 +45,33 @@
     </div>
     <div class="muted oggi-riga">Oggi sarebbe: {{ sessioni[p.piano.pianificata].nome if p.piano.pianificata in sessioni else p.piano.pianificata }}
       {% if p.piano.attivita == 'duello' %}· già sul ring{% endif %}</div>
+    <div class="muted oggi-riga" title="Sul ring non sempre ti dà retta: a ogni occasione (il suo turno, un attacco che gli ordini, una risposta...) può fare di testa sua. Più si fida di te e meno è stressato, meno succede; cosa fa dipende dal carattere.">
+      Di testa sua sul ring: <strong>{{ p.iniziativa }}%</strong> a occasione</div>
     {% if p.ok %}
+    {% if p.sfidante %}
+    {% set s = p.sfidante %}
+    <div class="sfidante sfidante-{{ s.stato }}">
+      <div class="sf-testa">Stasera affronta</div>
+      <div class="sf-corpo">
+        <canvas class="anteprima" data-aspetto='{{ s.aspetto|tojson|forceescape }}' aria-label="Anteprima di {{ s.nome }}"></canvas>
+        <div class="sf-dati">
+          <div class="sf-nome">{{ s.nome }}</div>
+          <div class="muted">LIV {{ s.livello }}{% if s.incontri %} · {{ s.incontri }} incontri{% endif %}{% if s.taglia %} · <span class="volt">taglia ¤ {{ s.taglia }}</span>{% endif %}</div>
+          <div class="sf-riga"><b>Poteri</b> {{ s.poteri|join(', ') if s.poteri else 'nessuno' }}</div>
+          <div class="sf-riga"><b>Impianti</b> {{ s.impianti|join(', ') if s.impianti else 'nessuno' }}</div>
+          <div class="sf-stats">{% for k, v in s.stats.items() %}<span title="{{ k }}">{{ k[:3]|upper }} {{ v }}</span>{% endfor %}</div>
+        </div>
+      </div>
+      <div class="muted sf-nota">{{ s.testo }}</div>
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('negozio', pid=c.id) }}">Equipaggia {{ c.nome.split(' ')[0] }} →</a>
+    </div>
+    {% else %}
+    <form method="post" action="{{ url_for('duelli_anteprima') }}">
+      <input type="hidden" name="pid" value="{{ c.id }}">
+      <button class="btn btn-ghost btn-sm full" title="Un informatore ti dice chi dovrà affrontare stasera: poi puoi equipaggiarlo o mandare qualcun altro. Il duello sarà proprio contro di lui."
+        {% if crediti < prezzo_anteprima %}disabled{% endif %}>🔍 Chi affronta stasera? — ¤ {{ prezzo_anteprima }}</button>
+    </form>
+    {% endif %}
     <form method="post" action="{{ url_for('duelli_avvia') }}">
       <input type="hidden" name="pid" value="{{ c.id }}">
       <button class="btn btn-volt full">Sali sul ring →</button>

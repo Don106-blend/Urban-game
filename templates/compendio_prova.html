@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Palestra di prova — Urban{% endblock %}
+{% block body_class %}prova-mode{% endblock %}
+{% block nav_mode %}completa{% endblock %}
+{% block content %}
+<div class="duello-head">
+  <h1>PALESTRA DI PROVA</h1>
+  <div class="round-chip" title="Statistiche a 1, nessun equipaggiamento, nessun aspetto. Nessun turno, nessuna stamina, nessuna ricarica.">PUPAZZI BASE · NON MUOIONO · SENZA TURNI</div>
+  <a class="btn btn-ghost btn-sm" href="{{ url_for('compendio') }}">← Compendium</a>
+</div>
+
+<div class="duello-grid">
+  <div class="corner corner-player">
+    <div id="pan-player"></div>
+  </div>
+
+  <div class="ring">
+    <div id="d-arena" class="arena"></div>
+    <div id="d-scena" class="scena"></div>
+    <div id="d-azioni" class="azioni prova"></div>
+  </div>
+
+  <div class="corner corner-cpu">
+    <div id="pan-cpu"></div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='fisica.js') }}"></script>
+<script src="{{ url_for('static', filename='pupazzo.js') }}"></script>
+<script src="{{ url_for('static', filename='poteri.js') }}"></script>
+<script src="{{ url_for('static', filename='mosse.js') }}?v={{ asset_v }}"></script>
+<script src="{{ url_for('static', filename='arena.js') }}"></script>
+<script src="{{ url_for('static', filename='compendio_prova.js') }}?v={{ asset_v }}"></script>
+{% endblock %}

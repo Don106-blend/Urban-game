@@ -89,11 +89,18 @@
 
     {% if not istruttore and stato != 'morto' %}
     <h2>Carattere</h2>
+    <p class="muted" title="A ogni occasione sul ring (il suo turno, un attacco che gli ordini, una risposta...) può fare di testa sua. Più si fida di te (fiducia {{ c.fiducia }}) e meno è stressato (stress {{ c.stress }}), meno succede; cosa fa dipende dal carattere.">
+      Sul ring fa di testa sua nel <strong>{{ iniziativa_p }}%</strong> delle occasioni.</p>
     <div class="tratti-elenco">
       {% for t in tratti %}
       <div class="tratto-card">
         <b>{{ t.nome }}</b> <span class="muted">— {{ t.descrizione }}</span>
         <div class="tratto-effetto">{{ t.effetto }}</div>
+        {% if iniziative[t.id] %}
+        <details class="tratto-iniz"><summary>Sul ring, di testa sua ({{ iniziative[t.id]|length }})</summary>
+          <ul>{% for e in iniziative[t.id] %}<li><b>{{ e.nome }}</b> <span class="muted">— {{ e.testo.replace('{nome}', c.nome.split(' ')[0]) }}</span></li>{% endfor %}</ul>
+        </details>
+        {% endif %}
       </div>
       {% endfor %}
       {% for _ in range(nascosti) %}

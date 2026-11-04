@@ -21,10 +21,11 @@
   },
   {
     "nome": "Difensivo",
-    "descrizione": "-1 al dado per colpire dell'avversario, -1 al tuo.",
+    "descrizione": "Nel prossimo turno dell'avversario: -1 al suo dado per colpire. Dura un turno solo.",
     "attivo_default": true,
     "durata": {
-      "tipo": "contrapposta"
+      "tipo": "fissa",
+      "turni": 1
     },
     "trigger": "attivo",
     "cooldown_turni": 1,
@@ -33,12 +34,6 @@
     "modificatori": [
       {
         "tipo": "colpire_avversario",
-        "flat": -1,
-        "dado_proprio": "",
-        "dado_avversario": ""
-      },
-      {
-        "tipo": "colpire_proprio",
         "flat": -1,
         "dado_proprio": "",
         "dado_avversario": ""
@@ -50,10 +45,11 @@
   },
   {
     "nome": "Aggressivo",
-    "descrizione": "+1 al tuo dado per colpire, +1 a quello dell'avversario.",
+    "descrizione": "In questo turno: +1 al tuo dado per colpire. Serve almeno un'azione ancora da giocare.",
     "attivo_default": true,
     "durata": {
-      "tipo": "contrapposta"
+      "tipo": "fissa",
+      "turni": 1
     },
     "trigger": "attivo",
     "cooldown_turni": 1,
@@ -65,21 +61,16 @@
         "flat": 1,
         "dado_proprio": "",
         "dado_avversario": ""
-      },
-      {
-        "tipo": "colpire_avversario",
-        "flat": 1,
-        "dado_proprio": "",
-        "dado_avversario": ""
       }
     ],
     "effetti_applicati": [],
     "effetti_avversario": [],
-    "id": 3
+    "id": 3,
+    "richiede_azioni": true
   },
   {
     "nome": "Taunt",
-    "descrizione": "Ad ogni dado per colpire si somma il tuo dado sociale meno quello dell'avversario.",
+    "descrizione": "Provocazione: per 3 turni, quando l'avversario ti attacca tira il suo dado sociale contro il tuo; se vinci tu, il suo dado per colpire cala della differenza.",
     "attivo_default": true,
     "durata": {
       "tipo": "fissa",
@@ -91,13 +82,7 @@
     "usi_massimi": 1,
     "modificatori": [
       {
-        "tipo": "colpire_proprio",
-        "flat": 0,
-        "dado_proprio": "sociale",
-        "dado_avversario": "sociale"
-      },
-      {
-        "tipo": "colpire_avversario",
+        "tipo": "provocazione",
         "flat": 0,
         "dado_proprio": "sociale",
         "dado_avversario": "sociale"
@@ -136,7 +121,7 @@
   {
     "id": 6,
     "nome": "Corpo di Fiamma",
-    "descrizione": "Immune a tutti i danni di tipo fuoco.",
+    "descrizione": "Il corpo è fuoco vivo: immune a tutti i danni di tipo fuoco, e chi ti colpisce da vicino prende fuoco (Bruciatura per 2 turni).",
     "attivo_default": false,
     "durata": {
       "tipo": "contrapposta"
@@ -147,7 +132,14 @@
         "tipo_danno": "fuoco"
       }
     ],
-    "effetti_applicati": []
+    "effetti_applicati": [],
+    "trigger": "vieni_colpito_mischia",
+    "effetti_avversario": [
+      {
+        "effetto": 1,
+        "turni": 2
+      }
+    ]
   },
   {
     "id": 7,

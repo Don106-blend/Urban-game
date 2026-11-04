@@ -21,11 +21,11 @@ TIPI_DANNO = ["contundente", "perforante", "taglio", "fuoco", "elettrico",
               "tutto", "nessuno"]
 TIPI_EFFETTO_POTERE = ["armatura", "cura", "mod_statistica", "resistenza", "immunita",
                        "debolezza", "azioni", "locazione_extra", "mira_bonus"]
-TIPI_MODIFICATORE = ["colpire_proprio", "colpire_avversario", "parata_sempre",
+TIPI_MODIFICATORE = ["colpire_proprio", "colpire_avversario", "provocazione", "parata_sempre",
                      "distribuisci_danni", "resistenza", "immunita", "debolezza",
                      "mod_rango", "immune_melee", "armatura"]
 TARGET_MOD = ["self", "avversario"]
-TRIGGER_STANCE = ["attivo", "attiva", "vieni_colpito", "manchi", "subisci_danni", "fai_danni"]
+TRIGGER_STANCE = ["attivo", "attiva", "vieni_colpito", "vieni_colpito_mischia", "manchi", "subisci_danni", "fai_danni"]
 TIPI_MOD_EFFETTO = ["mod_rango", "flat_risultato", "colpire", "azioni", "debolezza",
                     "stamina_mod"]
 LOCAZIONI_STANCE = ["tutte", "testa", "busto", "braccio_sx", "braccio_dx",
@@ -56,6 +56,12 @@ DURATA
   • fissa: dura il numero di turni indicato, senza tiro.
   (Le stance date da un potere come "attivate subito" durano tutto lo scontro.)
 
+QUANDO VALE (durata fissa, 1 turno): il conto dei turni scende all'inizio del TUO turno dopo, quindi una
+  stance attivata nel tuo turno vale per il resto del tuo turno e per tutto il prossimo turno dell'avversario.
+  Per questo un modificatore su colpire_avversario (Difensivo) serve contro il suo prossimo turno e uno su
+  colpire_proprio (Aggressivo) nel turno in corso.
+  "Serve un'azione da giocare" (richiede_azioni): la stance non si attiva se non restano azioni (Aggressivo).
+
 COOLDOWN E UTILIZZI
   • Cooldown: turni di attesa dopo che la stance TERMINA prima di poterla
     riattivare (0 = nessuna attesa). Il conto alla rovescia parte quando
@@ -68,6 +74,7 @@ QUANDO (trigger) — decide quando scattano gli effetti nel tempo:
               tempo partono all'attivazione.
   • attiva  : come sopra, gli effetti partono una volta all'attivazione.
   • vieni_colpito : ogni volta che un attacco ti va a segno.
+  • vieni_colpito_mischia : come vieni_colpito, ma solo se l'attacco non e' a distanza (Corpo di Fiamma).
   • manchi        : ogni volta che manchi (o vieni schivato/parato).
   • subisci_danni : ogni volta che perdi HP davvero.
   • fai_danni     : ogni volta che infliggi HP di danno.
@@ -82,6 +89,10 @@ ALLORA — cosa fa la stance (attiva solo le sezioni che ti servono):
         (flat = bonus/malus fisso IN PIP: un pip vale un rango intero, quindi +1
          sposta la probabilita' di colpire di circa 10 punti; dado proprio/avversario
          = aggiunge il tuo dado meno quello avversario, es. Taunt col dado sociale.)
+    • provocazione        : quando l'AVVERSARIO ti attacca, il dado proprio (il tuo) e il dado
+        avversario (il suo) si sfidano: se vinci tu, il suo tiro per colpire cala della
+        differenza (flat si somma alla sfida). Se perde il provocatore non succede niente.
+        (es. Taunt col dado sociale.)
     • parata_sempre       : puoi sempre parare i colpi che ti raggiungono.
     • distribuisci_danni  : i danni che subisci vengono divisi su tutto il corpo.
     • resistenza          : riduce del 'valore' PER CENTO i danni di un tipo (o "tutto"),
@@ -930,6 +941,7 @@ class TabStance(CrudTab):
         self.cooldown_turni = tk.StringVar(value="0")
         self.usi_limitati = tk.BooleanVar()
         self.usi_massimi = tk.StringVar(value="1")
+        self.richiede_azioni = tk.BooleanVar()
         self.ha_mod = tk.BooleanVar()
         self.ha_self = tk.BooleanVar()
         self.ha_avv = tk.BooleanVar()
@@ -939,6 +951,7 @@ class TabStance(CrudTab):
         ttk.Label(r1, text="Nome").pack(side="left")
         ttk.Entry(r1, textvariable=self.nome, width=34).pack(side="left", padx=6)
         ttk.Checkbutton(r1, text="Attiva di default", variable=self.attivo_default).pack(side="left")
+        ttk.Checkbutton(r1, text="Serve un'azione da giocare", variable=self.richiede_azioni).pack(side="left", padx=8)
         ttk.Button(r1, text="?", width=2, command=self.mostra_aiuto).pack(side="left", padx=8)
         ttk.Label(form, text="Descrizione").pack(anchor="w", pady=(6, 0))
         self.descr = tk.Text(form, width=60, height=3)
@@ -1013,6 +1026,7 @@ class TabStance(CrudTab):
     def form_da_item(self, s):
         self.nome.set(s.get("nome", ""))
         self.attivo_default.set(s.get("attivo_default", False))
+        self.richiede_azioni.set(s.get("richiede_azioni", False))
         self.descr.delete("1.0", "end")
         self.descr.insert("1.0", s.get("descrizione", ""))
         dur = s.get("durata", {})
@@ -1050,6 +1064,7 @@ class TabStance(CrudTab):
             "cooldown_turni": num(self.cooldown_turni),
             "usi_limitati": self.usi_limitati.get(),
             "usi_massimi": num(self.usi_massimi, 1),
+            **({"richiede_azioni": True} if self.richiede_azioni.get() else {}),
             "modificatori": self.modificatori.get() if self.ha_mod.get() else [],
             "effetti_applicati": self.eff_self.get() if self.ha_self.get() else [],
             "effetti_avversario": self.eff_avv.get() if self.ha_avv.get() else [],

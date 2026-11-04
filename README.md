@@ -10,7 +10,7 @@ Server Flask + editor dei dati in Tkinter. Nessuna dipendenza oltre a Flask.
 |---|---|
 | Gioco (http://127.0.0.1:5000) | `avvia_app.bat` (Windows) o `sh avvia_app.sh`: controllano Python e Flask, **si aggiornano da GitHub** e aprono il browser. In sviluppo: `python app.py` |
 | Editor di attacchi, poteri, stance, effetti, oggetti | `python editor.py` oppure `avvia_editor.bat` |
-| Test delle regole | `python test_combat.py`, `python test_azzardo.py`, `python test_palestra.py`, `python test_editor.py`, `python test_nemesi.py`, `python test_cyberware.py`, `python test_cyberwear.py`, `python test_imboscata.py`, `node test_fisica.js` |
+| Test delle regole | `python test_combat.py`, `python test_azzardo.py`, `python test_palestra.py`, `python test_editor.py`, `python test_nemesi.py`, `python test_cyberware.py`, `python test_cyberwear.py`, `python test_imboscata.py`, `python test_iniziativa.py`, `python test_compendio.py`, `node test_fisica.js`, `node test_mosse.js` |
 | Misure di bilanciamento | `python balance.py tutto` (v. sotto) |
 | Una palestra di prova nel browser (cartella temporanea) | `python tools/demo_palestra.py` (`--scenario base|vuota`), porta 5057 |
 | I ritmi della palestra (punti, ferite, stress, fiducia) | `python tools/sim_palestra.py --settimane 60 --allievi 3 --duelli 4` |
@@ -36,7 +36,22 @@ temporanea (`URBAN_SAVE_DIR`) e non li toccano mai. Per provare l'app su una cop
   Il difensore vede il tiro d'attacco prima di scegliere. La parata dimezza il danno e sposta il colpo dove vuole il difensore.
 - Il kit base è Pugno (1 azione) + Colpo pesante (2 azioni, **non si schiva, non si para e non si mira**: contro di lui restano solo i riflessi, perché la
   schivata riesce sempre e a 70 danni il pesante che si schiva valeva il 22-26% contro tre Pugni, qualunque fosse il danno; v. `tools/fase3_dati.py`).
-  Mirare costa 1 azione e dà +1 al tiro del difensore.
+  **La mira** costa 1 azione e sceglie dove andrà il prossimo colpo: vale nel turno in cui la si prende e in quello dopo (mirare come ultima azione non è sprecato),
+  poi si scioglie da sola. Si scioglie anche dopo **qualunque** colpo, pure uno che non si mira: il Colpo pesante la spreca, e con una mira in corso la scheda dice
+  «(NON PUÒ ESSERE MIRATA)» in rosso sotto ogni mossa che non si mira. Si può rimirare (costa di nuovo un'azione). Dà +1 al tiro del difensore
+  (`MIRA_PENALITA`) e **un colpo mirato va dove è mirato**: la schivata, che di norma riesce sempre, contro di lui **si tira** (acrobatica contro il tiro d'attacco,
+  `MIRA_SCHIVATA_SICURA`), e la parata lo attutisce ma **non lo sposta** su un altro arto (`MIRA_PARATA_SPOSTA`). Senza questo la risposta del round, una sola,
+  annullava o spostava sempre l'unico colpo mirato (a segno il 7%) e mirare alla testa valeva il 44%: `balance.py mira` (M4) lo misura a ~57%.
+- Le tre stance del kit base valgono per **un turno**: **Difensivo** nel prossimo turno dell'avversario (−1 al suo dado per colpire), **Aggressivo** nel turno in corso
+  (+1 al tuo; non si attiva senza azioni da giocare: `richiede_azioni` nei dati). **Taunt** è una sfida sociale: per 3 turni, quando l'avversario ti attacca, il suo
+  dado sociale si confronta col tuo e se vinci tu il suo tiro per colpire cala della differenza (modificatore `provocazione`; prima sommava lo stesso valore ai tiri
+  di entrambi i lati, quindi si annullava e valeva zero). Una stance `fissa` di 1 turno scade all'inizio del TUO turno dopo: copre il resto del tuo turno e tutto il
+  prossimo dell'avversario.
+- **Iniziativa dei combattenti** (`iniziativa.py`, `data/iniziative.json`): nei duelli della palestra l'allievo non sempre ti ascolta. A ogni occasione (inizio del suo
+  turno, un attacco che gli ordini, una risposta, un colpo che prende o che dà) c'è una probabilità `P_MAX × (0,65·(1−fiducia) + 0,35·stress) × moltiplicatore dei tratti`
+  (al massimo una iniziativa per round) che faccia di testa sua: cambi di attacco o di mira, guardia, furia, risposte non volute, un'azione persa... Cosa fa dipende dal
+  **tratto di carattere**: ogni tratto ha almeno 5 eventi. Più fiducia e meno stress, meno iniziativa; la probabilità è sul pannello del giocatore, nella serata e nella scheda
+  del colpo (la riga «⚡»). Non c'è nel Torneo Evo né nel Compendium.
 - Un potere spento **non si può riaccendere nello stesso turno** (spegnere e riaccendere rinnovava armatura e cure per un'azione): `Personaggio.puo_attivare_potere`,
   flag `spento_ora` dello slot, azzerato da `tick_turno`. Vale anche per gli augment Attivi.
 - Locazioni: testa 80, busto 120, quattro arti da 100. Si perde con testa o busto a 0. Un colpo non mirato prende il busto il doppio
@@ -76,14 +91,33 @@ Opzioni: `--n` (duelli per cella), `--seed`, `--jobs`. Per prove "what-if" senza
 
 `engine.py` regole e `Personaggio` · `app.py` server, duello web, torneo, IA, economia · `palestra.py` la vita fuori dal ring
 (calendario, allenamento, tratti, eventi: logica pura, senza Flask) · `azzardo.py` il Banco: puntate, folla e azzardi del ring (logica pura) · `nemesi.py` i rivali che tornano, la loro memoria e i soprannomi (logica pura) · `balance.py` harness · `editor.py` editor dati ·
-`static/`, `templates/` interfaccia · `data/` contenuti (anche `tratti.json`, `eventi_palestra.json`, `attrezzi.json`, `anagrafica.json`, `soprannomi.json`).
+`iniziativa.py` cosa fa un atleta di testa sua sul ring (logica pura) · `static/`, `templates/` interfaccia · `data/` contenuti (anche `tratti.json`, `iniziative.json`,
+`eventi_palestra.json`, `attrezzi.json`, `anagrafica.json`, `soprannomi.json`).
+
+## Compendium e serata
+
+- **Compendium** (voce nel menu, `/compendio`): ogni potere a ogni rango con le mosse (nuove a quel rango, cumulative), le stance e gli effetti (`catalogo_poteri()`), da leggere.
+  Da lì, o dalla voce «Palestra di prova», si arriva a `/compendio/prova` (`ProvaPoteri`, un `DuelloWeb` senza palestra): due **pupazzi base** (tutto a 1, nessun
+  aspetto né equipaggiamento) su cui si equipaggiano dalla barra in basso fino a 4 poteri ciascuno, al rango che si vuole, e si prova ogni mossa subito: **niente turni,
+  risorse, stamina, ricariche né usi**. Nessuno muore (testa e busto restano a 1 hp) e dopo qualche secondo di calma si rigenera tutto a vita piena (armatura dei poteri
+  compresa). «Sempre a segno» (default) fa colpire ogni mossa; spento, il tiro è vero. «Avanza un turno» è facoltativo (fa scorrere bruciature e durate).
+- **L'informatore della serata** (`/duelli/anteprima`, `PREZZO_ANTEPRIMA` = ¤40): a pagamento, una volta per allievo e per giornata, dice contro chi combatterà stasera quell'allievo
+  (livello, poteri, impianti, statistiche, cosa c'è stato tra i due). È lo sfidante vero: il duello lo usa, e la sera dopo il pettegolezzo è vecchio. Si poteva già
+  equipaggiare l'allievo (Negozio) o scegliere chi mandare: ora si sa prima contro chi.
 
 Il vecchio simulatore Tkinter (`combat.py`) è stato eliminato: era una seconda implementazione con le regole di prima dell'overhaul. Per simulare duelli c'è `balance.py`, che pilota il vero `DuelloWeb`.
 
 ## Schermata del duello
 Il centro del duello ha due zone. In alto l'**arena**: i due combattenti sono ragdoll fisici (corpi rigidi, giunti con muscoli PD, attrito, passi per rientrare in guardia), disegnati su canvas a posizione reale e interpolata; un colpo li fa scivolare in proporzione al danno, la testa scatta, il sangue sporca la locazione colpita e, quando una locazione va in negativo, la pelle si strappa a macchie (maschera alpha) e sotto compaiono la carne e lo scheletro con le viscere (`scheletro_*`/`carne_*`, STILE_SPRITE.md sez. 11), un arto storpio penzola, due gambe storpie costringono in ginocchio, da morti si cade e si resta fermi. Chi attacca carica e colpisce (pugno, fendente, affondo; a distanza parte un proiettile), chi difende schiva (indietro, abbassandosi, saltando) o para, in coda uno scambio alla volta, con hit-stop e scossa dello schermo. In basso la **scena dei tiri**: l'ultimo scambio come scheda (chi attacca, con cosa, descrizione e sigle delle regole, i due tiri a confronto, l'esito e il calcolo del danno fino agli HP persi); il vecchio log testuale resta nello "Storico testuale" chiuso. Poteri, augment e stance hanno la descrizione nei menu. Il server prepara gli scambi in `DuelloWeb.eventi` (campo `eventi` dello stato) e la descrizione di un attacco in `info_attacco()`.
 
-Fisica: `static/fisica.js` (motore a corpi rigidi), `static/pupazzo.js` (il combattente), `static/arena.js` (disegno e scambi); i test si lanciano con `node test_fisica.js`, il banco di prova nel browser e' `tools/lab/arena.html`. Il dettaglio e' in `STILE_SPRITE.md`, sez. 10. L'**aspetto dei poteri accesi** (pelle di pietra, ossidiana, lava e cristallo con pezzi rinforzati; sfere di fuoco, acqua e acido, rocce e teschi in orbita; aure, fulmini, campo di forza, neve, onde soniche; si sommano tra loro) e' in `static/poteri.js`: `STILE_SPRITE.md`, sez. 18. Lo **sfondo del ring** e il **mirino** (con "Mira" si clicca la parte del corpo dell'avversario sull'arena, alla Fallout VATS) sono in `STILE_SPRITE.md`, sez. 19.
+Fisica: `static/fisica.js` (motore a corpi rigidi), `static/pupazzo.js` (il combattente), `static/arena.js` (disegno e scambi); i test si lanciano con `node test_fisica.js`, il banco di prova nel browser e' `tools/lab/arena.html`. Il dettaglio e' in `STILE_SPRITE.md`, sez. 10. L'**aspetto dei poteri accesi** (pelle di pietra, ossidiana, lava e cristallo con pezzi rinforzati; sfere di fuoco, acqua e acido, rocce e teschi in orbita; aure, fulmini, campo di forza, neve, onde soniche; si sommano tra loro) e' in `static/poteri.js`: `STILE_SPRITE.md`, sez. 18. **Animazioni dei singoli attacchi** (`static/mosse.js`): un attacco con la sua coreografia la recita al posto di quella di base (il colpo porta `att_id`, l'id
+dell'attacco). Oggi: Pirocinesi (scintilla in palombella, Palla di fuoco, Lanciafiamme con il getto continuo, Eruzione con le braccia al cielo e la lava che sbuca da sotto
+l'avversario; tutte con le fiamme sulla mano), Scheggie (tre, ad arco dal basso in alto) e Scheggia di Ghiaccio (una, con la scia): se colpiscono si conficcano nel
+punto colpito, attaccate al corpo, e spariscono da sole. Il server decide com'e' andata; la coreografia dice QUANDO il colpo arriva (`h.contatto()`) e **solo da li'** il
+gioco segna danni, numeri e knockback: `Arena.vista()` tiene indietro gli hp dei pannelli, la pelle e il sangue sui corpi, la scheda dello scambio e i numeri, i menu e la CPU
+aspettano che la scena abbia finito. Per aggiungerne una basta una funzione in `TAB` (id dell'attacco -> coreografia); `node test_mosse.js` prova ogni coreografia con
+ogni esito (un solo contatto, poi la fine). Il **Corpo di Fiamma** (stance di Pirocinesi r4) rende il corpo fuoco luminoso (`Poteri.fuoco`, come l'acqua ma additivo, con aura)
+e brucia chi lo colpisce da vicino (trigger `vieni_colpito_mischia`: come le Spine, ma non contro i colpi a distanza). Lo **sfondo del ring** e il **mirino** (con "Mira" si clicca la parte del corpo dell'avversario sull'arena, alla Fallout VATS) sono in `STILE_SPRITE.md`, sez. 19.
 
 Torneo Evo (modalita' a parte: non tocca la palestra, non dà crediti e **non dà l'eroe**; puntate e clausole sono soltanto un punteggio): a fine round tutti i danni vengono curati (anche gli arti CRIPPLED) e la stamina torna piena. Dopo ogni round anche le CPU vincitrici crescono come il giocatore: +1 Controllo, un potere, un upgrade di statistica e un oggetto di equipaggiamento (sempre, scelti tra le stesse offerte; `upgrade_torneo` e `avversario_upgrade` nello stato dicono cosa hanno preso).
 

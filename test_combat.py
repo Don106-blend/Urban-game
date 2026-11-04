@@ -230,7 +230,7 @@ def main():
     pm.attacchi.append({"nome": "Pugno", "can_aim": True})
     assert pm.puo_mirare()
     pm.mira = "testa"
-    assert not pm.puo_mirare()  # sta già mirando
+    assert pm.puo_mirare()  # sta già mirando: si può cambiare bersaglio (la mira persiste, non deve essere una trappola)
 
     # effetto "azioni" (supervelocità): aumenta risorse per turno e quelle correnti
     pv = Personaggio("Veloce")
@@ -1317,7 +1317,7 @@ def overhaul(webapp):
     import subprocess
     import sys
     from engine import eroe_base, umanita_max
-    from engine import (AZIONI_BASE, BONUS_RANGO, MIRA_PENALITA, RESISTENZA_MAX, PESO_LOCAZIONE,
+    from engine import (AZIONI_BASE, BONUS_RANGO, MIRA_PENALITA, MIRA_SCHIVATA_SICURA, MIRA_PARATA_SPOSTA, RESISTENZA_MAX, PESO_LOCAZIONE,
                         dotazione_base, costo_azioni, prob_supera, carica_db)
     db = webapp.DB
 
@@ -1450,9 +1450,9 @@ def overhaul(webapp):
         atteso = PESO_LOCAZIONE.get(l, 1) / tot_peso
         assert abs(conta[l] / 14000 - atteso) < 0.02, (l, conta[l])
 
-    # la mira vale per TUTTI i colpi mirabili del turno; il Colpo pesante non si mira e non la consuma
-    from engine import MIRA_DURA_TURNO
-    assert MIRA_DURA_TURNO and nomi_kit["Colpo pesante"]["can_aim"] is False
+    # la mira sceglie dove va il PROSSIMO colpo e vale nel turno in cui la si prende e nel successivo; qualunque colpo la scioglie,
+    # anche uno che non si mira (il Colpo pesante la spreca)
+    assert nomi_kit["Colpo pesante"]["can_aim"] is False
     ma, mb = Personaggio("MiraTurnoA"), Personaggio("MiraTurnoB")
     for q in (ma, mb):
         dotazione_base(q, db["attacchi"], db["stances"])
@@ -1461,19 +1461,111 @@ def overhaul(webapp):
     ma.azioni, ma.mira, mb.risposte = 3, "testa", 1
     pg_m = next(a for a in ma.attacchi if a["nome"] == "Pugno")
     pw_m = next(a for a in ma.attacchi if a["nome"] == "Colpo pesante")
-    for _ in range(2):                                  # due Pugni dello stesso turno: entrambi mirati
-        mb.risposte = 1
-        dm2.usa_attacco(pg_m)
-        assert dm2.pending["loc"] == "testa" and dm2.pending["pen_mira"] == MIRA_PENALITA
-        assert ma.mira == "testa"
-        dm2.risolvi_risposta("nessuna risposta")
-    ma.azioni, mb.risposte = 2, 1                        # il pesante: ne' mirato ne' consuma la mira
+    dm2.usa_attacco(pg_m)                                # il primo Pugno e' mirato e scioglie la mira
+    assert ma.mira is None
+    # un colpo mirato va dove e' mirato: la schivata (che di norma riesce sempre) li' si tira, e la parata lo attutisce ma non lo sposta
+    assert not MIRA_SCHIVATA_SICURA and not MIRA_PARATA_SPOSTA
+    pend = dm2.pending
+    assert pend["mirata"] == "testa" and pend["loc"] == "testa" and pend["pen_mira"] == MIRA_PENALITA == 1
+    assert {"parata", "schivata"} <= set(pend["opzioni"]), "le risposte restano: cambia come funzionano"
+    assert dm2.prob_difesa(mb, pend)["schivata"] < 1.0, "la schivata non e' sicura"
+    note = {d_["scelta"]: d_["nota"] for d_ in dm2.info_attacco_in_corso()["difese"]}
+    assert "si tira" in note["schivata"] and "dov'è mirato" in note["parata"]
+    dm2.risolvi_risposta("schivata")
+    ev_m = [e for e in dm2.eventi if e["tipo"] == "colpo"][-1]
+    assert ev_m["mirata"] and ev_m["risposta"] == "schivata" and ev_m["tiro_dif"] is not None, "schivare un colpo mirato si tira"
+    ma.mira, ma.azioni, mb.risposte = "testa", 3, 1
+    dm2.usa_attacco(pg_m)
+    dm2.risolvi_risposta("parata", "braccio_sx")           # parare non sposta il colpo sul braccio: resta sulla testa
+    ev_p = [e for e in dm2.eventi if e["tipo"] == "colpo"][-1]
+    assert ev_p["loc"] == "testa" and not ev_p["deviato"]
+    ma.azioni, mb.risposte = 3, 1
+    dm2.usa_attacco(pg_m)                                # il colpo dopo non e' mirato (la mira era per un colpo solo): la schivata riesce sempre
+    assert dm2.pending["pen_mira"] == 0 and dm2.prob_difesa(mb, dm2.pending)["schivata"] == 1.0
+    dm2.risolvi_risposta("nessuna risposta")
+    ma.azioni, ma.mira, mb.risposte = 2, "braccio_sx", 1   # il pesante non e' mirato, ma scioglie la mira lo stesso
     dm2.usa_attacco(pw_m)
-    assert dm2.pending is None and ma.mira == "testa"      # (non si evita: si risolve da solo, sui riflessi)
+    assert dm2.pending is None and ma.mira is None      # (non si evita: si risolve da solo, sui riflessi)
     ev_pes = [e for e in dm2.eventi if e["tipo"] == "colpo"][-1]
     assert ev_pes["pen_mira"] == 0 and not ev_pes["mirata"]
-    dm2.fine_turno()                                     # la mira non si porta nel turno dopo
-    assert ma.mira is None
+    # la mira presa come ultima azione vale nel turno dopo (e il primo colpo di quel turno e' mirato); poi, se non si e' usata, si scioglie
+    mc, md = Personaggio("MiraCarica"), Personaggio("MiraBersaglio")
+    mc.mira = "testa"
+    mc.fine_turno_mira()
+    assert mc.mira == "testa"                            # il turno in cui l'ha presa e' finito: ancora valida nel successivo
+    mc.fine_turno_mira()
+    assert mc.mira is None                               # finito anche il turno dopo: si scioglie da sola
+    mc.mira = "testa"
+    mc.fine_turno_mira()
+    mc.mira = "busto"                                    # rimirare azzera il conto: un'altra mira intera
+    mc.fine_turno_mira()
+    assert mc.mira == "busto"
+    dm3 = webapp.DuelloWeb(pg=md, avversario=mc)
+    dotazione_base(mc, db["attacchi"], db["stances"])
+    dm3.attivo, dm3.altro = mc, md
+    mc.mira = "testa"
+    dm3.fine_turno()                                     # (nel duello: fine turno di chi mira, poi quello dell'altro, poi di nuovo il suo)
+    assert mc.mira == "testa"
+    dm3.attivo, dm3.altro = mc, md
+    dm3.fine_turno()
+    assert mc.mira is None, "la mira dura il turno in cui si prende e il successivo"
+    menu_mira = webapp.DuelloWeb.azioni_player(dm2)
+    assert menu_mira["mira_su"] is None and all("can_aim" in x for x in menu_mira["attacchi"])
+    # la CPU, con una mira in corso, non la butta su un colpo che non si mira
+    dm2.attivo, dm2.altro = ma, mb
+    ma.azioni, ma.mira = 3, "testa"
+    random.seed(2)
+    assert all(dm2.scegli_attacco(ma, mb)["can_aim"] for _ in range(40))
+
+    # ---- stance Difensivo / Aggressivo / Taunt: quando valgono ----
+    st_id = {x["nome"]: x for x in db["stances"]}
+    dif, agg, taunt = st_id["Difensivo"], st_id["Aggressivo"], st_id["Taunt"]
+    ta, tb = Personaggio("StA"), Personaggio("StB")
+    # Difensivo: vale nel prossimo turno dell'avversario, per un turno; il suo -1 non tocca i colpi di chi la porta
+    ta.attiva_stance(dif, tb, [])
+    assert ta.stance_manuale_attiva()["turni"] == 1
+    random.seed(3)
+    assert bonus_colpire(tb, ta) == -1 and bonus_colpire(ta, tb) == 0
+    ta.tick_turno()                                      # all'inizio del suo turno dopo e' finita (e parte il cooldown)
+    assert ta.stance_manuale_attiva() is None and bonus_colpire(tb, ta) == 0
+    # Aggressivo: +1 ai propri colpi nel turno in corso, niente di piu' (l'avversario non guadagna nulla)
+    tc, td = Personaggio("StC"), Personaggio("StD")
+    assert agg.get("richiede_azioni")
+    tc.azioni = 0
+    assert not tc.puo_attivare_stance(agg)               # senza azioni da giocare non si attiva
+    tc.azioni = 1
+    assert tc.puo_attivare_stance(agg)
+    tc.attiva_stance(agg, td, [])
+    assert bonus_colpire(tc, td) == 1 and bonus_colpire(td, tc) == 0
+    tc.tick_turno()
+    assert bonus_colpire(tc, td) == 0
+    # il menu del giocatore e il server rifiutano l'Aggressivo senza azioni
+    dsa = webapp.DuelloWeb(pg=Personaggio("SA"), avversario=Personaggio("SB"))
+    for q in (dsa.p, dsa.cpu):
+        dotazione_base(q, db["attacchi"], db["stances"])
+    dsa.fase, dsa.attivo, dsa.altro = "player", dsa.p, dsa.cpu
+    dsa.p.azioni, dsa.p.bonus = 0, 1
+    assert "non hai più azioni" in dsa.azione_player({"tipo": "stance", "id": agg["id"]})
+    assert next(x for x in dsa.azioni_player()["stance"] if x["id"] == agg["id"])["ok"] is False
+    dsa.p.azioni = 2
+    assert dsa.azione_player({"tipo": "stance", "id": agg["id"]}) is None
+    # Taunt: prima sommava lo stesso valore ai tiri di tutti e due i lati (si annullava: a ranghi pari valeva zero); ora e' una
+    # sfida sociale: se la vince chi provoca, il tiro di chi lo attacca cala della differenza; se la perde non succede nulla
+    pt, po = Personaggio("Provoca"), Personaggio("Provocato")
+    pt.stance_attive.append({"def": taunt, "turni": 3})
+    random.seed(5)
+    contro = [bonus_colpire(po, pt) for _ in range(4000)]
+    suoi = [bonus_colpire(pt, po) for _ in range(4000)]
+    assert max(contro) == 0 and min(contro) < 0 and set(suoi) == {0}      # mai un regalo a chi attacca, mai un effetto sui colpi del provocatore
+    assert -1.9 < sum(contro) / len(contro) < -1.4                       # a ranghi pari: E[max(0, d10-d10)] = 1,65
+    po.stats["sociale"] = 4
+    pt.stats["sociale"] = 1
+    assert all(bonus_colpire(po, pt) >= -9 for _ in range(200))
+    assert sum(bonus_colpire(po, pt) for _ in range(2000)) / 2000 > -0.9   # sfida in salita (sociale 1 contro 4): vale ~0,56
+    pt.stats["sociale"] = 4
+    po.stats["sociale"] = 1
+    assert sum(bonus_colpire(po, pt) for _ in range(2000)) / 2000 < -2.5   # sfida vinta: pesa davvero
+    assert any(m["fonte"].startswith("Taunt") for m in po.modificatori_tiri(pt))   # chi lo subisce lo vede nelle sue schede
 
     # ---- overhaul fase 4: IA a valore atteso ----
     ia_a, ia_d = Personaggio("IA-A"), Personaggio("IA-D")
@@ -1844,11 +1936,11 @@ def overhaul(webapp):
     assert all(pf.danni_tipo[l]["acido"] == 60 // 6 for l in ("testa", "gamba_sx")) and pf.danni_tipo["busto"]["acido"] == 20
     pan = webapp.pannello(pf, False)
     assert pan["hp"]["busto"]["tipi"] == pf.danni_tipo["busto"] and pan["hp"]["gamba_dx"]["tipi"] == {"acido": 10}
-    assert pan["extra"] == {"ali": False, "braccia": False, "volo": False, "acqua": False, "velocita": 0, "forza": 0, "poteri": {}, "stance_poteri": []}
+    assert pan["extra"] == {"ali": False, "braccia": False, "volo": False, "acqua": False, "fuoco": False, "velocita": 0, "forza": 0, "poteri": {}, "stance_poteri": []}
     pf.poteri.append({"def": next(x for x in webapp.DB["poteri"] if x["nome"] == "Ali"), "rango": 1, "attivo": False})
     pf.poteri.append({"def": next(x for x in webapp.DB["poteri"] if x["nome"] == "2x2"), "rango": 1, "attivo": True})
     pf.stance_attive.append({"def": next(x for x in webapp.DB["stances"] if x["nome"] == "Volo"), "turni": 3})
-    assert webapp.pannello(pf, False)["extra"] == {"ali": False, "braccia": True, "volo": True, "acqua": False, "velocita": 0, "forza": 0,
+    assert webapp.pannello(pf, False)["extra"] == {"ali": False, "braccia": True, "volo": True, "acqua": False, "fuoco": False, "velocita": 0, "forza": 0,
                                                    "poteri": {12: 1}, "stance_poteri": []}   # solo cio' che e' ATTIVO (Volo e' di Ali, spento)
     pf.poteri[0]["attivo"] = True
     assert webapp.pannello(pf, False)["extra"]["ali"] is True
@@ -1861,6 +1953,30 @@ def overhaul(webapp):
     pf.stance_attive.append({"def": sd_acqua, "turni": 3})
     assert webapp.pannello(pf, False)["extra"]["acqua"] is True
     assert webapp.pannello(pf, False)["extra"]["poteri"] == {11: 1, 12: 1} and webapp.pannello(pf, False)["extra"]["stance_poteri"] == [11]
+
+    # stance Corpo di Fiamma: il corpo si vede fuoco luminoso, e chi la porta e' come le Spine ma solo contro chi colpisce da vicino
+    sd_fiamma = next(x for x in webapp.DB["stances"] if x["id"] == webapp.STANCE_CORPO_FIAMMA)
+    assert sd_fiamma["nome"] == "Corpo di Fiamma", "STANCE_CORPO_FIAMMA e' ancora la stance giusta"
+    assert sd_fiamma["trigger"] == "vieni_colpito_mischia" and sd_fiamma["effetti_avversario"] and "da vicino" in sd_fiamma["descrizione"]
+    assert webapp.pannello(pf, False)["extra"]["fuoco"] is False
+    pf.stance_attive.append({"def": sd_fiamma, "turni": -1})
+    assert webapp.pannello(pf, False)["extra"]["fuoco"] is True
+    brucia = {}
+    for nome_att in ("Pugno", "scintilla"):                  # la mischia brucia chi colpisce, il colpo a distanza no
+        fa, fd = Personaggio("Fuoco-A"), Personaggio("Fuoco-D")
+        for q in (fa, fd):
+            dotazione_base(q, db["attacchi"], db["stances"])
+        fa.attacchi.append(next(x for x in db["attacchi"] if x["nome"] == "scintilla"))
+        fd.stance_attive.append({"def": sd_fiamma, "turni": -1})
+        dfu = webapp.DuelloWeb(pg=fd, avversario=fa)         # la CPU (fa) attacca il lato "player" (fd)
+        dfu.attivo, dfu.altro = fa, fd
+        fa.azioni, fd.risposte = 3, 0
+        dfu.sempre_a_segno = True
+        dfu.usa_attacco(next(x for x in fa.attacchi if x["nome"] == nome_att))
+        assert [e for e in dfu.eventi if e["tipo"] == "colpo"][-1]["esito"] == "colpito"
+        brucia[nome_att] = [e["def"]["nome"] for e in fa.effetti_attivi]
+    assert brucia["Pugno"] == ["Bruciatura"] and brucia["scintilla"] == [], f"Corpo di Fiamma brucia solo chi colpisce da vicino: {brucia}"
+    assert [e for e in dfu.eventi if e["tipo"] == "colpo"][-1]["att_id"] == 9, "il colpo porta l'id dell'attacco: la scena sceglie la sua animazione"
 
     # ---- aspetto dei poteri (static/poteri.js): quali poteri sono accesi (con rango), quali hanno una stance in corso e di chi e' una mossa ----
     def _pot(nome):

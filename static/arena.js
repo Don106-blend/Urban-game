@@ -19,6 +19,7 @@ const Arena = (() => {
   const BORDO = 14;                 // fascia del pavimento in fondo all'arena (px schermo)
 
   const PO = typeof Poteri !== "undefined" ? Poteri : null;    // l'aspetto dei poteri (static/poteri.js): senza, il duello e' lo stesso ma senza effetti
+  const MO = typeof Mosse !== "undefined" ? Mosse : null;      // le animazioni dei singoli attacchi (static/mosse.js): senza, ogni attacco ha l'animazione di base
   let man = null, parti = null;     // parti.json e i pezzi caricati
   let ring = null;                  // lo sfondo del ring (static/sprites/ring): {sfondo, luci} = immagini, null = non disponibile (resta il fondale a gradiente)
   let pot = null;                   // poteri.json: i pezzi che i poteri sostituiscono (rinforzati, appuntiti), in `parti[nome].rinf` / `.app`
@@ -448,7 +449,7 @@ const Arena = (() => {
     const pup = new Pupazzo.Pupazzo(man);
     const L = {lato, f: lato === "p" ? 1 : -1, O: 0, pup, acidoVel: {}, tele: {}, carne: {}, rk: {}, sag: {}, chiave: {}, prof: {}, lamp: {}, voci: [], nome: "", vest: {}, capelli: null, cop: null, aspKey: null, tip: {}, dati: {}, acidoVis: {}, acidoObj: {}, fulm: {}, ali: null, extra: {}, tAnim: 0, fasce: {},
                ko: false, ultimo: null, xNome: 0,
-               po: null, telaR: {}, sagR: {}, sagApp: {}, rinfOn: {}, vestOff: {}, locEx: {}, acq: 0};      // i poteri: stato degli effetti, pezzi rinforzati (tela e sagoma), sagoma dell'avambraccio appuntito, quali pezzi sono rinforzati ora
+               po: null, telaR: {}, sagR: {}, sagApp: {}, rinfOn: {}, vestOff: {}, locEx: {}, acq: 0, fuo: 0};      // i poteri: stato degli effetti, pezzi rinforzati (tela e sagoma), sagoma dell'avambraccio appuntito, quali pezzi sono rinforzati ora
     for (const [nome, p] of Object.entries(parti)) {
       const c = document.createElement("canvas"); c.width = p.w; c.height = p.h;
       L.tele[nome] = c; L.sag[nome] = sagoma(nome);
@@ -908,6 +909,7 @@ const Arena = (() => {
     mondo(L);
     if (!sagome && PO && L.po) PO.dietro(L, aiuti);                        // sfere e detriti che passano dietro, teschi, neve lontana
     if (!sagome && L.acq > 0.02) disegnaAcqua(L);                          // stance Forma d'acqua
+    else if (!sagome && L.fuo > 0.02) disegnaFuoco(L);                     // stance Corpo di Fiamma
     else disegnaCorpo(L);
     if (!sagome && PO && L.po) { mondo(L); PO.davanti(L, aiuti); }         // campo di forza, sfere davanti, aure, fulmini, neve vicina
   }
@@ -916,8 +918,11 @@ const Arena = (() => {
      di sempre su una tela nascosta (opaco, cosi' i livelli non si sommano) e i pixel passano da `Poteri.acqua`, che li ricolora e li rende
      trasparenti; poi si stampa il risultato. Dentro e fuori dalla stance `L.acq` (0..1) fa una dissolvenza incrociata col corpo vero. ---- */
   const acq = {cv: null, cx: null, out: null, ox: null};
-  function disegnaAcqua(L) {
-    if (!PO || !PO.acqua) { disegnaCorpo(L); return; }
+  function disegnaAcqua(L) { disegnaTrasformato(L, L.acq, PO && PO.acqua, false); }
+  /* Corpo di Fiamma: lo stesso procedimento dell'acqua, ma il corpo e' fuoco e LUMINOSO (si somma alla scena e ha un'aura) */
+  function disegnaFuoco(L) { disegnaTrasformato(L, L.fuo, PO && PO.fuoco, true); }
+  function disegnaTrasformato(L, k, fn, luce) {
+    if (!fn) { disegnaCorpo(L); return; }
     // il riquadro attorno al corpo (px dello schermo, a risoluzione del dispositivo)
     let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
     for (const b of Object.values(L.pup.corpi)) {
@@ -933,18 +938,27 @@ const Arena = (() => {
       acq.cx = acq.cv.getContext("2d", {willReadFrequently: true});
     }
     if (!acq.out || acq.out.width < dw || acq.out.height < dh) acq.out = Object.assign(document.createElement("canvas"), {width: dw, height: dh});
-    const c0 = ctx, k = L.acq;
+    const c0 = ctx;
     if (k < 0.98) { ctx.globalAlpha = 1 - k; disegnaCorpo(L); ctx.globalAlpha = 1; }          // il corpo vero svanisce mentre l'acqua arriva
     const a = acq.cx;
     a.setTransform(1, 0, 0, 1, 0, 0); a.imageSmoothingEnabled = false; a.clearRect(dx0, dy0, dw, dh);
     ctx = a; mondo(L);
     try { disegnaCorpo(L); } finally { ctx = c0; }
     const img = a.getImageData(dx0, dy0, dw, dh), pel = L.pup.corpi.busto_inf;
-    PO.acqua(img.data, dw, dh, {cell: S * dpr, ox: dx0 - (L.O + L.f * pel.x) * S * dpr, oy: dy0 - (pavY - 111 * S + pel.y * S) * dpr, t: L.tAnim, seme: semeLato(L.lato)});
+    fn(img.data, dw, dh, {cell: S * dpr, ox: dx0 - (L.O + L.f * pel.x) * S * dpr, oy: dy0 - (pavY - 111 * S + pel.y * S) * dpr, t: L.tAnim, seme: semeLato(L.lato)});
     const o = acq.out.getContext("2d");
     o.clearRect(0, 0, acq.out.width, acq.out.height); o.putImageData(img, 0, 0);
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = k;
     ctx.drawImage(acq.out, 0, 0, dw, dh, dx0, dy0, dw, dh);
+    if (luce) {                                                // luminoso: lo stesso corpo si somma alla scena, un po' sfocato, e intorno c'e' un'aura
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = 0.3 * k;
+      for (const [ox, oy] of [[-1.2, 0], [1.2, 0], [0, -1.6], [0, 1.2]]) ctx.drawImage(acq.out, 0, 0, dw, dh, dx0 + ox * S * dpr * 0.5, dy0 + oy * S * dpr * 0.5, dw, dh);
+      const cx = (x0 + x1) / 2 * dpr, cy = (y0 + y1) / 2 * dpr, R = 50 * S * dpr, g = ctx.createRadialGradient(cx, cy, 2, cx, cy, R);
+      g.addColorStop(0, "rgba(255,150,40,0.4)"); g.addColorStop(0.55, "rgba(255,90,14,0.16)"); g.addColorStop(1, "rgba(255,60,8,0)");
+      ctx.globalAlpha = k; ctx.fillStyle = g; ctx.fillRect(cx - R, cy - R, 2 * R, 2 * R);
+      ctx.globalCompositeOperation = "source-over";
+    }
     ctx.globalAlpha = 1;
   }
 
@@ -959,15 +973,26 @@ const Arena = (() => {
     ctx.beginPath(); ctx.ellipse(x, 111, 21 * k + (L.pup.morto ? 16 : 0), 2.6, 0, 0, Math.PI * 2); ctx.fill();
   }
 
-  function disegnaParticelle() {
+  function disegnaParticelle(davanti = false) {
     ctx.setTransform(S * dpr, 0, 0, S * dpr, (scossa.a > 0.01 ? scossa.x * dpr : 0), (pavY - 111 * S + (scossa.a > 0.01 ? scossa.y : 0)) * dpr);
-    for (const m of macchie) { ctx.fillStyle = m.col; ctx.fillRect(Math.round(m.x), 110.2, m.w, 1); }
+    if (!davanti) for (const m of macchie) { ctx.fillStyle = m.col; ctx.fillRect(Math.round(m.x), 110.2, m.w, 1); }
     for (const q of particelle) {
+      if (!!q.davanti !== davanti) continue;
       ctx.globalAlpha = Math.min(1, q.vita / q.fade);
-      ctx.fillStyle = q.col;
+      ctx.fillStyle = q.cols ? q.cols[Math.min(q.cols.length - 1, Math.floor((1 - q.vita / q.vita0) * q.cols.length))] : q.col;
+      if (q.luce) ctx.globalCompositeOperation = "lighter";
       ctx.fillRect(q.x - q.s / 2, q.y - q.s / 2, q.s, q.s);
+      if (q.luce) ctx.globalCompositeOperation = "source-over";
     }
     ctx.globalAlpha = 1;
+  }
+
+  /* gli effetti delle animazioni degli attacchi (proiettili, scintille, schegge conficcate...): nello stesso spazio delle particelle */
+  function disegnaFx() {
+    if (!MO) return;
+    ctx.setTransform(S * dpr, 0, 0, S * dpr, (scossa.a > 0.01 ? scossa.x * dpr : 0), (pavY - 111 * S + (scossa.a > 0.01 ? scossa.y : 0)) * dpr);
+    MO.disegna(ctx);
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
   }
 
   function disegnaProiettili() {
@@ -1001,14 +1026,16 @@ const Arena = (() => {
     if (luogo === "vicolo") disegnaVicolo();      // il duello mortale: un vicolo, senza pubblico
     else { disegnaFondale(); disegnaPali(); disegnaFolla(); disegnaLuciRing(); }
     for (const L of Object.values(lati)) disegnaOmbra(L);
-    disegnaParticelle();
+    disegnaParticelle(false);
     if (mira.attiva && lati[mira.lato]) disegnaConMirino();
     else {
       // chi e' in piedi dietro, chi e' caduto davanti non conta: si disegna prima la CPU, poi il giocatore
       disegnaCombattente(lati.c); disegnaCombattente(lati.p);
     }
     for (const L of Object.values(lati)) disegnaCopStacc(L);
+    disegnaParticelle(true);                    // fiamme e scintille che stanno sopra i combattenti
     disegnaProiettili();
+    disegnaFx();
     for (const L of Object.values(lati)) L.xNome = L.pup.corpi.busto_inf.x;
     disegnaNomi();
     if (mira.attiva) disegnaMirino();
@@ -1143,7 +1170,9 @@ const Arena = (() => {
 
   /* ---------------------------------------------------------------------------------------------------- */
   /* simulazione */
-  function particella(o) { particelle.push({vita: 1, fade: 0.3, s: 1, g: GRAV, ...o}); if (particelle.length > 500) particelle.shift(); }
+  /* una particella. Oltre a colore (`col`), vita, gravita' (`g`): `cols` = rampa di colori lungo la vita (il fuoco: dal bianco caldo al rosso scuro),
+     `luce` = si somma alla scena invece di coprirla (fiamme, scintille), `attrito` = resistenza dell'aria, `davanti` = sta sopra i combattenti */
+  function particella(o) { const q = {vita: 1, fade: 0.3, s: 1, g: GRAV, ...o}; q.vita0 = q.vita; particelle.push(q); if (particelle.length > 900) particelle.shift(); }
 
   /* coordinate: locale di un combattente -> mondo (px sprite) */
   const aMondo = (L, p) => [L.O + L.f * p[0], p[1]];
@@ -1179,7 +1208,9 @@ const Arena = (() => {
   function avanzaParticelle(dt) {
     for (let i = particelle.length - 1; i >= 0; i--) {
       const q = particelle[i];
-      q.vita -= dt; q.vy += q.g * dt; q.x += q.vx * dt; q.y += q.vy * dt;
+      q.vita -= dt; q.vy += q.g * dt;
+      if (q.attrito) { const f = Math.exp(-q.attrito * dt); q.vx *= f; q.vy *= f; }
+      q.x += q.vx * dt; q.y += q.vy * dt;
       if (q.y >= 110.5 && q.g > 0) {
         if (q.macchia) { macchie.push({x: q.x, w: 1 + (Math.random() < 0.4), col: q.col}); if (macchie.length > 160) macchie.shift(); }
         particelle.splice(i, 1); continue;
@@ -1234,6 +1265,15 @@ const Arena = (() => {
         particella({x: L.O + L.f * (b.x + (Math.random() - 0.5) * 5), y: b.y + (Math.random() - 0.3) * 6, vx: 0, vy: 8 + Math.random() * 14, s: 1, vita: 0.55, fade: 0.25, col: Math.random() < 0.5 ? "#7fd0f5" : "#c4eeff", g: 700});
       }
     }
+    {                                                        // Corpo di Fiamma: dissolvenza dentro e fuori, e fiamme che salgono dal corpo
+      const su = L.extra.fuoco ? 1 : 0, v = L.fuo || 0;
+      L.fuo = Math.abs(su - v) < 0.004 ? su : v + (su - v) * (1 - Math.exp(-DT * 4));
+      if (L.fuo > 0.4 && !L.ko) for (let i = 0; i < 2; i++) if (Math.random() < 0.5) {
+        const b = L.pup.corpi[["busto_sup", "busto_inf", "testa", "avambraccio_dx", "avambraccio_sx", "coscia_dx", "coscia_sx", "stinco_dx", "stinco_sx"][Math.floor(Math.random() * 9)]];
+        particella({x: L.O + L.f * (b.x + (Math.random() - 0.5) * 6), y: b.y + (Math.random() - 0.5) * 6, vx: (Math.random() - 0.5) * 12, vy: -16 - Math.random() * 34,
+                    g: -40, s: Math.random() < 0.25 ? 2 : 1, vita: 0.45 + Math.random() * 0.4, fade: 0.25, cols: FIAMMA, luce: true, davanti: true});
+      }
+    }
     if (PO && L.po) PO.passo(L, aiuti);                      // i poteri: effetti a mossa, braci, teschi, neve
     // la falda del cappotto e' appesa al busto basso come un pendolo smorzato: quando il corpo va avanti si scosta all'indietro, quando si ferma ondeggia
     if (L.falda) {
@@ -1276,6 +1316,7 @@ const Arena = (() => {
       avanzaL(L);
     }
     avanzaScambio();
+    if (MO) MO.passo(DT);
     avanzaParticelle(DT);
     scossa.a *= Math.exp(-DT * 14);
     scossa.x = (Math.random() - 0.5) * 2 * scossa.a; scossa.y = (Math.random() - 0.5) * 2 * scossa.a;
@@ -1300,6 +1341,7 @@ const Arena = (() => {
      colpo subito e' un impulso proporzionale al danno, il resto lo fa la fisica. */
   const COLORI_PROIETTILE = {fuoco: "#ff8a2a", gelo: "#8fe8ff", elettrico: "#fff27a", acido: "#9dff4a", psionico: "#e07bff",
                              magico: "#b86bff", perforante: "#ffe9b0", taglio: "#dfe8f0", contundente: "#cfd6e0"};
+  const FIAMMA = ["#fff7c8", "#ffd24a", "#ff8a1f", "#e8400c", "#6a1a0c"];    // la rampa del fuoco: dal bianco caldo al rosso scuro
   const proiettili = [];
   const futuro = (secondi, fn) => futuri.push({t: Math.max(0.0001, secondi), fn});
   const tipoSchivata = loc => loc === "testa" ? "abbassa" : loc && loc.startsWith("gamba") ? "salto" : "indietro";
@@ -1312,6 +1354,39 @@ const Arena = (() => {
             recupero: molti ? 0.2 : pesante ? 0.44 : 0.34};
   }
 
+  /* Il colpo "arriva" (a segno, parato o schivato) quando la sua animazione lo dice: SOLO da quel momento si segnano i danni, i numeri e il
+     knockback (v. vista()). Cosi' la scena e la pagina non anticipano mai quello che l'animazione deve ancora mostrare. */
+  const attesa = [];                // i colpi gia' decisi dal server la cui animazione non e' ancora arrivata al contatto
+  const ascoltatori = [];           // chi vuole sapere quando un colpo arriva (la pagina: numeri fluttuanti, pannelli)
+  const liberi = [];                // chi aspetta che la scena sia libera (nessun colpo in coda o in corso)
+  let ultimoVisto = null;           // gli hp che la scena mostra adesso: {p, c}
+
+  function rivela(ev) {
+    if (!ev) return;
+    const i = attesa.indexOf(ev);
+    if (i >= 0) attesa.splice(i, 1);
+    if (ev._riv) return;
+    ev._riv = true;
+    for (const f of ascoltatori) f(ev);
+  }
+  const occupata = () => attesa.length > 0 || !!scambio || coda.length > 0;
+  /* lo stato da mostrare: finche' un colpo non e' arrivato gli hp, gli scambi e il resto restano com'erano prima di lui */
+  function vista(St) {
+    if (!St || !St.player || !St.cpu) return St;
+    if (!attesa.length) { ultimoVisto = {p: St.player.hp, c: St.cpu.hp}; return St; }
+    const n0 = attesa[0].n, prima = ultimoVisto || {p: St.player.hp, c: St.cpu.hp};
+    return {...St, player: {...St.player, hp: prima.p}, cpu: {...St.cpu, hp: prima.c}, eventi: (St.eventi || []).filter(e => e.n < n0),
+            finito: false, vinto_dal_player: null};
+  }
+  /* per le pagine: se la scena non risponde (scheda nascosta, animazioni bloccate) si lascia andare tutto */
+  function liberaTutto() {
+    for (const ev of attesa.slice()) rivela(ev);
+    coda.length = 0; scambio = null; proiettili.length = 0;
+    if (MO) MO.reset();
+    for (const f of liberi.splice(0)) f();
+  }
+
+  /* un colpo per volta: se la scena ha un'animazione apposita per questo attacco (static/mosse.js) la recita lei, altrimenti la solita */
   function avviaScambio(ev) {
     const att = lati[ev.chi === "p" ? "p" : "c"], dif = lati[ev.chi === "p" ? "c" : "p"];
     const par = parametri(ev);
@@ -1321,31 +1396,32 @@ const Arena = (() => {
     const locB = ev.split ? "busto" : (colpito ? ev.loc : (ev.loc_att || ev.loc || "busto"));
     const forza = colpito ? Math.max(0.06, (ev.hp_persi || 0) / 90) : 0;
     const protesi = !!ev.protesi;
-    scambio = {t: 0, fine: false, ev};
+    scambio = {t: 0, fine: false, ev, max: 4};
     // dove mirare: il davanti della locazione (per le parate, un poco piu' fuori, dove arrivera' l'avambraccio)
     const davanti = () => forzaPunto(dif, locB, dif.pup.fronte(locB));     // il davanti della locazione, come si vede (Super Forza)
     // il bersaglio della mano: dove deve arrivare la mano fisica perche', ingrandita da Super Forza, tocchi il punto voluto
     const punto = () => forzaPunto(att, "braccio_dx", daMondo(att, aMondo(dif, parato ? [davanti()[0] + 8, davanti()[1]] : davanti())), true);
 
-    const reazione = () => {                                    // la difesa parte un istante prima del colpo
+    const reazione = (tipo) => {                                // la difesa parte un istante prima del colpo
       if (colpito) return;
       if (parato) dif.pup.para({mano: "dx", punto: () => { const d = davanti(); return forzaPunto(dif, "braccio_dx", [d[0] + 5, d[1]], true); }});
-      else dif.pup.schiva(tipoSchivata(locB));
+      else dif.pup.schiva(tipo || tipoSchivata(locB));
     };
 
-    const contatto = (info) => {                                // la mano (o il proiettile) arriva
-      const pW = info ? aMondo(att, forzaPunto(att, "braccio_dx", [info.x, info.y])) : aMondo(dif, davanti());   // punto d'impatto nel mondo (come si vede)
+    const contatto = (info, opz = {}) => {                      // la mano (o il proiettile) arriva
+      rivela(ev);                                               // ...e solo adesso si segnano il danno e i numeri
+      const pW = info && info.mondo ? info.mondo : info ? aMondo(att, forzaPunto(att, "braccio_dx", [info.x, info.y])) : aMondo(dif, davanti());   // punto d'impatto nel mondo (come si vede)
       const punta = forzaPunto(dif, ev.loc, daMondo(dif, pW), true);             // ...e nel sistema (fisico) del difensore
       if (colpito) {
-        const dir = [-1, -0.14 - 0.08 * Math.random()];
+        const dir = opz.dir || [-1, -0.14 - 0.08 * Math.random()];
         if (ev.ucciso) {
           dif.pup.muori(forza, dir); dif.ko = true;
           rallenta = 0.3; rallentaT = 0.5;                       // il colpo di grazia in ralenti (tempo reale)
         } else dif.pup.colpisci(ev.split ? "busto" : ev.loc, forza, dir, punta[0], punta[1]);
         dif.ultimo = {forza};
         for (const p of Object.values(parti)) if (ev.split || p.loc === ev.loc) dif.lamp[p.loc] = 1;
-        schizzi(pW, [dif.f * -1, -0.25], forza, protesi || !(ev.hp_persi > 0));          // senza danno: scintille, non sangue
-        stella(pW, forza > 0.5 ? "#ffffff" : "#ffe9a0", 8, 130 + 120 * Math.min(1, forza));
+        if (!opz.senzaSchizzi) schizzi(pW, [dif.f * -1, -0.25], forza, protesi || !(ev.hp_persi > 0));          // senza danno: scintille, non sangue
+        if (!opz.senzaStella) stella(pW, forza > 0.5 ? "#ffffff" : "#ffe9a0", 8, 130 + 120 * Math.min(1, forza));
         congela = Math.max(congela, 0.035 + 0.08 * Math.min(1, forza));
         scossa.a = Math.max(scossa.a, 0.8 + 3.2 * Math.min(1, forza));
         att.pup.spingiTutto(-20, 0);                              // il contraccolpo
@@ -1364,6 +1440,20 @@ const Arena = (() => {
                carica: par.carica, colpo: par.colpo, recupero: par.recupero, tenuta: 0.06,
                anticipo: colpito ? 0 : 0.05, alAnticipo: reazione,
                alFine: () => { scambio && (scambio.fine = true); }};
+
+    // un attacco con la sua animazione (static/mosse.js): ha in mano tutto quello che serve per recitarla e per dire quando il colpo arriva
+    if (MO && MO.ha(ev)) {
+      scambio.max = 7;
+      const fine = () => { if (scambio && scambio.ev === ev) scambio.fine = true; };
+      const mano = (l) => aMondo(att, forzaPunto(att, "braccio_" + l, att.pup._polso(l)));
+      MO.avvia(ev, {ev, att, dif, colpito, parato, locB, forza, base: o, davanti, punto, reazione, contatto, fine, mano,
+                    bersaglio: () => aMondo(dif, parato ? [davanti()[0] + 8, davanti()[1]] : davanti()),
+                    pose: (L, nome) => posaCorpo(L.pup.corpi[nome]), aMondo, daMondo, particella, futuro,
+                    attacca: (extra) => att.pup.attacca({...o, ...extra}), gesto: (tipo, opz) => att.pup.gesto(tipo, opz),
+                    scuoti: (a) => { scossa.a = Math.max(scossa.a, a); }});
+      return;
+    }
+
     if (!par.dist) {
       o.alContatto = contatto;
     } else {
@@ -1389,7 +1479,10 @@ const Arena = (() => {
       q.x += q.vx * DT; q.y += q.vy * DT; q.t -= DT;
       if (q.t <= 0) proiettili.splice(i, 1);
     }
-    if (scambio) { scambio.t += DT; if (scambio.fine || scambio.t > 4) scambio = null; }
+    if (scambio) {
+      scambio.t += DT;
+      if (scambio.fine || scambio.t > (scambio.max || 4)) { rivela(scambio.ev); scambio = null; }      // (se per qualche motivo il contatto non c'e' stato, il colpo si segna adesso)
+    }
     if (!scambio && coda.length) avviaScambio(coda.shift());
     if (!scambio && !coda.length) for (const L of Object.values(lati)) {
       if (L.morteAttesa && !L.ko) { L.ko = true; L.pup.muori((L.ultimo || {forza: 0.5}).forza); }
@@ -1399,6 +1492,7 @@ const Arena = (() => {
       v.avviata = true;
       futuro(0.9, () => { const L = lati[v.lato]; if (L && !L.ko) L.pup.esulta(v.tipo); });      // il tempo del colpo di grazia, poi la festa
     }
+    if (liberi.length && !occupata()) for (const f of liberi.splice(0)) f();
   }
 
   /* come esulta chi vince: in salute, braccia al cielo e saltelli; sotto meta' degli hp totali, a sorte o quello o un braccio solo
@@ -1463,7 +1557,7 @@ const Arena = (() => {
     if (sotto && L.cop && !L.copStacc) staccaCopricapo(L, primo);
     else if (!sotto && L.copStacc) L.copStacc = null;
     L.extra = pg.extra || {};                                    // ali (potere Ali), braccia extra (2x2), volo (stance): spariscono con loro
-    if (primo) L.acq = L.extra.acqua ? 1 : 0;                    // (Forma d'acqua: a duello gia' avviato niente dissolvenza)
+    if (primo) { L.acq = L.extra.acqua ? 1 : 0; L.fuo = L.extra.fuoco ? 1 : 0; }                    // (Forma d'acqua: a duello gia' avviato niente dissolvenza)
     if (primo) L.fk = 1 + FORZA_RANGO * (L.extra.forza || 0);    // (a duello gia' avviato niente crescita: e' gia' cosi')
     L.pup.volo(!!L.extra.volo);
     const morto = !inPalestra && (pg.hp.testa.val <= 0 || pg.hp.busto.val <= 0);
@@ -1510,8 +1604,11 @@ const Arena = (() => {
     if (!lati.p) return;
     const pg = ultimoStato && (ev.chi === "p" ? ultimoStato.cpu : ultimoStato.player);
     ev.protesi = !!(pg && pg.hp[ev.loc] && pg.hp[ev.loc].protesi);      // le protesi scintillano invece di sanguinare
+    ev._riv = false;
     coda.push(ev);
+    attesa.push(ev);                                       // il suo danno si segna quando l'animazione arriva al contatto
     if (coda.length > 6) { const v = coda.shift(); /* troppi arretrati (scheda nascosta): si salta la scena */
+      rivela(v);
       if (v.esito === "colpito" && v.hp_persi > 0) lati[v.chi === "p" ? "c" : "p"].pup.colpisci(v.split ? "busto" : v.loc, v.hp_persi / 90); }
   }
 
@@ -1555,7 +1652,8 @@ const Arena = (() => {
 
   /* ricostruisce da zero i due combattenti (per il laboratorio: una scena dopo l'altra) */
   function reset(St) {
-    coda.length = futuri.length = particelle.length = macchie.length = proiettili.length = 0;
+    coda.length = futuri.length = particelle.length = macchie.length = proiettili.length = attesa.length = 0;
+    if (MO) MO.reset();
     scambio = null; vittoria = null; congela = 0; rallenta = 1; rallentaT = 0; scossa.a = 0; acc = 0;
     costruisci("p"); costruisci("c");
     adatta();
@@ -1633,5 +1731,6 @@ const Arena = (() => {
   /* per il laboratorio: fa esultare un combattente a comando ("salti" o "braccio") */
   const festeggia = (lato, tipo) => lati[lato] && lati[lato].pup.esulta(tipo);
 
-  return {update, reset, anteprima, colpo, evento, passi, disegna, stato, festeggia, mira: accendiMira, statoMira, puntaMira, lati: () => lati, particella, scuoti: a => { scossa.a = Math.max(scossa.a, a); }, kit};
+  return {update, reset, anteprima, colpo, evento, passi, disegna, stato, festeggia, vista, occupata, liberaTutto, pronta: () => !!lati.p,
+          alImpatto: (fn) => ascoltatori.push(fn), quandoLibera: (fn) => liberi.push(fn), mira: accendiMira, statoMira, puntaMira, lati: () => lati, particella, scuoti: a => { scossa.a = Math.max(scossa.a, a); }, kit};
 })();

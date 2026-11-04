@@ -1,0 +1,946 @@
+{
+ "descrizione": "Le iniziative dei combattenti sul ring (iniziativa.py): cosa fa un allievo di testa sua, per tratto di carattere. Una per volta, con una probabilita' che sale col poco affiatamento (fiducia bassa) e con lo stress.",
+ "tratti": {
+  "orgoglioso": [
+   {
+    "id": "orgoglioso_testa",
+    "nome": "Niente ordini",
+    "quando": "attacco",
+    "fa": [
+     {
+      "tipo": "mira",
+      "loc": "testa"
+     }
+    ],
+    "testo": "{nome} non vuole sentire ordini: punta alla testa e basta."
+   },
+   {
+    "id": "orgoglioso_furia",
+    "nome": "Orgoglio ferito",
+    "quando": "colpito",
+    "fa": [
+     {
+      "tipo": "effetto",
+      "nome": "Furia",
+      "turni": 2,
+      "su": "se"
+     }
+    ],
+    "testo": "{nome} vede rosso: l'orgoglio ferito lo fa esplodere."
+   },
+   {
+    "id": "orgoglioso_niente_parata",
+    "nome": "A testa alta",
+    "quando": "risposta",
+    "fa": [
+     {
+      "tipo": "risposta",
+      "scelta": "nessuna"
+     }
+    ],
+    "testo": "{nome} rifiuta di coprirsi: incassa a testa alta."
+   },
+   {
+    "id": "orgoglioso_sfida",
+    "nome": "Lo sguardo di sfida",
+    "quando": "turno",
+    "fa": [
+     {
+      "tipo": "stance",
+      "nome": "Taunt"
+     }
+    ],
+    "testo": "{nome} fissa l'avversario e lo provoca, senza che nessuno glielo chieda."
+   },
+   {
+    "id": "orgoglioso_pesante",
+    "nome": "Chiuderla subito",
+    "quando": "attacco",
+    "fa": [
+     {
+      "tipo": "attacco",
+      "scelta": "pesante"
+     }
+    ],
+    "testo": "{nome} vuole finirla qui: tira il colpo più duro che ha."
+   },
+   {
+    "id": "orgoglioso_rivincita",
+    "nome": "Non così",
+    "quando": "turno",
+    "fa": [
+     {
+      "tipo": "effetto",
+      "nome": "Rivincita",
+      "turni": 3,
+      "su": "se"
+     }
+    ],
+    "testo": "{nome} non accetta di perdere in questo modo.",
+    "cond": {
+     "hp_sotto": 0.6,
+     "round_min": 3
+    }
+   }
+  ],
+  "disciplinato": [
+   {
+    "id": "disciplinato_guardia",
+    "nome": "Guardia da manuale",
+    "quando": "turno",
+    "fa": [
+     {
+      "tipo": "stance",
+      "nome": "Difensivo"
+     }
+    ],
+    "testo": "{nome} ricompone la guardia come in allenamento."
+   },
+   {
+    "id": "disciplinato_schema",
+    "nome": "Lo schema",
+    "quando": "attacco",
+    "fa": [
+     {
+      "tipo": "attacco",
+      "scelta": "pugno"
+     }
+    ],
+    "testo": "{nome} ignora il colpo che gli hai chiesto: lo schema è lo schema, Pugno pulito."
+   },
+   {
+    "id": "disciplinato_parata",
+    "nome": "Riflesso condizionato",
+    "quando": "risposta",
+    "fa": [
+     {
+      "tipo": "risposta",
+      "scelta": "parata"
+     }
+    ],
+    "testo": "{nome} para d'istinto, come mille volte in palestra."
+   },
+   {
+    "id": "disciplinato_respiro",
+    "nome": "Controllo del respiro",
+    "quando": "turno",
+    "fa": [
+     {
+      "tipo": "stamina",
+      "delta": 2
+     }
+    ],
+    "testo": "{nome} controlla il respiro e recupera fiato."
+   },
+   {
+    "id": "disciplinato_lucido",
+    "nome": "Resta lucido",
+    "quando": "colpisce",
+    "fa": [
+     {
+      "tipo": "effetto",
+      "nome": "Sangue freddo",
+      "turni": 2,
+      "su": "se"
+     }
+    ],
+    "testo": "{nome} non esulta dopo il colpo: resta lucido."
+   },
+   {
+    "id": "disciplinato_busto",
+    "nome": "Il bersaglio sicuro",
+    "quando": "attacco",
+    "fa": [
+     {
+      "tipo": "mira",
+      "loc": "busto"
+     }
+    ],
+    "testo": "{nome} sceglie il bersaglio più sicuro, il busto, e va lì."
+   }
+  ],
+  "pigro": [
+   {
+    "id": "pigro_sbadiglio",
+    "nome": "Sbadiglio",
+    "quando": "attacco",
+    "fa": [
+     {
+      "tipo": "salta"
+     }
+    ],
+    "testo": "{nome} sbadiglia e lascia passare l'azione."
+   },
+   {
+    "id": "pigro_svogliato",
+    "nome": "Senza voglia",
+    "quando": "turno",
+    "fa": [
+     {
+      "tipo": "azioni",
+      "delta": -1
+     }
+    ],
+    "testo": "{nome} entra sul ring senza voglia: oggi ha un'azione in meno."
+   },
+   {
+    "id": "pigro_nessuna",
+    "nome": "Senza scomodarsi",
+    "quando": "risposta",
+    "fa": [
+     {
+      "tipo": "risposta",
+      "scelta": "nessuna"
+     }
+    ],
+    "testo": "{nome} non si scomoda: fa quello che gli riesce senza fatica."
+   },
+   {
+    "id": "pigro_scorta",
+    "nome": "Forze risparmiate",
+    "quando": "turno",
+    "fa": [
+     {
+      "tipo": "stamina",
+      "delta": 3
+     }
+    ],
+    "testo": "{nome} ha risparmiato le forze fino ad ora: ne ha di più del previsto."
+   },
+   {
+    "id": "pigro_comodo",
+    "nome": "Comodo in guardia",
+    "quando": "turno",
+    "fa": [
+     {
+      "tipo": "stance",
+      "nome": "Difensivo"
+     }
+    ],
+    "testo": "{nome} si mette comodo in guardia e lascia venire l'avversario."
+   }
+  ],
+  "avido": [
+   {
+    "id": "avido_conti",
+    "nome": "Fa i conti",
+    "quando": "attacco",
+    "fa": [
+     {
+      "tipo": "attacco",
+      "scelta": "migliore"
+     }
+    ],
+    "testo": "{nome} fa due conti: sceglie il colpo che rende di più."
+   },
+   {
+    "id": "avido_banco",
+    "nome": "Il pubblico paga",
+    "quando": "turno",
+    "fa": [
+     {
+      "tipo": "effetto",
+      "nome": "Incitamento",
+      "turni": 2,
+      "su": "se"
+     }
+    ],
+    "testo": "{nome} sente i soldi sul banco: più il pubblico scommette, più si scalda."
+   },
+   {
+    "id": "avido_schiva",
+    "nome": "La pelle costa",
+    "quando": "risposta",
+    "fa": [
+     {
+      "tipo": "risposta",
+      "scelta": "schivata"
+     }
+    ],
+    "testo": "{nome} non rischia la pelle gratis: schiva."
+   },
+   {
+    "id": "avido_conta",
+    "nome": "Conta i soldi",
+    "quando": "turno",
+    "fa": [
+     {
+      "tipo": "effetto",
+      "nome": "Distratto",
+      "turni": 1,
+      "su": "se"
+     }
+    ],
+    "testo": "{nome} conta le banconote del banco invece di guardare l'avversario.",
+    "cond": {
+     "round_min": 2
+    }
+   },
+   {
+    "id": "avido_fiuta",
+    "nome": "Fiuta il colpo",
+    "quando": "attacco",
+    "fa": [
+     {
+      "tipo": "mira",
+      "loc": "testa"
+     }
+    ],
+    "testo": "{nome} fiuta la vittoria: va dritto al punto che chiude l'incontro.",
+    "cond": {
+     "avv_hp_sotto": 0.5
+    }
+   },
+   {
+    "id": "avido_odore",
+    "nome": "L'odore dei soldi",
+    "quando": "turno",
+    "fa": [
+     {
+      "tipo": "azioni",
+      "delta": 1
+     }
+    ],
+    "testo": "{nome} sente l'odore dei soldi: un'azione in più.",
+    "cond": {
+     "avv_hp_sotto": 0.4
+    }
+   }
+  ],
+  "leale": [
+   {
+    "id": "leale_parata",
+    "nome": "Si mette di mezzo",
+    "quando": "risposta",
+    "fa": [
+     {
+      "tipo": "risposta",
+      "scelta": "parata"
+     }
+    ],
+    "testo": "{nome} si mette di mezzo e para: non cede un millimetro."
+   },
+   {
+    "id": "leale_posto",
+    "nome": "Tiene la posizione",
+    "quando": "turno",
+    "fa": [
+     {
+      "tipo": "stance",
+      "nome": "Difensivo"
+     }
+    ],
+    "testo": "{nome} tiene la posizione e resta in guardia, come promesso."
+   },
+   {
+    "id": "leale_denti",
+    "nome": "Stringe i denti",
+    "quando": "colpito",
+    "fa": [
+     {
+      "tipo": "effetto",
+      "nome": "Guardia alta",
+      "turni": 1,
+      "su": "se"
+     }
+    ],
+    "testo": "{nome} stringe i denti e rialza la guardia."
+   },
+   {
+    "id": "leale_angolo",
+    "nome": "Per il suo angolo",
+    "quando": "colpisce",
+    "fa": [
+     {
+      "tipo": "effetto",
+      "nome": "Incitamento",
+      "turni": 2,
+      "su": "se"
+     }
+    ],
+    "testo": "{nome} dedica il colpo al suo angolo: lo vedi, ti guarda."
+   },
+   {
+    "id": "leale_fiato",
+    "nome": "Non ti deluderà",
+    "quando": "turno",
+    "fa": [
+     {
+      "tipo": "cura",
+      "loc": "busto",
+      "quanto": 20
+     }
+    ],
+    "testo": "{nome} stringe i denti per non deluderti: ritrova fiato e forze.",
+    "cond": {
+     "hp_sotto": 0.8
+    }
+   },
+   {
+    "id": "leale_energie",
+    "nome": "Energie nascoste",
+    "quando": "turno",
+    "fa": [
+     {
+      "tipo": "stamina",
+      "delta": 2
+     }
+    ],
+    "testo": "{nome} trova energie che non sapeva di avere."
+   }
+  ],
+  "fragile": [
+   {
+    "id": "fragile_strappo",
+    "nome": "Si strappa",
+    "quando": "turno",
+    "fa": [
+     {
+      "tipo": "danno",
+      "loc": "arto",
+      "quanto": 15
+     }
+    ],
+    "testo": "{nome} si strappa un muscolo scaldandosi: il corpo non perdona."
+   },
+   {
+    "id": "fragile_blocco",
+    "nome": "Si blocca",
+    "quando": "colpito",
+    "fa": [
+     {
+      "tipo": "effetto",
+      "nome": "Esposto",
+      "turni": 2,
+      "su": "se"
+     }
+    ],
+    "testo": "{nome} si blocca per il dolore e resta scoperto."
+   },
+   {
+    "id": "fragile_schiva",
+    "nome": "Non vuole prenderle",
+    "quando": "risposta",
+    "fa": [
+     {
+      "tipo": "risposta",
+      "scelta": "schivata"
+     }
+    ],
+    "testo": "{nome} non vuole prenderne un altro: schiva con tutto quello che ha."
+   },
+   {
+    "id": "fragile_esita",
+    "nome": "Esita",
+    "quando": "attacco",
+    "fa": [
+     {
+      "tipo": "salta"
+     }
+    ],
+    "testo": "{nome} guarda il suo braccio, esita e perde l'azione."
+   },
+   {
+    "id": "fragile_pizzico",
+    "nome": "Un pizzico",
+    "quando": "colpisce",
+    "fa": [
+     {
+      "tipo": "stamina",
+      "delta": -2
+     }
+    ],
+    "testo": "{nome} sente un pizzico dopo il colpo: stringe la spalla e perde fiato."
+   },
+   {
+    "id": "fragile_protegge",
+    "nome": "Si protegge",
+    "quando": "turno",
+    "fa": [
+     {
+      "tipo": "stance",
+      "nome": "Difensivo"
+     }
+    ],
+    "testo": "{nome} si protegge: la guardia è altissima."
+   }
+  ],
+  "cocciuto": [
+   {
+    "id": "cocciuto_pugno",
+    "nome": "Si fa come dice lui",
+    "quando": "attacco",
+    "fa": [
+     {
+      "tipo": "attacco",
+      "scelta": "pugno"
+     }
+    ],
+    "testo": "{nome} ha deciso: Pugno, e non si discute."
+   },
+   {
+    "id": "cocciuto_senza_mira",
+    "nome": "A testa bassa",
+    "quando": "attacco",
+    "fa": [
+     {
+      "tipo": "senza_mira"
+     }
+    ],
+    "testo": "{nome} non vuole mirare: tira a testa bassa e che succeda quel che succede."
+   },
+   {
+    "id": "cocciuto_nessuna",
+    "nome": "Non si abbassa",
+    "quando": "risposta",
+    "fa": [
+     {
+      "tipo": "risposta",
+      "scelta": "nessuna"
+     }
+    ],
+    "testo": "{nome} non si copre: ha deciso che non si abbassa."
+   },
+   {
+    "id": "cocciuto_impunta",
+    "nome": "Si impunta",
+    "quando": "colpito",
+    "fa": [
+     {
+      "tipo": "effetto",
+      "nome": "Furia",
+      "turni": 1,
+      "su": "se"
+     }
+    ],
+    "testo": "{nome} si impunta: più lo colpiscono, più va avanti."
+   },
+   {
+    "id": "cocciuto_avanti",
+    "nome": "Avanti, avanti",
+    "quando": "turno",
+    "fa": [
+     {
+      "tipo": "effetto",
+      "nome": "Sconsiderato",
+      "turni": 2,
+      "su": "se"
+     }
+    ],
+    "testo": "{nome} si butta avanti a testa bassa, senza sentire ragioni."
+   },
+   {
+    "id": "cocciuto_spinge",
+    "nome": "Spinge",
+    "quando": "turno",
+    "fa": [
+     {
+      "tipo": "stance",
+      "nome": "Aggressivo"
+     }
+    ],
+    "testo": "{nome} decide di spingere: stance aggressiva, anche se non gliel'hai detto."
+   }
+  ],
+  "carismatico": [
+   {
+    "id": "carismatico_pubblico",
+    "nome": "Il pubblico lo segue",
+    "quando": "turno",
+    "fa": [
+     {
+      "tipo": "effetto",
+      "nome": "Ovazione",
+      "turni": 2,
+      "su": "se"
+     }
+    ],
+    "testo": "{nome} alza le braccia e il pubblico lo segue."
+   },
+   {
+    "id": "carismatico_sfotte",
+    "nome": "Prende in giro",
+    "quando": "turno",
+    "fa": [
+     {
+      "tipo": "stance",
+      "nome": "Taunt"
+     }
+    ],
+    "testo": "{nome} prende in giro l'avversario: la provocazione parte da sola."
+   },
+   {
+    "id": "carismatico_gioca",
+    "nome": "Gioca col pubblico",
+    "quando": "colpisce",
+    "fa": [
+     {
+      "tipo": "effetto",
+      "nome": "Incitamento",
+      "turni": 2,
+      "su": "se"
+     }
+    ],
+    "testo": "{nome} gioca col pubblico dopo il colpo, e il pubblico risponde."
+   },
+   {
+    "id": "carismatico_spettacolo",
+    "nome": "Lo spettacolo",
+    "quando": "attacco",
+    "fa": [
+     {
+      "tipo": "attacco",
+      "scelta": "pesante"
+     }
+    ],
+    "testo": "{nome} improvvisa: il colpo più spettacolare che ha."
+   },
+   {
+    "id": "carismatico_sorride",
+    "nome": "Sorride sanguinando",
+    "quando": "colpito",
+    "fa": [
+     {
+      "tipo": "stamina",
+      "delta": 2
+     }
+    ],
+    "testo": "{nome} sorride sanguinando: il pubblico lo carica."
+   },
+   {
+    "id": "carismatico_scena",
+    "nome": "Para con scena",
+    "quando": "risposta",
+    "fa": [
+     {
+      "tipo": "risposta",
+      "scelta": "parata"
+     }
+    ],
+    "testo": "{nome} para con tutta la scena: fa colpo sulla folla."
+   }
+  ],
+  "ambizioso": [
+   {
+    "id": "ambizioso_pesante",
+    "nome": "Vuole il colpo",
+    "quando": "attacco",
+    "fa": [
+     {
+      "tipo": "attacco",
+      "scelta": "pesante"
+     }
+    ],
+    "testo": "{nome} sente l'occasione: tira il colpo che fa notizia."
+   },
+   {
+    "id": "ambizioso_momento",
+    "nome": "Il suo momento",
+    "quando": "turno",
+    "fa": [
+     {
+      "tipo": "azioni",
+      "delta": 1
+     }
+    ],
+    "testo": "{nome} sente il suo momento: spinge forte, un'azione in più.",
+    "cond": {
+     "hp_sopra": 0.6
+    }
+   },
+   {
+    "id": "ambizioso_testa",
+    "nome": "Per la copertina",
+    "quando": "attacco",
+    "fa": [
+     {
+      "tipo": "mira",
+      "loc": "testa"
+     }
+    ],
+    "testo": "{nome} punta alla testa: vuole la copertina."
+   },
+   {
+    "id": "ambizioso_strafa",
+    "nome": "Strafà",
+    "quando": "turno",
+    "fa": [
+     {
+      "tipo": "effetto",
+      "nome": "Esposto",
+      "turni": 2,
+      "su": "se"
+     }
+    ],
+    "testo": "{nome} tenta il numero da copertina e si scopre."
+   },
+   {
+    "id": "ambizioso_slancio",
+    "nome": "Lo slancio",
+    "quando": "colpisce",
+    "fa": [
+     {
+      "tipo": "effetto",
+      "nome": "Incitamento",
+      "turni": 2,
+      "su": "se"
+     }
+    ],
+    "testo": "{nome} sente la vittoria vicina: lo slancio lo porta avanti."
+   },
+   {
+    "id": "ambizioso_non_cade",
+    "nome": "Non può cadere ora",
+    "quando": "risposta",
+    "fa": [
+     {
+      "tipo": "risposta",
+      "scelta": "schivata"
+     }
+    ],
+    "testo": "{nome} non può permettersi di cadere ora: schiva.",
+    "cond": {
+     "hp_sotto": 0.5
+    }
+   }
+  ],
+  "paranoico": [
+   {
+    "id": "paranoico_guardia",
+    "nome": "Controlla le porte",
+    "quando": "turno",
+    "fa": [
+     {
+      "tipo": "stance",
+      "nome": "Difensivo"
+     }
+    ],
+    "testo": "{nome} controlla le porte... e la guardia."
+   },
+   {
+    "id": "paranoico_schiva",
+    "nome": "Se l'aspettava",
+    "quando": "risposta",
+    "fa": [
+     {
+      "tipo": "risposta",
+      "scelta": "schivata"
+     }
+    ],
+    "testo": "{nome} se l'aspettava: era già spostato."
+   },
+   {
+    "id": "paranoico_chiude",
+    "nome": "Sospetta una trappola",
+    "quando": "colpito",
+    "fa": [
+     {
+      "tipo": "effetto",
+      "nome": "Guardia alta",
+      "turni": 2,
+      "su": "se"
+     }
+    ],
+    "testo": "{nome} sospetta una trappola: si chiude a riccio."
+   },
+   {
+    "id": "paranoico_guarda",
+    "nome": "Guarda alle spalle",
+    "quando": "attacco",
+    "fa": [
+     {
+      "tipo": "salta"
+     }
+    ],
+    "testo": "{nome} guarda alle sue spalle e perde l'azione."
+   },
+   {
+    "id": "paranoico_mente",
+    "nome": "Tradimento ovunque",
+    "quando": "turno",
+    "fa": [
+     {
+      "tipo": "effetto",
+      "nome": "Distratto",
+      "turni": 2,
+      "su": "se"
+     }
+    ],
+    "testo": "{nome} vede tradimenti ovunque: la mente corre e il colpo no."
+   },
+   {
+    "id": "paranoico_busto",
+    "nome": "Non rischia",
+    "quando": "attacco",
+    "fa": [
+     {
+      "tipo": "mira",
+      "loc": "busto"
+     }
+    ],
+    "testo": "{nome} non rischia: punta al bersaglio più grosso."
+   }
+  ],
+  "veterano": [
+   {
+    "id": "veterano_mestiere",
+    "nome": "Il mestiere",
+    "quando": "attacco",
+    "fa": [
+     {
+      "tipo": "attacco",
+      "scelta": "migliore"
+     }
+    ],
+    "testo": "{nome} conosce il mestiere: il colpo giusto, senza aspettare l'ordine."
+   },
+   {
+    "id": "veterano_parata",
+    "nome": "Ne ha viste",
+    "quando": "risposta",
+    "fa": [
+     {
+      "tipo": "risposta",
+      "scelta": "parata"
+     }
+    ],
+    "testo": "{nome} ne ha viste di peggio: para senza pensarci."
+   },
+   {
+    "id": "veterano_freddo",
+    "nome": "Sangue freddo",
+    "quando": "colpisce",
+    "fa": [
+     {
+      "tipo": "effetto",
+      "nome": "Sangue freddo",
+      "turni": 2,
+      "su": "se"
+     }
+    ],
+    "testo": "{nome} non si scompone: sangue freddo."
+   },
+   {
+    "id": "veterano_respiro",
+    "nome": "Ha preso di peggio",
+    "quando": "colpito",
+    "fa": [
+     {
+      "tipo": "cura",
+      "loc": "busto",
+      "quanto": 15
+     }
+    ],
+    "testo": "{nome} ha preso di peggio: respira e va avanti."
+   },
+   {
+    "id": "veterano_guardia",
+    "nome": "Guardia da strada",
+    "quando": "turno",
+    "fa": [
+     {
+      "tipo": "stance",
+      "nome": "Difensivo"
+     }
+    ],
+    "testo": "{nome} alza la guardia di strada: poco bella, molto efficace.",
+    "cond": {
+     "hp_sotto": 0.5
+    }
+   },
+   {
+    "id": "veterano_punto_debole",
+    "nome": "Vede il punto debole",
+    "quando": "attacco",
+    "fa": [
+     {
+      "tipo": "mira",
+      "loc": "testa"
+     }
+    ],
+    "testo": "{nome} vede il punto debole e ci va.",
+    "cond": {
+     "avv_hp_sotto": 0.5
+    }
+   }
+  ],
+  "fanatico": [
+   {
+    "id": "fanatico_trance",
+    "nome": "In trance",
+    "quando": "turno",
+    "fa": [
+     {
+      "tipo": "azioni",
+      "delta": 1
+     }
+    ],
+    "testo": "{nome} è in trance: una carica in più."
+   },
+   {
+    "id": "fanatico_stanco",
+    "nome": "Troppo allenamento",
+    "quando": "turno",
+    "fa": [
+     {
+      "tipo": "stamina",
+      "delta": -2
+     }
+    ],
+    "testo": "{nome} si è allenato troppo: arriva già stanco."
+   },
+   {
+    "id": "fanatico_pesante",
+    "nome": "Senza freni",
+    "quando": "attacco",
+    "fa": [
+     {
+      "tipo": "attacco",
+      "scelta": "pesante"
+     }
+    ],
+    "testo": "{nome} non conosce misura: il colpo più pesante."
+   },
+   {
+    "id": "fanatico_ride",
+    "nome": "Ride dei colpi",
+    "quando": "colpito",
+    "fa": [
+     {
+      "tipo": "effetto",
+      "nome": "Furia",
+      "turni": 2,
+      "su": "se"
+     }
+    ],
+    "testo": "{nome} ride dei colpi: gli danno carica."
+   },
+   {
+    "id": "fanatico_non_para",
+    "nome": "Non si difende",
+    "quando": "risposta",
+    "fa": [
+     {
+      "tipo": "risposta",
+      "scelta": "nessuna"
+     }
+    ],
+    "testo": "{nome} non perde tempo a coprirsi: si allena, non si difende."
+   },
+   {
+    "id": "fanatico_bersaglio",
+    "nome": "Fuori controllo",
+    "quando": "colpisce",
+    "fa": [
+     {
+      "tipo": "effetto",
+      "nome": "Sconsiderato",
+      "turni": 1,
+      "su": "se"
+     }
+    ],
+    "testo": "{nome} perde il controllo: tira senza guardia, e della difesa chi se ne importa."
+   }
+  ]
+ }
+}

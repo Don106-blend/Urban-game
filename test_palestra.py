@@ -219,6 +219,43 @@ def main():
         S["palestra"]["eventi"].clear()
         ok(all(v >= 1 for v in a["hp"].values()), "mai sotto 1 hp")
 
+    # ============================================================ l'informatore della serata: chi affronta stasera, a pagamento
+    nuova_partita()
+    sa = assumi(nome="Spia Uno", tratti=["leale"], fiducia=60, stress=0)
+    sb = assumi(nome="Spia Due", tratti=["leale"], fiducia=60, stress=0)
+    S["crediti"] = 500
+    pag = client.get("/duelli").get_data(as_text=True)
+    ok(webapp.sfidante_svelato(sa["id"]) is None and "Chi affronta stasera" in pag and "Stasera affronta" not in pag, "all'inizio non si sa nulla")
+    ok("Di testa sua sul ring" in pag, "la serata dice quanto ti da' retta l'allievo")
+    client.post("/duelli/anteprima", data={"pid": sa["id"]})
+    riv = webapp.sfidante_svelato(sa["id"])
+    ok(riv is not None and S["crediti"] == 500 - webapp.PREZZO_ANTEPRIMA, "svelato, e pagato")
+    pag = client.get("/duelli").get_data(as_text=True)
+    ok("Stasera affronta" in pag and webapp.nemesi.nome_completo(riv) in pag, "la scheda dello sfidante e' nella serata")
+    client.post("/duelli/anteprima", data={"pid": sa["id"]})
+    ok(S["crediti"] == 500 - webapp.PREZZO_ANTEPRIMA, "una volta sola per allievo e per giornata")
+    ok(webapp.sfidante_svelato(sb["id"]) is None, "l'altro allievo ha il suo sfidante: non e' stato svelato")
+    sch = webapp.scheda_sfidante(riv, sa["id"])
+    ok(sch["livello"] == riv["livello"] and len(sch["stats"]) == len(STATS) and sch["nome"], "la scheda dice livello, statistiche, nome")
+    client.post("/duelli/avvia", data={"pid": sa["id"]})
+    dd = webapp.DUELLO
+    ok(dd.rivale is riv and dd.cpu.nome == webapp.nemesi.nome_completo(riv), "il duello e' proprio contro lo sfidante svelato")
+    ok(webapp.sfidante_svelato(sa["id"]) is None, "svelato e combattuto: il pettegolezzo si consuma")
+    webapp.DUELLO = None
+    S.pop("duello_pendente", None)
+    S["crediti"] = webapp.PREZZO_ANTEPRIMA - 1                 # senza soldi niente informatore
+    client.post("/duelli/anteprima", data={"pid": sb["id"]})
+    ok(webapp.sfidante_svelato(sb["id"]) is None and S["crediti"] == webapp.PREZZO_ANTEPRIMA - 1, "senza crediti non si compra")
+    S["crediti"] = 500
+    client.post("/duelli/anteprima", data={"pid": sb["id"]})
+    ok(webapp.sfidante_svelato(sb["id"]) is not None, "con i crediti si compra")
+    S["giorno"] += 1                                           # il giorno dopo il pettegolezzo e' vecchio
+    ok(webapp.sfidante_svelato(sb["id"]) is None and webapp._anteprime_oggi() == {}, "l'anteprima vale una serata sola")
+    sb["ultimo_duello"] = S["giorno"]                          # chi non puo' combattere oggi non ha niente da spiare
+    c0 = S["crediti"]
+    client.post("/duelli/anteprima", data={"pid": sb["id"]})
+    ok(S["crediti"] == c0 and webapp.sfidante_svelato(sb["id"]) is None, "un allievo che non combatte non costa un informatore")
+
     # ============================================================ duello: occupa la giornata, cambia fiducia e stress
     nuova_partita()
     a = assumi(nome="Test Tre", tratti=["orgoglioso", "ambizioso"], fiducia=50, stress=0)

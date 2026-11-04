@@ -16,11 +16,12 @@ import math
 
 import aspetto
 import azzardo
+import iniziativa
 import nemesi
 import palestra
 import tattiche
-from engine import (BONUS_RANGO, LOCAZIONI, STATS, SKILLS, FALLBACK, MAX_POTERI, DADO_BASE,
-                    MARGINE_CAP, MARGINE_FATTORE, MIRA_PENALITA, MIRA_DURA_TURNO, costo_azioni, prob_supera,
+from engine import (BONUS_RANGO, LOCAZIONI, STATS, SKILLS, FALLBACK, MAX_POTERI, DADO_BASE, per_rango,
+                    MARGINE_CAP, MARGINE_FATTORE, MIRA_PENALITA, MIRA_SCHIVATA_SICURA, MIRA_PARATA_SPOSTA, costo_azioni, prob_supera,
                     umanita_max, nome_casuale,
                     Personaggio, personaggio_casuale, eroe_base, carica_db,
                     bonus_colpire, dotazione_base, valuta, costo_upgrade)
@@ -35,6 +36,7 @@ CREDITI_INIZIALI = 300      # (resta il riferimento con cui si stimano i crediti
 CREDITI_PARTENZA = 500      # i crediti di una partita nuova: due allievi, o uno e qualcosa per lui
 RICOMPENSA_VITTORIA = 150
 PREZZO_MEDIKIT = 30
+PREZZO_ANTEPRIMA = 40       # un informatore sul ring: per sapere PRIMA di salire contro chi combatterà un allievo stasera (v. /duelli/anteprima)
 N_CONTRATTI = 3             # aspiranti che si presentano alla palestra ogni settimana
 PREZZO_CERCA_ALTRI = 60     # un aspirante in piu' (passaparola)
 MAX_ASPIRANTI = 5
@@ -397,6 +399,7 @@ def aggiungi_aspirante():
 
 # ---------------------------------------------------------------- duello web
 STANCE_FORMA_ACQUA = 18       # id della stance "Forma d'acqua" in stances.json (il test controlla il nome)
+STANCE_CORPO_FIAMMA = 6       # id di "Corpo di Fiamma": il corpo e' fuoco luminoso (il test controlla il nome)
 
 
 def pannello(p, turno, altro=None):
@@ -415,6 +418,7 @@ def pannello(p, turno, altro=None):
         "extra": {"ali": p.potere_attivo("Ali"), "braccia": p.potere_attivo("2x2"),
                   "volo": any(x["def"]["nome"] == "Volo" for x in p.stance_attive),
                   "acqua": any(x["def"]["id"] == STANCE_FORMA_ACQUA for x in p.stance_attive),     # stance Forma d'acqua: il corpo e' acqua (static/arena.js)
+                  "fuoco": any(x["def"]["id"] == STANCE_CORPO_FIAMMA for x in p.stance_attive),    # stance Corpo di Fiamma: il corpo e' fuoco luminoso
                   "velocita": p.rango_potere_attivo("Supervelocità"), "forza": p.rango_potere_attivo("Super Forza"),
                   "poteri": p.poteri_attivi_rango(), "stance_poteri": p.poteri_in_stance()},
         "risorse": {"azioni": p.azioni, "n_azioni": p.n_azioni,
@@ -810,8 +814,31 @@ def scegli_rivale(record, pg):
     if r is None:
         r = _nuovo_rivale(record, pg)
         rivali.append(r)
-        nemesi.pota(rivali, protetti={r["id"]})
+        nemesi.pota(rivali, protetti={r["id"], *_anteprime_oggi().values()})      # (chi e' stato svelato oggi resta in giro fino al duello)
     return r
+
+
+def _anteprime_oggi():
+    """{id allievo (testo): id del rivale svelato} per la serata di oggi. Cambiato il giorno, il pettegolezzo e' vecchio: si butta."""
+    a = STATO.get("anteprime") or {}
+    return dict(a.get("per", {})) if a.get("giorno") == STATO.get("giorno") else {}
+
+
+def sfidante_svelato(pid):
+    """Il rivale che l'allievo `pid` affrontera' stasera, se l'informatore e' stato pagato; None se non si sa (o non e' piu' in giro)."""
+    rid = _anteprime_oggi().get(str(pid))
+    return next((r for r in STATO.get("rivali", []) if r["id"] == rid), None)
+
+
+def scheda_sfidante(r, pid):
+    """Cosa si vede di uno sfidante svelato: chi e', quanto vale, cosa ha addosso, cosa c'e' stato tra lui e l'allievo."""
+    nomi_p = {x["id"]: x["nome"] for x in DB["poteri"]}
+    cat = {"protesi": {x["id"]: x["nome"] for x in DB["protesi"]}, "augments": {x["id"]: x["nome"] for x in DB["augments"]}}
+    eti = nemesi.etichetta(r, pid, STATO.get("giorno"))
+    return {"nome": nemesi.nome_completo(r), "livello": r["livello"], "aspetto": r.get("aspetto"), "incontri": r.get("incontri", 0),
+            "poteri": [f"{nomi_p.get(x['id'], '?')} r{x['rango']}" for x in r.get("poteri", [])],
+            "impianti": [cat[k].get(i, "?") for k in ("protesi", "augments") for i in r.get(k, [])],
+            "stats": {k: r["stats"].get(k, 1) for k in STATS}, "stato": eti["stato"], "testo": eti["testo"], "taglia": nemesi.taglia(r)}
 
 
 def genera_avversario(record, pg):
@@ -869,6 +896,7 @@ def cresce_rivale(riv, vinto_allievo):
 
 class DuelloWeb:
     """Stato del duello lato server, pilotato da /api/duello/azione."""
+    sempre_a_segno = False    # solo la palestra di prova del Compendio (ProvaPoteri): il bersaglio non para e ogni colpo lo prende
 
     def __init__(self, record=None, pg=None, avversario=None, torneo=None, posta=None, azzardo_attivo=None, mortale=False):
         self.rec = record  # None = duello senza palestra: torneo (o CPU vs CPU)
@@ -906,6 +934,8 @@ class DuelloWeb:
         self.tavolo = azzardo.Tavolo(self, banco=self.arena_attiva) if (not mortale and (self.arena_attiva or giocabile)) else None
         # le scelte del giocatore si registrano solo nel gioco vero (duello della palestra o torneo), mai nel harness
         self.reg = tattiche.Registratore("torneo" if torneo is not None else "duello") if self.arena_attiva else None
+        # l'atleta della palestra non sempre ascolta: iniziative di testa sua, per tratto (iniziativa.py). Solo il suo, solo nei duelli veri
+        self.iniz = iniziativa.Iniziativa(self, record) if record is not None else None
         self.usato_potere = False   # per le clausole "stoico"/"bestia"
         self.min_hp_crit = 1.0      # hp minimi (frazione di testa + busto) toccati dal player, per la clausola "incassatore"
         self.scriv("=== DUELLO ===")
@@ -1032,6 +1062,8 @@ class DuelloWeb:
         self.check_sconfitta(self.attivo, self.altro)
         if not self.finito:
             self.fase = "player" if self.attivo is self.p else "cpu"
+            if self.iniz is not None and self.attivo is self.p:
+                self.iniz.turno()       # (puo' anche attaccare per conto suo: non tocca la fase, se il duello finisce)
 
     def _riattiva_augment_passivi(self, chi):
         """Un augment Passivo resta sempre acceso: se un EMP l'ha appena spento e
@@ -1047,8 +1079,7 @@ class DuelloWeb:
     def fine_turno(self):
         for pg in (self.p, self.cpu):
             pg.reazioni_bloccate = False     # il Modulo di IA predittiva vale per il turno in cui e' stato usato
-        if MIRA_DURA_TURNO:
-            self.attivo.mira = None   # una mira di turno non si porta in quello dopo
+        self.attivo.fine_turno_mira()     # la mira vale per il turno in cui si prende e per il successivo
         if self.tavolo is not None:
             self.tavolo.fine_turno(self.attivo)
         if self.idx == 0:
@@ -1178,8 +1209,7 @@ class DuelloWeb:
         a.azioni -= costo_azioni(att)
         a.consuma_attacco(att)
         mirata = a.mira if att.get("can_aim") else None
-        if not MIRA_DURA_TURNO:  # mira di turno: la cancella fine_turno(), non un attacco
-            a.mira = None
+        a.mira = None        # qualunque colpo scioglie la mira, anche uno che non si mira (il Colpo pesante la spreca)
         colpi = max(1, att.get("colpi", 1))
         # la locazione si decide una volta sola per l'intero attacco (anche multi-colpo):
         # è quella annunciata qui, e resta la stessa fino alla risoluzione del danno —
@@ -1276,21 +1306,22 @@ class DuelloWeb:
         a = self.attivo
         att, ta, pen, loc = pend["att"], pend["ta"], pend["pen_mira"], pend["loc"]
         opzioni = pend["opzioni"]
+        sch_tiro = self._schivata_a_tiro(pend)
         if len(opzioni) == 1:
             return opzioni[0], None
         colpo = stima_colpo(att)
         mg = d.malus_gambe()
         split = att.get("split_danni", False)
         bonus_att = a.bonus_tiro(self._skill_attacco(att), d) + bonus_colpire(a, d)
-        l_par = self._loc_parata(d, colpo / 2)
+        l_par = loc if (pend.get("mirata") and not MIRA_PARATA_SPOSTA) else self._loc_parata(d, colpo / 2)
         # bonus di difesa calcolati UNA volta (la stima li usa decine di volte)
         b_dif = {"nessuna risposta": d.bonus_tiro("riflessi", a),
                  "parata": d.bonus_tiro("armi_corpo_a_corpo", a),
                  "schivata": d.bonus_tiro("acrobatica", a) + mg}
 
         def regge(opz, t_att):
-            if opz == "schivata":
-                return 1.0   # la schivata riesce sempre (v. risolvi_risposta)
+            if opz == "schivata" and not sch_tiro:
+                return 1.0   # la schivata riesce sempre (v. risolvi_risposta), tranne contro un colpo mirato
             t = t_att - b_dif[opz] - pen   # serve d10 >= t
             return min(1.0, max(0.0, (DADO_BASE + 1 - t) / DADO_BASE))
 
@@ -1334,6 +1365,14 @@ class DuelloWeb:
                    "parata": "se fallisce il danno si dimezza e scegli dove incassarlo",
                    "schivata": "riesce sempre: nega tutto il colpo (costa la risposta del round)"}
 
+    def _nota_difesa(self, opz, pend):
+        """Cosa fa questa risposta davanti a QUESTO colpo: contro un colpo mirato la schivata si tira e la parata non sposta il colpo."""
+        if opz == "schivata" and self._schivata_a_tiro(pend):
+            return "contro un colpo mirato si tira: acrobatica contro il suo tiro (costa la risposta del round)"
+        if opz == "parata" and pend.get("mirata") and not MIRA_PARATA_SPOSTA:
+            return "colpo mirato: se fallisce il danno si dimezza ma il colpo resta dov'è mirato"
+        return self.NOTE_DIFESA.get(opz, "")
+
     def prob_difesa(self, d, pend):
         """P(il difensore regge) per ogni risposta disponibile contro il colpo in sospeso: il tiro
         d'attacco e' gia' noto. Sono i numeri che il client mostra al giocatore, cosi' la scelta
@@ -1343,20 +1382,29 @@ class DuelloWeb:
         base = {"nessuna risposta": d.bonus_tiro("riflessi", a),
                 "parata": d.bonus_tiro("armi_corpo_a_corpo", a),
                 "schivata": d.bonus_tiro("acrobatica", a) + d.malus_gambe()}
-        return {opz: 1.0 if opz == "schivata" else
+        sch_tiro = self._schivata_a_tiro(pend)
+        return {opz: 1.0 if opz == "schivata" and not sch_tiro else
                 round(min(1.0, max(0.0, (DADO_BASE + 1 - (ta - base[opz] - pen)) / DADO_BASE)), 2)
                 for opz in pend["opzioni"]}
+
+    @staticmethod
+    def _schivata_a_tiro(pend):
+        """True se contro questo colpo la schivata non e' sicura ma si tira: succede coi colpi mirati (MIRA_SCHIVATA_SICURA)."""
+        return bool(pend.get("mirata")) and not MIRA_SCHIVATA_SICURA
 
     def p_colpire_stimata(self, att, a, d):
         """Probabilita' stimata che un attacco vada a segno: contro la MIGLIORE difesa che il
         bersaglio puo' permettersi ora (riflessi, e parata/schivata se ha ancora la risposta)."""
-        pen = MIRA_PENALITA if (a.mira and att.get("can_aim")) else 0
+        mirato = bool(a.mira and att.get("can_aim"))
+        pen = MIRA_PENALITA if mirato else 0
         difese = [d.bonus_tiro("riflessi", a)]
         if d.risposte > 0:
             if (not att.get("ranged") and att.get("parabile", True)) or d.ha_flag("parata_sempre"):
                 difese.append(d.bonus_tiro("armi_corpo_a_corpo", a))
             if att.get("can_dodge") and d.puo_schivare():
-                return 0.0   # la schivata riesce sempre: contro la migliore difesa non si colpisce
+                if not mirato or MIRA_SCHIVATA_SICURA:
+                    return 0.0   # la schivata riesce sempre: contro la migliore difesa non si colpisce
+                difese.append(d.bonus_tiro("acrobatica", a) + d.malus_gambe())     # contro un colpo mirato si tira
         fisso = a.bonus_tiro(self._skill_attacco(att), d) - max(difese) - pen
         # una stance che tira dadi dentro il bonus a colpire (la Taunt) fa oscillare una stima sola da -2 a +9: si fa la media,
         # altrimenti la percentuale mostrata balla a ogni aggiornamento e chi aspetta il numero giusto sceglie solo il rumore
@@ -1368,7 +1416,7 @@ class DuelloWeb:
         """True se una stance in campo tira dadi nel bonus a colpire (v. engine.bonus_colpire)."""
         return any(m.get("dado_proprio") or m.get("dado_avversario")
                    for st in a.stance_attive + d.stance_attive for m in st["def"].get("modificatori", [])
-                   if m["tipo"] in ("colpire_proprio", "colpire_avversario"))
+                   if m["tipo"] in ("colpire_proprio", "colpire_avversario", "provocazione"))
 
     def info_attacco_in_corso(self):
         """Cosa sta per colpire il giocatore (solo in fase 'risposta'): attacco, tiro, bersaglio,
@@ -1380,14 +1428,14 @@ class DuelloWeb:
                 "mirata": bool(pend.get("mirata")), "split": att.get("split_danni", False),
                 "colpo": att.get("colpi", 1) - pend.get("colpi_rimasti", 1) + 1,
                 "colpi": att.get("colpi", 1), "azioni_avversario": a.azioni,
-                "difese": [{"scelta": opz, "p": p, "nota": self.NOTE_DIFESA.get(opz, "")}
-                           for opz, p in self.prob_difesa(self.p, pend).items()]}
+                "difese": [{"scelta": opz, "p": p, "nota": self._nota_difesa(opz, pend)} for opz, p in self.prob_difesa(self.p, pend).items()]}
 
     def ev_attacco(self, att, a, d):
         """Danno atteso PER AZIONE di un attacco: P(colpire) x danno / costo in azioni. Il
         difensore si stima sui riflessi; se ha ancora la risposta, parata (dimezza) e
         schivata (nega) ne tolgono una parte (fattori di risposta, a spanne)."""
-        pen = MIRA_PENALITA if (a.mira and att.get("can_aim")) else 0
+        mirato = bool(a.mira and att.get("can_aim"))
+        pen = MIRA_PENALITA if mirato else 0
         k = (a.bonus_tiro(self._skill_attacco(att), d) + bonus_colpire(a, d)
              - d.bonus_tiro("riflessi", a) - pen)
         f = 1.0
@@ -1408,6 +1456,8 @@ class DuelloWeb:
         giocabili = a.attacchi_giocabili()
         if not giocabili:
             return None
+        if a.mira:      # con la mira presa non si butta via su un colpo che non si mira
+            giocabili = [x for x in giocabili if x.get("can_aim")] or giocabili
         punti = [(self.ev_attacco(x, a, d), x) for x in giocabili]
         t = self._tat()
         if t is not None:  # contrasta la difesa preferita del giocatore (v. Modello.moltiplicatore_attacco)
@@ -1432,11 +1482,13 @@ class DuelloWeb:
         crip_prima = set(d.crippled)
         split = att.get("split_danni", False)
         skill_dif = {"parata": "armi corpo a corpo", "schivata": "acrobatica"}.get(scelta, "riflessi")
+        sch_tiro = scelta == "schivata" and self._schivata_a_tiro(pend)      # contro un colpo mirato la schivata si tira
         # con che probabilita' questo colpo andava a segno contro la difesa scelta (la folla premia l'improbabile, v. azzardo.sorpresa)
-        if scelta == "schivata":
+        if scelta == "schivata" and not sch_tiro:
             p_colpo = 0.0
         else:
-            b_dif = d.bonus_tiro("armi_corpo_a_corpo" if scelta == "parata" else "riflessi", a)
+            b_dif = (d.bonus_tiro("acrobatica", a) + d.malus_gambe() if scelta == "schivata"
+                     else d.bonus_tiro("armi_corpo_a_corpo" if scelta == "parata" else "riflessi", a))
             p_colpo = max(0.0, min(1.0, (ta - b_dif - pen_mira - 1) / DADO_BASE))
         if scelta == "parata":
             d.risposte -= 1
@@ -1444,6 +1496,8 @@ class DuelloWeb:
             # dell'attacco, resta locale a questa risoluzione (i colpi successivi tornano
             # a mirare loc_attacco)
             loc = loc_parata if loc_parata in d.hp else random.choice(list(d.hp))
+            if mirata and not MIRA_PARATA_SPOSTA:
+                loc = loc_attacco        # un colpo mirato va dove e' mirato: la parata lo attutisce, non lo sposta
             td = d.tira("armi_corpo_a_corpo", a) + pen_mira
             self.scriv(f"{d.nome} para: {td} (armi corpo a corpo"
                        + (f" +{pen_mira} mira" if pen_mira else "") + f") contro {ta}.")
@@ -1456,15 +1510,23 @@ class DuelloWeb:
         elif scelta == "schivata":
             d.risposte -= 1
             # la schivata riesce SEMPRE e non si tira: il costo e' la risposta del round, e la offrono
-            # solo gli attacchi schivabili e chi ha le gambe sane (v. puo_schivare)
-            td = None
-            colpito = False
-            self.scriv(f"{d.nome} schiva!", "miss")
+            # solo gli attacchi schivabili e chi ha le gambe sane (v. puo_schivare). Tranne contro un colpo mirato: li' si tira
+            if sch_tiro:
+                td = d.tira("acrobatica", a) + d.malus_gambe() + pen_mira
+                self.scriv(f"{d.nome} tenta di schivare il colpo mirato: {td} (acrobatica"
+                           + (f" +{pen_mira} mira" if pen_mira else "") + f") contro {ta}.")
+                colpito = td < ta
+                if not colpito:
+                    self.scriv(f"{d.nome} schiva!", "miss")
+            else:
+                td = None
+                colpito = False
+                self.scriv(f"{d.nome} schiva!", "miss")
         else:
             td = d.tira("riflessi", a) + pen_mira
             self.scriv(f"{d.nome} regge sui riflessi: {td} (riflessi"
                        + (f" +{pen_mira} mira" if pen_mira else "") + f") contro {ta}.")
-            colpito = td < ta
+            colpito = td < ta or self.sempre_a_segno
             if not colpito:
                 self.scriv(f"{d.nome} schiva d'istinto!", "miss")
         if not colpito:
@@ -1504,6 +1566,9 @@ class DuelloWeb:
                 self.scriv("  " + r)
             for r in d.scatta_trigger("vieni_colpito", a, DB["effetti"]):
                 self.scriv("  " + r)
+            if not att.get("ranged"):       # le stance che reagiscono solo a chi colpisce da vicino (Corpo di Fiamma)
+                for r in d.scatta_trigger("vieni_colpito_mischia", a, DB["effetti"]):
+                    self.scriv("  " + r)
             if danno_reale > 0:
                 for r in a.scatta_trigger("fai_danni", d, DB["effetti"]):
                     self.scriv("  " + r)
@@ -1522,7 +1587,10 @@ class DuelloWeb:
             mitigato=mitiga_meta, deviato=colpito and not split and loc != loc_attacco,
             base=base, margine=margine, danno=danno, tipo_danno=tipo_danno,
             hp_persi=danno_reale, assorbito=assorbito, ucciso=d.sconfitto(),
-            effetti=info_attacco(att)["effetti"] if colpito else [])
+            effetti=info_attacco(att)["effetti"] if colpito else [], att_id=att.get("id"),
+            iniz=self.iniz.preleva_note() if self.iniz is not None else [])
+        if self.iniz is not None and not self.finito:     # le reazioni dell'atleta a uno scambio (furia, guardia...)
+            self.iniz.dopo_colpo(a, d, bool(colpito), danno_reale)
         if self.tavolo is not None:       # la folla reagisce dopo la scheda del colpo, non prima
             self.tavolo.dopo_scambio(a, d, scelta, bool(colpito), p_colpo, danno_reale, loc,
                                      d.crippled - crip_prima, d.sconfitto())
@@ -1574,11 +1642,9 @@ class DuelloWeb:
             self.evento("info", i0, titolo="Risparmia le forze",
                         desc="Spegne il potere più costoso per non finire la stamina.")
             return
-        # mira: solo se dopo resta un'azione per attaccare (mirare costa 1 azione:
-        # senza questo guard la CPU alternava mira/attacco dimezzando i suoi danni
-        # — v. feedback "non mi ha fatto danni")
-        if (a.puo_mirare() and (a.mira_bonus or a.azioni >= 2)
-                and random.random() < self._prob("mira", "mira")):
+        # mira: solo se non sta gia' mirando (la mira resta finche' non la usa: rimirare butterebbe un'azione; v. feedback
+        # "non mi ha fatto danni"). Anche come ultima azione: il primo colpo mirabile del prossimo turno la usa.
+        if (a.puo_mirare() and not a.mira and random.random() < self._prob("mira", "mira")):
             a.consuma_mira()
             critiche = [l for l in ("testa", "busto") if l in self.altro.hp]
             t = self._tat()
@@ -1623,7 +1689,7 @@ class DuelloWeb:
     def _occasioni(self):
         """Che cosa poteva fare il giocatore adesso (stesse condizioni che la CPU usa per scegliere)."""
         a = self.p
-        return {"mira": a.puo_mirare() and (a.mira_bonus or a.azioni >= 2),
+        return {"mira": a.puo_mirare() and not a.mira,
                 "potere": a.azioni >= 1 and (any(not s["attivo"] and a.puo_attivare_potere(s) for s in a.poteri)
                                              or any(s["def"].get("attivo", True) and not s["attivo"]
                                                     and a.puo_attivare_augment(s) and a.puo_pagare_augment(s)
@@ -1690,7 +1756,10 @@ class DuelloWeb:
             scelta = dati.get("scelta")
             if scelta not in self.pending["opzioni"]:
                 return "scelta non valida"
-            self.risolvi_risposta(scelta, dati.get("loc"))
+            loc = dati.get("loc")
+            if self.iniz is not None:
+                scelta, loc = self.iniz.risposta(scelta, loc, self.pending["opzioni"])      # l'atleta puo' rispondere a modo suo
+            self.risolvi_risposta(scelta, loc)
             return None
         if tipo == "cpu_step":
             if self.fase == "cpu" and not self.finito:
@@ -1732,9 +1801,9 @@ class DuelloWeb:
             a.consuma_mira()
             a.mira = loc
             self.scriv(f"{a.nome} prende la mira su {loc} "
-                       f"(+{MIRA_PENALITA} alla difficoltà, "
-                       + ("i colpi mirabili di questo turno puntano lì)." if MIRA_DURA_TURNO
-                          else "il prossimo attacco punta lì)."))
+                       f"(+{MIRA_PENALITA} alla difficoltà"
+                       + ("" if MIRA_SCHIVATA_SICURA else ", schivarlo richiede un tiro") + ("" if MIRA_PARATA_SPOSTA else ", la parata non lo sposta")
+                       + "; il prossimo colpo punta lì: in questo turno o nel successivo, poi la mira si scioglie).")
             self.evento("mira", loc=loc)
         elif tipo == "attacco":
             att = next((x for x in a.attacchi_visibili() if x["id"] == dati.get("id")), None)
@@ -1745,7 +1814,10 @@ class DuelloWeb:
                         else f"{att['nome']} costa {costo_azioni(att)} azioni")
             if not a.puo_usare_attacco(att):
                 return "attacco in ricarica o senza utilizzi rimasti"
-            self.usa_attacco(att)
+            if self.iniz is not None:
+                att = self.iniz.attacco(att)         # l'atleta puo' cambiare attacco, mira o lasciar cadere l'azione
+            if att is not None:
+                self.usa_attacco(att)
         elif tipo == "potere":
             slot = next((s for s in a.poteri
                          if s["def"]["id"] == dati.get("id") and not s["attivo"]), None)
@@ -1795,6 +1867,8 @@ class DuelloWeb:
                 return "stance non disponibile"
             if a.bonus < 1:
                 return "azioni bonus esaurite"
+            if sdef.get("richiede_azioni") and a.azioni <= 0:
+                return f"{sdef['nome']} vale per questo turno: non hai più azioni da giocare"
             if not a.puo_attivare_stance(sdef):
                 return "stance in ricarica o senza utilizzi rimasti"
             self.usa_stance(a, sdef, self.cpu)
@@ -1808,13 +1882,14 @@ class DuelloWeb:
             "attacchi": [{"id": x["id"], "nome": x["nome"],
                           "tipo_danno": x.get("tipo_danno", "contundente"),
                           "costo_azioni": costo_azioni(x),
-                          "colpi": x.get("colpi", 1), "info": info_attacco(x),
+                          "colpi": x.get("colpi", 1), "info": info_attacco(x), "can_aim": bool(x.get("can_aim")),
                           "p_colpire": self.p_colpire_stimata(x, a, self.cpu),
                           "ok": a.puo_pagare_attacco(x) and a.puo_usare_attacco(x),
                           "cooldown": a.stato_attacco(x)["cooldown"],
                           "usi_rimasti": a.stato_attacco(x)["usi_rimasti"]}
                          for x in a.attacchi_visibili()],
             "mira": a.puo_mirare(),
+            "mira_su": a.mira,           # dove punta il prossimo colpo (vale per questo turno e il successivo)
             "mira_costo": "bonus" if a.mira_bonus else "azione",
             "poteri": [{"id": s["def"]["id"], "nome": s["def"]["nome"],
                         "rango": s["rango"], "desc": s["def"].get("descrizione", ""),
@@ -1838,7 +1913,7 @@ class DuelloWeb:
                                for s in a.augments
                                if s["attivo"] and s["def"].get("attivo", True)],
             "stance": [{"id": s["id"], "nome": s["nome"], "desc": s.get("descrizione", ""),
-                        "ok": a.bonus >= 1 and a.puo_attivare_stance(s),
+                        "ok": a.bonus >= 1 and a.puo_attivare_stance(s), "serve_azioni": bool(s.get("richiede_azioni")),
                         "cooldown": a.stato_stance(s)["cooldown"],
                         "usi_rimasti": a.stato_stance(s)["usi_rimasti"]}
                        for s in a.stance_conosciute
@@ -1852,6 +1927,8 @@ class DuelloWeb:
         cp = pannello(self.cpu, self.attivo is self.cpu and not self.finito, self.p)
         if self.tavolo is not None:     # rilancio in corso, Ultima Puntata gia' giocata, pip della folla: per entrambi uguale
             pl["azzardo"], cp["azzardo"] = self.tavolo.stato_lato(self.p), self.tavolo.stato_lato(self.cpu)
+        if self.iniz is not None:
+            pl["iniziativa"] = self.iniz.info()
         return {
             "fase": self.fase, "round": self.round, "finito": self.finito,
             "vincitore": self.vincitore.nome if self.vincitore else None,
@@ -1866,7 +1943,7 @@ class DuelloWeb:
             "eventi": self.eventi[-12:],
             "menu": self.azioni_player() if self.fase == "player" else None,
             "locazioni": list(LOCAZIONI),
-            "mira_pen": MIRA_PENALITA, "mira_dura_turno": MIRA_DURA_TURNO,
+            "mira_pen": MIRA_PENALITA, "mira_schivata_sicura": MIRA_SCHIVATA_SICURA, "mira_parata_sposta": MIRA_PARATA_SPOSTA,
             "survey_fatto": self.survey_fatto,
             "torneo": self.rec is None,
             "arena": self.info_arena(),
@@ -1877,6 +1954,259 @@ class DuelloWeb:
 
 
 DUELLO = None  # ponytail: un solo duello alla volta (single-player locale)
+
+
+# ---------------------------------------------------------------- il Compendio: i poteri a tutti i ranghi e la palestra di prova
+def descrivi_formula(f):
+    """Una formula di dadi in chiaro: (1d controllo + 2) × 10. I dadi di statistica sono sempre d10 + il bonus del rango."""
+    parti = [f"{d.get('n', 1)}d {d['tipo']}" for d in f.get("dadi", [])]
+    if f.get("flat"):
+        parti.append(str(f["flat"]))
+    base = " + ".join(parti) or "0"
+    mult = f.get("mult", 1)
+    if mult == 1:
+        return base
+    return f"({base}) × {mult}" if len(parti) > 1 else f"{base} × {mult}"
+
+
+def descrivi_effetto_potere(e):
+    """Che cosa fa all'accensione una voce di `effetti` di un potere (armatura, cura, statistiche, resistenze, azioni, arti extra...)."""
+    t = e["tipo"]
+    if t == "armatura":
+        loc = e.get("locazione", "tutte")
+        return f"Armatura (hp extra): {descrivi_formula(e)} su {'ogni locazione' if loc == 'tutte' else loc.replace('_', ' ')}"
+    if t == "cura":
+        return f"Cura {descrivi_formula(e)} hp su ogni locazione, subito"
+    if t == "mod_statistica":
+        return f"{e['statistica'].replace('_', ' ').capitalize()} {e['delta']:+d} ranghi finché è acceso"
+    if t == "resistenza":
+        return f"Resistenza {e.get('tipo_danno', '')} +{e.get('valore', 0)}% (tetto 75%)"
+    if t == "immunita":
+        return f"Immune ai danni di tipo {e.get('tipo_danno')}"
+    if t == "debolezza":
+        return f"Subisce il 50% di danni in più di tipo {e.get('tipo_danno')}"
+    if t == "mira_bonus":
+        return "Mirare costa un'azione bonus invece di un'azione"
+    if t == "azioni":
+        parti = [f"{e[k]:+d} {nome}" for k, nome in (("azioni", "azioni"), ("bonus", "azioni bonus"), ("risposte", "risposte")) if e.get(k)]
+        return "Per turno: " + (", ".join(parti) or "nessun cambiamento")
+    if t == "locazione_extra":
+        return f"Una nuova parte del corpo: {e.get('nome', 'extra')} ({e.get('hp', 50)} hp)"
+    return t
+
+
+def _descrivi_durata(sd):
+    d = sd.get("durata", {})
+    return f"{d.get('turni', 1)} turni" if d.get("tipo") == "fissa" else "tiro di tattica contro l'avversario (> 0 = turni)"
+
+
+def catalogo_poteri():
+    """Tutti i poteri a tutti i ranghi, per il Compendio: a ogni rango gli attacchi e le stance che si hanno (cumulativi: i `nuovo` sono
+    quelli che arrivano proprio a quel rango), gli effetti all'accensione e quelli nel tempo (questi non si sommano: vale quello del rango)."""
+    att = {x["id"]: x for x in DB["attacchi"]}
+    sta = {x["id"]: x for x in DB["stances"]}
+    eff = {x["id"]: x for x in DB["effetti"]}
+
+    def stance(sid, nuova, attivata):
+        sd = sta[sid]
+        return {"id": sid, "nome": sd["nome"], "desc": sd.get("descrizione", ""), "durata": _descrivi_durata(sd), "nuova": nuova,
+                "cooldown": sd.get("cooldown_turni", 0), "usi": sd.get("usi_massimi") if sd.get("usi_limitati") else None, "attivata": attivata}
+
+    out = []
+    for pw in DB["poteri"]:
+        ranghi = []
+        for r in range(1, pw.get("rango", 1) + 1):
+            ids_att = [(a, rr == r) for rr in range(1, r + 1) for a in pw.get("attacchi", {}).get(str(rr), []) if a in att]
+            ids_sta = [(a, rr == r) for rr in range(1, r + 1) for a in pw.get("stance", {}).get(str(rr), []) if a in sta]
+            ranghi.append({
+                "rango": r,
+                "effetti": [descrivi_effetto_potere(e) for e in per_rango(pw.get("effetti", {}), r)],
+                "effetti_nel_tempo": [{"nome": eff[x["effetto"]]["nome"], "desc": descrizione_effetto(eff[x["effetto"]]),
+                                       "turni": None if x.get("persistente") else x.get("turni", 1)}
+                                      for x in per_rango(pw.get("effetti_nel_tempo", {}), r) if x.get("effetto") in eff],
+                "attacchi": [dict(info_attacco(att[a]), id=a, nuovo=nuovo, costo_azioni=costo_azioni(att[a]),
+                                  sostituisce=att[att[a]["sostituisce"]]["nome"] if att[a].get("sostituisce") in att else None)
+                             for a, nuovo in ids_att],
+                "stance": [stance(a, nuova, False) for a, nuova in ids_sta]
+                          + [stance(a, False, True) for a in per_rango(pw.get("stance_attivate", {}), r) if a in sta],
+            })
+        out.append({"id": pw["id"], "nome": pw["nome"], "descrizione": pw.get("descrizione", ""), "rango_max": pw.get("rango", 1), "ranghi": ranghi})
+    return out
+
+
+class ProvaPoteri(DuelloWeb):
+    """La palestra di prova del Compendio: due pupazzi base (statistiche a 1, nessun equipaggiamento, nessun aspetto) per scoprire i poteri e
+    provarli senza limiti. Non ci sono turni, risorse, stamina, ricariche o usi: si equipaggia un potere (al rango voluto, al massimo
+    MAX_POTERI insieme per pupazzo) e si usa subito ogni sua mossa. Nessuno muore (testa e busto restano a 1 hp) e a richiesta si rigenera
+    tutto a vita piena (hp, armatura, ferite). E' un DuelloWeb senza palestra: il colpo, la difesa e il danno sono quelli veri."""
+
+    def __init__(self):
+        a, b = self._pupazzo("Pupazzo blu"), self._pupazzo("Pupazzo rosso")
+        super().__init__(pg=a, avversario=b)
+        self.fase = "prova"
+        self.sempre_a_segno = True
+        self._armatura = {}
+        self.scriv("=== PALESTRA DI PROVA: pupazzi base, nessun turno, nessun limite ===", "round")
+        for q in (self.p, self.cpu):
+            self._fotografa(q)
+
+    @staticmethod
+    def _pupazzo(nome):
+        q = Personaggio(nome)
+        dotazione_base(q, DB["attacchi"], DB["stances"])
+        q.aspetto = None            # niente capelli e vestiti: il pupazzo di base
+        q.livello = 1
+        q.init_stamina()
+        return q
+
+    # ---------- il lato su cui si agisce ----------
+    def _lati(self, lato):
+        return (self.p, self.cpu) if lato == "p" else (self.cpu, self.p)
+
+    def _prepara(self, chi, altro):
+        """Chi agisce ha azioni a volonta' e mosse sempre pronte; chi subisce non risponde mai (solo riflessi, e a segno se richiesto)."""
+        self.attivo, self.altro = chi, altro
+        chi.azioni = chi.bonus = 99
+        chi.risposte = altro.risposte = 0
+        for st in chi.attacco_stato.values():
+            st["cooldown"] = 0
+            if st["usi_rimasti"] is not None:
+                st["usi_rimasti"] = 99
+
+    def _fotografa(self, chi):
+        """L'armatura che il pupazzo ha adesso e' quella 'piena' (poteri e stance): e' quella che si ripristina rigenerando."""
+        self._armatura[id(chi)] = dict(chi.armatura)
+
+    def check_sconfitta(self, chi, vincitore):
+        """Nessuno muore: testa e busto restano a 1 hp (un colpo mortale li lascia li' e basta)."""
+        for l in ("testa", "busto"):
+            if chi.hp[l] <= 0:
+                chi.hp[l] = 1
+
+    def rigenera(self):
+        for q in (self.p, self.cpu):
+            for l in q.hp:
+                q.hp[l] = q.hp_max[l]
+            q.crippled.clear()
+            q.danni_tipo.clear()
+            q.armatura = {l: self._armatura.get(id(q), {}).get(l, 0) for l in q.hp}
+
+    def ripulisci(self):
+        """Ricomincia da pupazzi nudi."""
+        a, b = self._pupazzo("Pupazzo blu"), self._pupazzo("Pupazzo rosso")
+        self.p, self.cpu, self.eventi = a, b, []
+        self._armatura = {}
+        self.attivo, self.altro = a, b
+        for q in (a, b):
+            self._fotografa(q)
+        self.scriv("— tutto azzerato: due pupazzi base —", "round")
+
+    # ---------- le azioni ----------
+    def azione_prova(self, dati):
+        """Un'azione della palestra di prova; ritorna un messaggio d'errore o None."""
+        tipo = dati.get("tipo")
+        chi, altro = self._lati(dati.get("lato", "p"))
+        if tipo == "equipaggia":
+            pd = next((x for x in DB["poteri"] if x["id"] == dati.get("id")), None)
+            rango = dati.get("rango")
+            if pd is None or not isinstance(rango, int) or not 1 <= rango <= pd.get("rango", 1):
+                return "potere o rango non validi"
+            slot = next((s for s in chi.poteri if s["def"]["id"] == pd["id"]), None)
+            if slot is None and len(chi.poteri) >= MAX_POTERI:
+                return f"Al massimo {MAX_POTERI} poteri insieme: toglierne uno prima"
+            if slot is not None:
+                if slot["rango"] == rango:
+                    return None
+                chi.disattiva_potere(slot)
+                chi.poteri.remove(slot)
+            self._prepara(chi, altro)
+            slot = {"def": pd, "rango": rango, "attivo": False}
+            chi.poteri.append(slot)
+            i0 = len(self.log)
+            for r in chi.attiva_potere(slot, DB["attacchi"], DB["stances"], DB["effetti"]):
+                self.scriv(r)
+            self.evento("potere", i0 + 1, titolo=pd["nome"], rango=rango, desc=pd.get("descrizione", ""),
+                        righe=[x["t"] for x in self.log[i0:]], poteri=[pd["id"]])
+            self._fotografa(chi)
+        elif tipo == "rimuovi":
+            slot = next((s for s in chi.poteri if s["def"]["id"] == dati.get("id")), None)
+            if slot is None:
+                return "potere non equipaggiato"
+            for r in chi.disattiva_potere(slot):
+                self.scriv(r)
+            chi.poteri.remove(slot)
+            self._fotografa(chi)
+        elif tipo == "attacco":
+            att = next((x for x in chi.attacchi if x["id"] == dati.get("id")), None)
+            if att is None:
+                return "attacco non disponibile"
+            self._prepara(chi, altro)
+            loc = dati.get("loc")
+            chi.mira = loc if loc in altro.hp and att.get("can_aim") else None     # (non mirabile: casuale)
+            self.usa_attacco(att)
+            chi.mira = None
+        elif tipo == "stance":
+            sdef = next((x for x in chi.stance_conosciute if x["id"] == dati.get("id")), None)
+            if sdef is None:
+                return "stance non disponibile"
+            attiva = next((x for x in chi.stance_attive if x["def"]["id"] == sdef["id"]), None)
+            if attiva is not None:
+                if attiva["turni"] < 0:
+                    return f"{sdef['nome']} è attivata dal potere: dura finché il potere è acceso"
+                chi._termina_stance(attiva, forzata=True)
+                chi.stato_stance(sdef)["cooldown"] = 0
+                self.scriv(f"{chi.nome} esce dalla stance {sdef['nome']}.")
+                self._fotografa(chi)
+                return None
+            vecchia = chi.stance_manuale_attiva()
+            if vecchia is not None:
+                chi._termina_stance(vecchia, forzata=True)
+            stato = chi.stato_stance(sdef)
+            stato["cooldown"] = 0
+            stato["usi_rimasti"] = None if stato["usi_rimasti"] is None else 99
+            self._prepara(chi, altro)
+            # (qui non ci sono turni: una stance dura finche' non la si spegne, e quella a tiro di tattica non puo' "non prendere effetto")
+            self.usa_stance(chi, dict(sdef, durata={"tipo": "fissa", "turni": 99}), altro)
+            self._fotografa(chi)
+        elif tipo == "rigenera":
+            self.rigenera()
+        elif tipo == "ripulisci":
+            self.ripulisci()
+        elif tipo == "turno":      # facoltativo: fa scorrere effetti nel tempo (bruciature, cure) e durate delle stance di un turno
+            for q in (self.p, self.cpu):
+                for r in q.tick_turno():
+                    self.scriv(f"{q.nome}: {r}")
+                q.init_stamina()
+                self.check_sconfitta(q, None)
+        elif tipo == "a_segno":
+            self.sempre_a_segno = bool(dati.get("valore"))
+        else:
+            return "azione sconosciuta"
+        return None
+
+    def _menu(self, q):
+        """Cosa puo' fare questo pupazzo adesso: tutte le mosse che ha (anche quelle 'sostituite') e le stance che conosce."""
+        return {"attacchi": [{"id": x["id"], "nome": x["nome"], "tipo_danno": x.get("tipo_danno", "contundente"), "colpi": x.get("colpi", 1),
+                              "costo_azioni": costo_azioni(x), "can_aim": bool(x.get("can_aim")), "info": info_attacco(x)} for x in q.attacchi],
+                "stance": [{"id": s["id"], "nome": s["nome"], "desc": s.get("descrizione", ""),
+                            "attiva": any(x["def"]["id"] == s["id"] for x in q.stance_attive),
+                            "da_potere": any(x["def"]["id"] == s["id"] and x["turni"] < 0 for x in q.stance_attive)} for s in q.stance_conosciute],
+                "poteri": [{"id": s["def"]["id"], "nome": s["def"]["nome"], "rango": s["rango"]} for s in q.poteri],
+                "locazioni": list(q.hp)}
+
+    def stato(self):
+        danneggiato = any(q.hp[l] < q.hp_max[l] or q.armatura.get(l, 0) < self._armatura.get(id(q), {}).get(l, 0) or q.crippled
+                          for q in (self.p, self.cpu) for l in q.hp)
+        return {"fase": "prova", "round": 0, "finito": False, "vincitore": None, "vinto_dal_player": None, "log": self.log[-60:],
+                "player": pannello(self.p, False, self.cpu), "cpu": pannello(self.cpu, False, self.p),
+                "eventi": self.eventi[-12:], "folla": None, "luogo": None, "mortale": False, "arena": None, "torneo": True,
+                "menu": {"p": self._menu(self.p), "c": self._menu(self.cpu)}, "max_poteri": MAX_POTERI,
+                "poteri": [{"id": pw["id"], "nome": pw["nome"], "rango_max": pw.get("rango", 1), "descrizione": pw.get("descrizione", "")}
+                           for pw in DB["poteri"]],
+                "a_segno": self.sempre_a_segno, "danneggiato": danneggiato, "mira_pen": MIRA_PENALITA}
+
+
+PROVA = None   # ponytail: una sola palestra di prova alla volta (single-player locale), come DUELLO
 
 
 # ---------------------------------------------------------------- torneo evo
@@ -2296,6 +2626,43 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/compendio")
+def compendio():
+    """Il Compendium: ogni potere a ogni rango, con le sue mosse e stance, da leggere (e da provare nella palestra di prova)."""
+    return render_template("compendio.html")
+
+
+@app.route("/api/compendio/catalogo")
+def api_compendio_catalogo():
+    return jsonify(catalogo_poteri())
+
+
+@app.route("/compendio/prova")
+def compendio_prova():
+    global PROVA
+    if PROVA is None:
+        PROVA = ProvaPoteri()
+    return render_template("compendio_prova.html")
+
+
+@app.route("/api/compendio/prova/stato")
+def api_compendio_prova_stato():
+    if PROVA is None:
+        return jsonify({"errore": "la palestra di prova non e' aperta"}), 404
+    return jsonify(PROVA.stato())
+
+
+@app.route("/api/compendio/prova/azione", methods=["POST"])
+def api_compendio_prova_azione():
+    if PROVA is None:
+        return jsonify({"errore": "la palestra di prova non e' aperta"}), 404
+    err = PROVA.azione_prova(request.get_json(silent=True) or {})
+    stato = PROVA.stato()
+    if err:
+        stato["errore"] = err
+    return jsonify(stato)
+
+
 @app.route("/sandbox")
 def sandbox():
     return render_template("sandbox.html")
@@ -2479,6 +2846,8 @@ def personaggio(pid):
                            BONUS_RANGO=BONUS_RANGO, FALLBACK=FALLBACK,
                            eta=palestra.eta(c, g), data=palestra.descrivi_data(g),
                            tratti=palestra.tratti_visibili(c),
+                           iniziative={t: iniziativa.EVENTI.get(t, []) for t in c.get("tratti", [])},
+                           iniziativa_p=round(iniziativa.probabilita(c) * 100),
                            nascosti=len(c.get("tratti", [])) - c.get("tratti_noti", 0),
                            bio=palestra.bio_completa(c), legami=legami,
                            sessioni=palestra.SESSIONI, sessioni_piano=palestra.SESSIONI_PIANO,
@@ -2923,9 +3292,13 @@ def duelli():
     idonei = []
     for c in palestra.membri_attivi(STATO):
         ok, motivo = palestra.puo_combattere(STATO, c)
+        riv = sfidante_svelato(c["id"])
         idonei.append({"rec": c, "stato": stato_salute(c), "ok": ok, "motivo": motivo,
-                       "eta": palestra.eta(c, g), "piano": palestra.assegnazione(STATO, c)})
+                       "eta": palestra.eta(c, g), "piano": palestra.assegnazione(STATO, c),
+                       "sfidante": scheda_sfidante(riv, c["id"]) if riv is not None and ok else None,
+                       "iniziativa": round(iniziativa.probabilita(c) * 100)})
     return render_template("duelli.html", idonei=idonei, ricompensa=POSTA_BASE["paga"], serate=palestra.serate(STATO),
+                           prezzo_anteprima=PREZZO_ANTEPRIMA,
                            data=palestra.descrivi_data(g), sessioni=palestra.SESSIONI,
                            speciali=palestra.ATTIVITA_SPECIALI)
 
@@ -2949,6 +3322,31 @@ def rivali():
     return render_template("rivali.html", schede=schede, max_rivali=nemesi.MAX_RIVALI)
 
 
+@app.route("/duelli/anteprima", methods=["POST"])
+def duelli_anteprima():
+    """Un informatore, a pagamento: dice contro chi combattera' stasera un allievo, cosi' si puo' equipaggiarlo o scegliere chi mandare.
+    Lo sfidante svelato e' quello vero: il duello lo userà (v. duelli_avvia). Si paga una volta per allievo e per giornata."""
+    pid = request.form.get("pid", type=int)
+    c = _allievo(pid)
+    ok, motivo = palestra.puo_combattere(STATO, c) if c is not None else (False, "non può combattere")
+    if not ok:
+        flash(f"{c['nome'] if c else 'Questo personaggio'} {motivo}: inutile spiare il suo sfidante.")
+    elif sfidante_svelato(pid) is not None:
+        flash(f"Lo sfidante di {c['nome']} lo sai già.")
+    elif STATO["crediti"] < PREZZO_ANTEPRIMA:
+        flash(f"L'informatore costa ¤{PREZZO_ANTEPRIMA}: non li hai.")
+    else:
+        r = scegli_rivale(c, record_to_pg(c))
+        a = STATO.get("anteprime") or {}
+        per = dict(a.get("per", {})) if a.get("giorno") == STATO["giorno"] else {}
+        per[str(pid)] = r["id"]
+        STATO["anteprime"] = {"giorno": STATO["giorno"], "per": per}
+        STATO["crediti"] -= PREZZO_ANTEPRIMA
+        salva_stato()
+        flash(f"L'informatore parla: stasera {c['nome']} affronterà {nemesi.nome_completo(r)} (livello {r['livello']}). ¤{PREZZO_ANTEPRIMA} spesi.")
+    return redirect(url_for("duelli"))
+
+
 @app.route("/duelli/avvia", methods=["POST"])
 def duelli_avvia():
     global DUELLO
@@ -2958,7 +3356,14 @@ def duelli_avvia():
     if not ok:
         flash(f"{c['nome'] if c else 'Questo personaggio'} {motivo}.")
         return redirect(url_for("duelli"))
-    DUELLO = DuelloWeb(c)
+    avversario = None
+    riv = sfidante_svelato(pid)
+    if riv is not None:      # l'informatore l'ha svelato: combatte proprio contro di lui (e il pettegolezzo si consuma)
+        avversario = record_to_pg(riv)
+        avversario.nome = nemesi.nome_completo(riv)
+        avversario.rivale = riv
+        STATO["anteprime"]["per"].pop(str(pid), None)
+    DUELLO = DuelloWeb(c, avversario=avversario)
     c["ultimo_duello"] = STATO["giorno"]     # la serata e' sua: oggi non si allena
     palestra.registra_serata(STATO)          # ...e il conto delle giornate saltate riparte
     # marcatore persistente: se il processo muore a duello aperto,

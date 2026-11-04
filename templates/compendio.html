@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Compendium — Urban{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>COMPENDIUM</h1>
+  <p class="muted">Ogni potere a ogni rango, con le mosse, le stance e gli effetti che dà. Qui non ci sono limiti né costi: si legge per imparare.
+     Per vederli in azione c'è la palestra di prova.</p>
+</div>
+<div class="comp-tabs">
+  <a class="on" href="{{ url_for('compendio') }}">Poteri</a>
+  <a href="{{ url_for('compendio_prova') }}">Palestra di prova →</a>
+</div>
+<div class="comp-layout">
+  <nav class="comp-lista" id="comp-lista" aria-label="I poteri"></nav>
+  <section class="comp-dettaglio" id="comp-dettaglio" aria-live="polite"></section>
+</div>
+<script src="{{ url_for('static', filename='compendio.js') }}?v={{ asset_v }}" data-ripeti></script>
+{% endblock %}

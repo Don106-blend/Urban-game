@@ -511,5 +511,87 @@
         "valore": 1
       }
     ]
+  },
+  {
+    "id": 26,
+    "nome": "Sangue freddo",
+    "descrizione": "Lucidità: +1 ai tiri per colpire.",
+    "tipo": "modificatore",
+    "tipo_danno": "",
+    "split": false,
+    "formula": {
+      "dadi": [],
+      "flat": 0,
+      "mult": 1
+    },
+    "modificatori": [
+      {
+        "tipo": "colpire",
+        "flat": 1
+      }
+    ]
+  },
+  {
+    "id": 27,
+    "nome": "Guardia alta",
+    "descrizione": "La guardia è chiusa: +2 ai riflessi.",
+    "tipo": "modificatore",
+    "tipo_danno": "",
+    "split": false,
+    "formula": {
+      "dadi": [],
+      "flat": 0,
+      "mult": 1
+    },
+    "modificatori": [
+      {
+        "tipo": "flat_risultato",
+        "statistica": "riflessi",
+        "valore": 2
+      }
+    ]
+  },
+  {
+    "id": 28,
+    "nome": "Distratto",
+    "descrizione": "La testa è altrove: -1 ai tiri per colpire.",
+    "tipo": "modificatore",
+    "tipo_danno": "",
+    "split": false,
+    "formula": {
+      "dadi": [],
+      "flat": 0,
+      "mult": 1
+    },
+    "modificatori": [
+      {
+        "tipo": "colpire",
+        "flat": -1
+      }
+    ]
+  },
+  {
+    "id": 29,
+    "nome": "Sconsiderato",
+    "descrizione": "Si butta avanti a testa bassa: +2 ai tiri per colpire, -2 ai riflessi.",
+    "tipo": "modificatore",
+    "tipo_danno": "",
+    "split": false,
+    "formula": {
+      "dadi": [],
+      "flat": 0,
+      "mult": 1
+    },
+    "modificatori": [
+      {
+        "tipo": "colpire",
+        "flat": 2
+      },
+      {
+        "tipo": "flat_risultato",
+        "statistica": "riflessi",
+        "valore": -2
+      }
+    ]
   }
 ]

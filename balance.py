@@ -165,19 +165,20 @@ def difendi(d):
 
 
 def _step_mira(loc):
-    """Policy 'mira sempre': se puo' prende la mira su `loc`, per il resto e' l'IA normale
-    (stesse stance, stessi poteri): cosi' l'unica differenza dall'avversario e' la mira."""
+    """Policy 'mira sempre': la mira e' del PROSSIMO colpo mirabile e resta li' anche nel turno dopo, quindi si gioca cosi': con una mira
+    presa il primo colpo mirabile la spende subito, e l'ULTIMA azione del turno (la prima, se non si ha un'altra mira) serve a mirare di nuovo
+    — non e' sprecata, il primo colpo del turno dopo e' li'. Per il resto e' l'IA normale (stesse stance, stessi poteri): cosi' l'unica
+    differenza dall'avversario e' la mira."""
     def step(d):
         a = d.attivo
-        if a.azioni > 0 and a.mira is None and a.puo_mirare():
+        mirabili = [x for x in a.attacchi_giocabili() if x.get("can_aim")]
+        if a.mira and a.azioni > 0 and mirabili:
+            d.usa_attacco(max(mirabili, key=lambda x: d.ev_attacco(x, a, d.altro)))
+            return
+        if a.mira is None and a.puo_mirare() and (a.mira_bonus or a.azioni == 1):
             a.consuma_mira()
             a.mira = loc
             return
-        if a.mira and a.azioni > 0:   # con la mira presa si attacca con un colpo MIRABILE
-            mirabili = [x for x in a.attacchi_giocabili() if x.get("can_aim")]
-            if mirabili:
-                d.usa_attacco(max(mirabili, key=lambda x: d.ev_attacco(x, a, d.altro)))
-                return
         d.cpu_step()
     return step
 

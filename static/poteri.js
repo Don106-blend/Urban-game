@@ -629,6 +629,36 @@ const Poteri = (() => {
     return dati;
   }
 
-  return {ID, acqua, aggiorna, chiave, rangoPelle, lama, coloraMateriale, mossa, passo, dietro, davanti, disegnaOnda, CUCITURA};
+  /* CORPO DI FIAMMA (stance): come l'acqua (arena.js disegna il corpo su una tela nascosta e passa qui i pixel), ma il corpo diventa FUOCO e luminoso:
+     la luminosita' di ogni pixel sceglie un tono del fuoco (nero-rosso al contorno, arancio, giallo, bianco caldo nei riflessi, cosi' restano le forme),
+     una texture di lingue di fiamma che salgono sposta il tono (le fiamme guizzano e il corpo "brucia"). Opaco (il fuoco non e' trasparente):
+     la luce in piu' (alone e aura) la aggiunge arena.js sommando il corpo alla scena. */
+  const FUOCO = [[40, 6, 4], [176, 32, 6], [246, 108, 14], [255, 198, 62], [255, 248, 206]];
+  function fuoco(dati, w, h, {cell = 2, ox = 0, oy = 0, t = 0, seme = 0} = {}) {
+    const gw = Math.ceil(w / cell) + 3, gh = Math.ceil(h / cell) + 3, ca = new Float32Array(gw * gh), cb = new Float32Array(gw * gh);
+    const gx0 = Math.floor(ox / cell), gy0 = Math.floor(oy / cell);
+    for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) {
+      const X = gx0 + i, Y = gy0 + j;
+      ca[j * gw + i] = vn(X * 0.3, Y * 0.2 + t * 3.1, seme + 131);                 // lingue di fiamma lunghe, che salgono
+      cb[j * gw + i] = vn(X * 0.75 + t * 0.7, Y * 0.55 + t * 4.4, seme + 149);     // il guizzo fine
+    }
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4, a = dati[i + 3];
+      if (!a) continue;
+      const lum = (0.3 * dati[i] + 0.59 * dati[i + 1] + 0.11 * dati[i + 2]) / 255;
+      const ci = Math.floor((x + ox) / cell) - gx0, cj = Math.floor((y + oy) / cell) - gy0, k = cj * gw + ci;
+      const na = ca[k], nb = cb[k];
+      let tono = lum < 0.12 ? 0 : lum < 0.3 ? 1 : lum < 0.66 ? 2 : lum < 0.9 ? 3 : 4;        // pochi toni: le forme restano
+      const contorno = tono === 0 && lum < 0.2;
+      if (!contorno) { if (na > 0.64) tono++; else if (na < 0.3) tono--; if (nb > 0.8) tono++; else if (nb < 0.15) tono--; }
+      tono = Math.max(contorno ? 0 : 1, Math.min(4, tono));
+      const c = FUOCO[tono];
+      dati[i] = c[0]; dati[i + 1] = c[1]; dati[i + 2] = c[2];
+      dati[i + 3] = contorno ? 230 : 255;
+    }
+    return dati;
+  }
+
+  return {ID, acqua, fuoco, aggiorna, chiave, rangoPelle, lama, coloraMateriale, mossa, passo, dietro, davanti, disegnaOnda, CUCITURA};
 })();
 if (typeof module !== "undefined") module.exports = Poteri;

@@ -16,6 +16,7 @@
       <a href="{{ url_for('negozio') }}" class="{{ 'on' if request.endpoint == 'negozio' }}">Negozio</a>
       <a href="{{ url_for('duelli') }}" class="{{ 'on' if request.endpoint in ('duelli','duello') }}">Serata</a>
       <a href="{{ url_for('rivali') }}" class="{{ 'on' if request.endpoint == 'rivali' }}">Rivali</a>
+      <a href="{{ url_for('compendio') }}" class="{{ 'on' if request.endpoint in ('compendio','compendio_prova') }}" title="Tutti i poteri a tutti i ranghi, e una palestra di prova senza limiti">Compendium</a>
       <a href="{{ url_for('torneo') }}" class="nav-torneo {{ 'on' if request.endpoint == 'torneo' }}" title="Modalità a parte: non tocca la tua palestra">Torneo Evo</a>
       <a href="{{ url_for('debug') }}" class="nav-debug {{ 'on' if request.endpoint == 'debug' }}">Debug</a>
     </nav>

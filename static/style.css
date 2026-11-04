@@ -582,6 +582,7 @@ a.fighter-card:hover { transform: translateY(-3px); border-color: var(--volt); }
 .btn-opz { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
 .opz-nome { font-weight: 800; }
 .opz-meta { font-size: 11.5px; color: var(--teal); }
+.opz-nomira { font-size: 11.5px; font-weight: 800; color: var(--danger); letter-spacing: .02em; }
 .opz-desc { font-size: 12px; color: var(--muted); font-weight: 400; line-height: 1.4; white-space: normal; }
 .btn-opz .scena-tags { margin-top: 2px; }
 
@@ -590,6 +591,8 @@ a.fighter-card:hover { transform: translateY(-3px); border-color: var(--volt); }
 .fl { position: absolute; left: 50%; top: 30%; transform: translateX(-50%); font-weight: 900; font-size: 40px;
       pointer-events: none; text-shadow: 0 2px 8px #000; animation: sale 1.4s ease-out forwards; z-index: 5; white-space: nowrap; }
 .fl-hit { color: var(--danger); }
+.fl-iniz { color: var(--amber, #ffb020); font-size: 30px; }
+.scena-iniz { margin-top: 8px; padding: 6px 10px; border-left: 3px solid var(--amber, #ffb020); background: rgba(255, 176, 32, .1); font-size: 12.5px; font-weight: 700; }
 .fl-miss { color: var(--teal); font-size: 28px; }
 @keyframes sale { 0% { opacity: 0; transform: translate(-50%, 10px) scale(.7); } 15% { opacity: 1; transform: translate(-50%, 0) scale(1.15); }
                   100% { opacity: 0; transform: translate(-50%, -60px) scale(1); } }
@@ -1122,3 +1125,77 @@ a.pal-tab { text-decoration: none; display: inline-block; }
 .neg-item .btn[disabled] { text-transform: none; letter-spacing: 0; font-size: 12px; line-height: 1.3; white-space: normal; padding: 8px 10px; }
 .neg-allievo .pallini { flex-wrap: wrap; gap: 3px; }
 .neg-allievo .pallino { width: 7px; height: 7px; border-width: 1px; }
+
+/* l'informatore della serata: chi affronta stasera un allievo (app.sfidante_svelato) */
+.sfidante { border: 1px solid var(--line); border-left: 3px solid var(--teal); border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+.sfidante-ti_ha_battuto, .sfidante-nemico { border-left-color: var(--danger); }
+.sfidante-battuto, .sfidante-domato { border-left-color: var(--volt); }
+.sf-testa { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.sf-corpo { display: flex; gap: 10px; align-items: flex-end; }
+.sf-corpo canvas { image-rendering: pixelated; width: 48px; height: 111px; flex: none; }
+.sf-dati { display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; min-width: 0; }
+.sf-nome { font-weight: 800; }
+.sf-riga b { color: var(--teal); margin-right: 4px; font-size: 11px; text-transform: uppercase; }
+.sf-stats { display: flex; flex-wrap: wrap; gap: 4px 8px; font-size: 11px; color: var(--muted); }
+.sf-nota { font-size: 12px; }
+
+/* ---------- Compendium: i poteri a tutti i ranghi (static/compendio.js) e la palestra di prova (static/compendio_prova.js) ---------- */
+.mode-card.compendio:hover { border-color: #b86bff; }
+.comp-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+.comp-tabs a { padding: 8px 16px; border: 1px solid var(--line); border-radius: 999px; font-weight: 800; font-size: 13px; color: var(--muted); }
+.comp-tabs a.on { background: var(--volt); color: #0b0d10; border-color: var(--volt); }
+.comp-layout { display: grid; grid-template-columns: 220px 1fr; gap: 20px; align-items: start; }
+.comp-lista { display: flex; flex-direction: column; gap: 6px; position: sticky; top: 76px; max-height: calc(100vh - 100px); overflow-y: auto; }
+.comp-voce { text-align: left; background: var(--panel); border: 1px solid var(--line); color: var(--text, #e8eaed); padding: 9px 12px; border-radius: 8px; font-weight: 700; cursor: pointer; }
+.comp-voce:hover { border-color: var(--teal); }
+.comp-voce.on { background: var(--volt); color: #0b0d10; border-color: var(--volt); }
+.comp-dettaglio { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px; min-width: 0; }
+.comp-testa { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.comp-testa h2 { font-size: 26px; font-weight: 900; }
+.comp-ranghi { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 14px 0; }
+.comp-rango { text-align: left; background: var(--panel-2); border: 1px solid var(--line); color: inherit; border-radius: 10px; padding: 10px 12px; cursor: pointer; display: flex; flex-direction: column; gap: 4px; }
+.comp-rango span { font-size: 11.5px; color: var(--muted); }
+.comp-rango.on { border-color: var(--volt); box-shadow: inset 0 0 0 1px var(--volt); }
+.comp-rango.on b { color: var(--volt); }
+.comp-sez { margin-top: 18px; }
+.comp-sez h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 2px; color: var(--muted); margin-bottom: 8px; }
+.comp-elenco { margin: 0; padding-left: 18px; line-height: 1.7; }
+.comp-carta { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; display: flex; flex-direction: column; gap: 5px; }
+.comp-carta.nuova { border-left: 3px solid var(--teal); }
+.comp-carta-testa { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.comp-nuovo { font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--teal); }
+.comp-nuovo.fissa { color: #b86bff; }
+.comp-nota { margin-top: 18px; font-size: 12px; }
+@media (max-width: 800px) { .comp-layout { grid-template-columns: 1fr; } .comp-lista { position: static; flex-direction: row; flex-wrap: wrap; max-height: none; } }
+
+.prova-pan-nome { background: none; border: 0; color: inherit; width: 100%; cursor: pointer; padding: 0; text-align: left; font-family: inherit; }
+.prova-pan-nome:hover > span:first-child { text-decoration: underline; }
+/* la palestra di prova non e' il duello (niente proporzioni fisse): l'arena prende lo spazio che resta e in basso c'e' la barra con poteri e mosse */
+.prova-mode .duello-grid { height: calc(100vh - 190px); min-height: 560px; align-items: stretch; grid-template-columns: 300px minmax(0, 1fr) 300px; }
+.prova-mode .corner { height: 100%; overflow-y: auto; box-sizing: border-box; }
+.prova-mode .ring { height: 100%; min-width: 0; }
+.prova-mode .arena { flex: 1 1 0; min-height: 200px; height: auto; }
+.prova-mode .scena { flex: 0 0 auto; }
+.prova-ticker { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 7px 12px; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prova-mode .azioni.prova { display: flex; flex-direction: column; gap: 6px; flex: 0 0 auto; max-height: 56%; overflow-y: auto; }
+.prova-mode .azioni.prova .btn { width: auto; }
+@media (max-width: 980px) { .prova-mode .duello-grid { grid-template-columns: 1fr; } }
+.prova-riga { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.prova-riga .titolo-menu { margin-right: 4px; }
+.prova-sep { flex: 1; }
+.prova-check { font-size: 12px; display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.prova-ranghi { display: inline-flex; gap: 4px; align-items: center; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+.azioni .btn.prova-btn { padding: 6px 10px; font-size: 12px; text-align: center; }
+.prova-btn.on { background: var(--volt); color: #0b0d10; border-color: var(--volt); }
+.prova-btn.potere.on { background: #b86bff; border-color: #b86bff; color: #0b0d10; }
+.prova-btn.stance.on { background: var(--teal); border-color: var(--teal); color: #0b0d10; }
+.prova-btn.mossa { display: inline-flex; flex-direction: column; align-items: flex-start; text-align: left; gap: 1px; }
+.prova-btn.mossa small { font-size: 10.5px; color: var(--muted); font-weight: 400; }
+.prova-btn.mossa.mirata { border-color: var(--danger); }
+.prova-poteri, .prova-mosse { gap: 5px; }
+.prova-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+/* le iniziative di un tratto sulla scheda del personaggio (iniziativa.py) */
+.tratto-iniz { margin-top: 6px; font-size: 12.5px; }
+.tratto-iniz summary { cursor: pointer; color: var(--teal); font-weight: 700; }
+.tratto-iniz ul { margin: 6px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; }

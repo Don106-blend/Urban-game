@@ -47,6 +47,7 @@ async function invia(azione) {
 function pianificaCpu() {
   clearTimeout(cpuTimer);
   if (S && S.fase === "cpu" && !S.finito) {
+    if (Arena.occupata()) { aspettaScena(); return; }          // la CPU gioca dopo che la scena ha finito
     cpuTimer = setTimeout(() => invia({tipo: "cpu_step"}), CPU_DELAY);
   }
 }
@@ -76,17 +77,46 @@ document.addEventListener("keydown", e => {
 /* ---------- render ---------- */
 function render() {
   el("d-round").textContent = "ROUND " + S.round;
+  // prima si mettono in coda i colpi nuovi: finche' la loro animazione non arriva al contatto, `Arena.vista` tiene indietro i loro danni
+  // (hp dei pannelli, pelle e sangue sui corpi, scheda dello scambio, numeri): il server ha gia' deciso, la scena li mostra quando accadono
+  effettiNuoviEventi();
+  const V = Arena.vista(S);
   // la mira dell'uno evidenzia la locazione bersaglio sulla scheda dell'altro
-  renderPannello("pan-player", S.player, S.cpu.mira);
-  renderPannello("pan-cpu", S.cpu, S.player.mira);
-  Arena.update(S);
+  renderPannello("pan-player", V.player, S.cpu.mira);
+  renderPannello("pan-cpu", V.cpu, S.player.mira);
+  Arena.update(V);
   sincronizzaMira();
   renderFolla();
-  renderScena();
+  renderScena(V);
   renderLog();
   renderAzioni();
-  effettiNuoviEventi();
   if (el("dlg-banco").open) { if (S.finito) chiudiBanco(); else renderBanco(); }
+}
+
+/* Un colpo e' arrivato nella scena (contatto dell'animazione): adesso compaiono il danno, il numero e il lampo sul bersaglio. */
+function impatto(ev) {
+  const corner = document.querySelector(ev.chi === "p" ? ".corner-cpu" : ".corner-player");
+  if (corner) {
+    const esito = ev.esito === "colpito" ? ["−" + ev.hp_persi, "fl-hit"] : [ESITI[ev.esito][0], "fl-miss"];
+    const f = document.createElement("div");
+    f.className = "fl " + esito[1];
+    f.textContent = esito[0];
+    corner.appendChild(f);
+    setTimeout(() => f.remove(), 1500);
+    if (ev.esito === "colpito" && ev.hp_persi > 0) {
+      corner.classList.remove("colpita"); void corner.offsetWidth; corner.classList.add("colpita");
+    }
+  }
+  if (S) render();
+}
+Arena.alImpatto(impatto);
+
+/* La scena sta recitando un colpo: i menu aspettano (e la CPU), poi si riparte. Se per qualche motivo non finisce (scheda nascosta) dopo un po' si lascia andare. */
+let attesaAnimazione = null;
+function aspettaScena() {
+  if (attesaAnimazione) return;
+  Arena.quandoLibera(() => { clearTimeout(attesaAnimazione); attesaAnimazione = null; if (S) { render(); pianificaCpu(); } });
+  attesaAnimazione = setTimeout(() => { attesaAnimazione = null; if (Arena.occupata()) Arena.liberaTutto(); }, 10000);
 }
 
 function staminaBar(r) {
@@ -278,13 +308,17 @@ function renderPannello(dove, p, mira_su) {
   // i bonus e malus ai tiri di adesso (arti feriti, stance, effetti): ogni chip dice cosa tira e da dove viene
   const segno = n => (n >= 0 ? "+" : "−") + Math.abs(n);
   const tiri = (p.modificatori || []).map(m => chip(
-    m.valore == null ? `${m.tiro}: no` : `${m.tiro} ${segno(m.valore)}${m.unita ? " " + m.unita : ""}${m.dado ? " +dado" : ""}`,
+    m.valore == null ? `${m.tiro}: no` : m.dado && !m.valore ? `${m.tiro} −dado${m.unita ? " " + m.unita : ""}`
+      : `${m.tiro} ${segno(m.valore)}${m.unita ? " " + m.unita : ""}${m.dado ? " +dado" : ""}`,
     m.fonte, m.valore == null || m.valore < 0 ? "chip-crip" : "tag-attiva")).join("");
   const riga = (et, v) => v ? `<div class="pan-inline"><b>${et}</b>${v}</div>` : "";
   // gli azzardi: un rilancio da giocare, l'Ultima Puntata gia' usata, la spinta della folla sul dado (uguale e contraria per i due lati)
   const az = p.azzardo || {};
   const azzardo = [az.rilancio ? chip(`Rilancio ×${az.mult}`, "da giocare") : "", az.ultima ? chip("Ultima Puntata", "giocata", "muted") : "",
                    az.scarto ? chip(`folla ${az.scarto > 0 ? "+" : ""}${az.scarto}`, "al dado", "muted") : ""].join("");
+
+  // quanto ti da' retta: la probabilita' che a ogni occasione faccia di testa sua (poca fiducia e tanto stress la alzano; v. iniziativa.py)
+  const ini = p.iniziativa ? `<span class="pi" title="Fiducia ${p.iniziativa.fiducia}/100 · stress ${p.iniziativa.stress}/100. Più si fida di te e meno è sotto stress, meno fa di testa sua. Carattere: ${esc(p.iniziativa.tratti.join(", ") || "ignoto")}.">di testa sua: <b>${p.iniziativa.p}%</b> <small class="muted">fiducia ${p.iniziativa.fiducia} · stress ${p.iniziativa.stress}</small></span>` : "";
 
   el(dove).innerHTML = `
     <div class="pan-nome"><span>${p.nome}</span>${p.turno ? '<span class="pan-turno">TURNO</span>' : ""}</div>
@@ -298,7 +332,7 @@ function renderPannello(dove, p, mira_su) {
       ${p.ddos_turni > 0 ? `<span class="chip-crip" title="Nessun augment si può accendere">⛓DDOS: ${p.ddos_turni}t</span>` : ""}
     </div>
     <div class="pan-sec pan-locs">${hp}</div>
-    ${riga("Poteri", poteri)}${riga("Augment", augments)}${riga("Stance", stance)}${riga("Effetti", effetti)}${riga("Tiri", tiri)}${riga("Azzardo", azzardo)}
+    ${riga("Poteri", poteri)}${riga("Augment", augments)}${riga("Stance", stance)}${riga("Effetti", effetti)}${riga("Tiri", tiri)}${riga("Azzardo", azzardo)}${riga("Iniziativa", ini)}
     ${dove === "pan-player" ? renderArena() : renderRivale()}
   `;
 }
@@ -343,7 +377,7 @@ function cartaColpo(ev) {
   const sottoAtt = esc((ev.skill_att || "").replace(/_/g, " ")) +
     (ev.mod_att ? ` ${ev.mod_att > 0 ? "+" : ""}${ev.mod_att} stance` : "");
   // la schivata non si tira: riesce sempre (tiro_dif nullo)
-  const schiva = ev.risposta === "schivata";
+  const schiva = ev.risposta === "schivata" && ev.tiro_dif == null;     // (contro un colpo mirato la schivata si tira)
   const sottoDif = schiva ? "riesce sempre" : esc(ev.skill_dif) + (ev.pen_mira ? ` +${ev.pen_mira} mira` : "");
   const colpita = ev.esito === "colpito";
   let danno = "";
@@ -371,7 +405,12 @@ function cartaColpo(ev) {
       ${dado(esc(RISPOSTA_NOME[ev.risposta] || "Difesa").toUpperCase(), schiva ? "✓" : ev.tiro_dif, sottoDif, colpita ? "" : "vince")}
     </div>
     <div class="esito-colpo e-${esitoCl}">${esitoTesto}${ev.mitigato ? " · ATTUTITO" : ""}</div>
-    ${danno}${eff}${dett}`;
+    ${danno}${eff}${dett}${notaIniziativa(ev)}`;
+}
+
+/* le iniziative dell'atleta che hanno cambiato questo colpo (iniziativa.py): "non mi danno retta" si vede */
+function notaIniziativa(ev) {
+  return ev.iniz && ev.iniz.length ? `<div class="scena-iniz">${ev.iniz.map(t => "⚡ " + esc(t)).join("<br>")}</div>` : "";
 }
 
 function cartaEvento(ev) {
@@ -392,13 +431,17 @@ function cartaEvento(ev) {
       return `<div class="scena-intesta">${nome}<span class="scena-azione">inizia il turno</span></div>${dett}`;
     case "mira":
       return `<div class="scena-intesta">${nome}<span class="scena-azione">🎯 prende la mira su <b>${nomeLoc(ev.loc)}</b></span></div>
-        <div class="scena-desc">I suoi colpi mirabili puntano lì${S && S.mira_dura_turno ? " per tutto il turno" : ""}, ma la difesa avversaria è più facile (+${S ? S.mira_pen : 1}).</div>`;
+        <div class="scena-desc">Il suo prossimo colpo punta lì (in questo turno o nel successivo, poi la mira si scioglie). ${S && !S.mira_schivata_sicura ? "Schivarlo non è sicuro (si tira) " : ""}${S && !S.mira_parata_sposta ? "e la parata non lo sposta. " : ""}La difesa avversaria è più facile (+${S ? S.mira_pen : 1}).</div>`;
     case "potere":
     case "stance":
       return `<div class="scena-intesta">${nome}<span class="scena-azione">${ev.tipo === "stance" ? "♦ assume la stance" : "✦ attiva"} <b>${esc(ev.titolo)}</b>${ev.rango ? ` <span class="muted">r${ev.rango}</span>` : ""}</span></div>
         <div class="scena-desc">${esc(ev.desc)}</div>${ev.righe && ev.righe.length
           ? `<ul class="scena-dettagli">${ev.righe.map(x => `<li>${esc(x.trim())}</li>`).join("")}</ul>` : ""}`;
     case "azzardo": return cartaAzzardo(ev, nome);
+    case "iniziativa":
+      return `<div class="scena-intesta">${nome}<span class="scena-azione">⚡ di testa sua: <b>${esc(ev.titolo)}</b> <span class="muted">· ${esc(ev.tratto)}</span></span></div>
+        <div class="scena-desc">${esc(ev.desc)}</div>${ev.righe && ev.righe.length
+          ? `<ul class="scena-dettagli">${ev.righe.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}`;
     case "folla":
       return `<div class="scena-intesta">${nome}<span class="scena-azione">📣 <b>${esc(ev.titolo)}</b></span></div>
         <div class="scena-desc">${esc(ev.desc)}</div>${dett}`;
@@ -437,8 +480,8 @@ function galleggia(ev) {
   const corner = document.querySelector(ev.chi === "p" ? ".corner-player" : ".corner-cpu");
   if (!corner) return;
   const f = document.createElement("div");
-  f.className = "fl " + (ev.tipo === "folla" ? "fl-jackpot" : CLASSE_FLOAT[ev.tag] || "fl-neutro");
-  f.textContent = ev.tipo === "folla" ? "OVAZIONE!" : String(ev.nome_esito || "").toUpperCase();
+  f.className = "fl " + (ev.tipo === "folla" ? "fl-jackpot" : ev.tipo === "iniziativa" ? "fl-iniz" : CLASSE_FLOAT[ev.tag] || "fl-neutro");
+  f.textContent = ev.tipo === "folla" ? "OVAZIONE!" : ev.tipo === "iniziativa" ? "DI TESTA SUA!" : String(ev.nome_esito || "").toUpperCase();
   corner.appendChild(f);
   setTimeout(() => f.remove(), 1500);
 }
@@ -462,15 +505,16 @@ function rigaCronaca(ev) {
     case "stance": t = `♦ ${n} · ${esc(ev.titolo)}`; break;
     case "potere": t = `✦ ${n} · ${esc(ev.titolo)}`; break;
     case "azzardo": t = `🎲 ${n} · ${esc(ev.nome_esito || ev.azzardo)}`; break;
+    case "iniziativa": t = `⚡ ${n} di testa sua · ${esc(ev.titolo)}`; break;
     case "folla": t = `📣 ${esc(ev.titolo)} · ${n}`; break;
     default: t = `${n} ${esc(ev.titolo || "")}`;
   }
   return `<div class="cron-riga">${t}</div>`;
 }
 
-function renderScena() {
+function renderScena(V = S) {
   const box = el("d-scena");
-  const evs = S.eventi || [];
+  const evs = V.eventi || [];
   const ultimo = evs[evs.length - 1];
   const c = S.fase === "risposta" ? S.in_corso : null;
   const testata = `<div class="scena-top">
@@ -520,21 +564,11 @@ function effettiNuoviEventi() {
     if (ev.n <= ultimoEffetto) continue;
     if (ev.tipo !== "colpo") {
       if (["mira", "potere", "stance", "azzardo", "folla"].includes(ev.tipo)) Arena.evento(ev);
-      if (ev.tipo === "azzardo" || ev.tipo === "folla") galleggia(ev);
+      if (ev.tipo === "azzardo" || ev.tipo === "folla" || ev.tipo === "iniziativa") galleggia(ev);
       continue;
     }
-    Arena.colpo(ev);
-    const corner = document.querySelector(ev.chi === "p" ? ".corner-cpu" : ".corner-player");
-    if (!corner) continue;
-    const esito = ev.esito === "colpito" ? ["−" + ev.hp_persi, "fl-hit"] : [ESITI[ev.esito][0], "fl-miss"];
-    const f = document.createElement("div");
-    f.className = "fl " + esito[1];
-    f.textContent = esito[0];
-    corner.appendChild(f);
-    setTimeout(() => f.remove(), 1500);
-    if (ev.esito === "colpito" && ev.hp_persi > 0) {
-      corner.classList.remove("colpita"); void corner.offsetWidth; corner.classList.add("colpita");
-    }
+    if (Arena.pronta()) Arena.colpo(ev);          // la scena lo recita e, al contatto, chiama impatto()
+    else impatto(ev);                             // (la scena non e' ancora caricata: niente animazione, i numeri escono subito)
   }
   ultimoEffetto = maxN;
 }
@@ -570,8 +604,8 @@ function testaMenu(titolo, extra = "") {
 }
 
 /* contenuto di un bottone-scheda: nome, riga di costi, e cosa fa */
-function opz(nome, meta, desc, extra = "") {
-  return `<span class="opz-nome">${nome}</span>` +
+function opz(nome, meta, desc, extra = "", avviso = "") {
+  return `<span class="opz-nome">${nome}</span>` + avviso +
     (meta ? `<span class="opz-meta">${meta}</span>` : "") +
     (desc ? `<span class="opz-desc">${esc(desc)}</span>` : "") + extra;
 }
@@ -614,6 +648,11 @@ function menuAzzardo(az) {
 
 function renderAzioni() {
   const box = el("d-azioni");
+  if (Arena.occupata() && (S.finito || S.fase === "player" || S.fase === "risposta")) {      // un colpo e' ancora in scena: prima si vede com'e' andata
+    box.innerHTML = `<div class="attesa">…</div>`;
+    aspettaScena();
+    return;
+  }
 
   if (S.finito) {
     const vinto = S.vinto_dal_player;
@@ -666,8 +705,12 @@ function renderAzioni() {
         const pct = d ? ` <span class="muted">— ${Math.round(d.p * 100)}% di reggere</span>` : "";
         const nota = d && d.nota ? ` title="${d.nota}"` : "";
         const nome = o === "nessuna risposta" ? "Nessuna risposta (riflessi)" : o[0].toUpperCase() + o.slice(1);
-        if (o === "parata") return bottone(`Parata${pct}<br><span class="muted nota-difesa">${d ? d.nota : ""} — scegli dove</span>`,
-          'menu="parata";render()', "btn-risposta");
+        if (o === "parata") {
+          // un colpo mirato va dove e' mirato: la parata non sposta niente, quindi non c'e' niente da scegliere
+          if (c && c.mirata && !S.mira_parata_sposta)
+            return bottone(`Parata${pct}<br><span class="muted nota-difesa">${d ? d.nota : ""}</span>`, `invia({tipo:"risposta",scelta:"parata",loc:"${c.locazione}"})`, "btn-risposta");
+          return bottone(`Parata${pct}<br><span class="muted nota-difesa">${d ? d.nota : ""} — scegli dove</span>`, 'menu="parata";render()', "btn-risposta");
+        }
         return bottone(`${nome}${pct}<br><span class="muted nota-difesa">${d ? d.nota : ""}</span>`,
           `invia({tipo:"risposta",scelta:"${o}"})`, "btn-risposta");
       }).join("");
@@ -678,7 +721,7 @@ function renderAzioni() {
   const m = S.menu;
   if (menu === "attacchi") {
     box.innerHTML = testaMenu("Attacchi", bannerRilancio()) +
-      bottone(`🎯 Prendi la mira ${costoPallini(1, m.mira_costo === "bonus" ? "bonus" : "az")}`, 'menu="mira";render()', "btn-azione", !m.mira) +
+      bottone(`🎯 ${m.mira_su ? `Cambia la mira (ora: ${nomeLoc(m.mira_su)})` : "Prendi la mira"} ${costoPallini(1, m.mira_costo === "bonus" ? "bonus" : "az")}`, 'menu="mira";render()', "btn-azione", !m.mira) +
       m.attacchi.map(a => {
         let extra = "";
         if (a.cooldown > 0) extra = ` [ricarica: ${a.cooldown}]`;
@@ -687,14 +730,16 @@ function renderAzioni() {
         const pc = a.p_colpire != null ? `≈${Math.round(a.p_colpire * 100)}% a segno` : "";
         const meta = [pc, costoPallini(costo), esc(extra.replace(/[\[\]]/g, "").trim())]
           .filter(Boolean).join(" · ");
+        // con una mira in corso un colpo che non si mira (il Colpo pesante) la spreca comunque (ogni colpo scioglie la mira): lo si dice in rosso
+        const noMira = m.mira_su && !a.can_aim ? `<span class="opz-nomira" title="Qualunque colpo scioglie la mira: questo la sprecherebbe">(NON PUÒ ESSERE MIRATA)</span>` : "";
         return bottone(opz(esc(a.nome), meta, a.info.desc,
-            `<span class="scena-tags">${chipTags(a.info)}</span>${righeEffetti(a.info)}`),
+            `<span class="scena-tags">${chipTags(a.info)}</span>${righeEffetti(a.info)}`, noMira),
           `invia({tipo:"attacco",id:${a.id}})`, "btn-azione btn-opz", !a.ok);
       }).join("") +
       bottone("← Indietro", "menu=null;render()", "btn-ghost");
   } else if (menu === "mira") {
     // la locazione non si sceglie coi tasti: il cursore e' un mirino sull'arena (Arena.mira, v. sincronizzaMira) e si clicca la parte del corpo
-    box.innerHTML = testaMenu(`Mira (+${S.mira_pen} alla difficoltà, ${S.mira_dura_turno ? "i colpi mirabili di questo turno puntano lì" : "il prossimo colpo punta lì"})`) +
+    box.innerHTML = testaMenu(`Mira (+${S.mira_pen} alla difficoltà${S.mira_schivata_sicura ? "" : ", schivarlo richiede un tiro"}${S.mira_parata_sposta ? "" : ", la parata non lo sposta"} · il prossimo colpo punta lì, in questo turno o nel successivo)`) +
       `<div class="mira-guida"><span class="mira-icona">⌖</span><div><b>Clicca sulla parte del corpo dell'avversario</b>
         <span class="muted">Passa il mirino sull'arena: la parte sotto il mirino si accende di rosso.</span></div></div>` +
       bottone("← Indietro (Esc)", 'menu="attacchi";render()', "btn-ghost");
@@ -724,7 +769,8 @@ function renderAzioni() {
         let extra = "";
         if (s.cooldown > 0) extra = ` [ricarica: ${s.cooldown}]`;
         else if (s.usi_rimasti != null) extra = ` [usi: ${s.usi_rimasti}]`;
-        return bottone(opz(esc(s.nome), [costoPallini(1, "bonus"), esc(extra.replace(/[\[\]]/g, "").trim())].filter(Boolean).join(" · "), s.desc),
+        const serve = s.serve_azioni && S.player.risorse.azioni <= 0 ? "servono azioni da giocare" : "";
+        return bottone(opz(esc(s.nome), [costoPallini(1, "bonus"), esc(extra.replace(/[\[\]]/g, "").trim()), serve].filter(Boolean).join(" · "), s.desc),
           `invia({tipo:"stance",id:${s.id}})`, "btn-azione btn-opz", !s.ok);
       }).join("") +
       bottone("← Indietro", "menu=null;render()", "btn-ghost");

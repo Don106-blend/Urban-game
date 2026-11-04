@@ -10,7 +10,7 @@
   if (!window.fetch || !window.DOMParser || !history.pushState || !window.URL) return;
   history.scrollRestoration = "manual";
 
-  const PESANTI = /^\/(duello|torneo)(\/|$)/;           // si aprono con un caricamento vero
+  const PESANTI = /^\/(duello|torneo|compendio\/prova)(\/|$)/;           // si aprono con un caricamento vero
   const ESTERNI = /^\/(api|static)\//;                          // non sono pagine
   const chiaveSrc = (src) => new URL(src, location.href).pathname;
   const caricati = new Set();                                   // gli script con src gia' eseguiti in questo documento

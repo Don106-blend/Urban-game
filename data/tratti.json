@@ -1,16 +1,16 @@
 [
   {"id": "orgoglioso", "nome": "Orgoglioso",
    "descrizione": "Non dimentica una sconfitta e non sopporta di essere trattato come un ragazzino.",
-   "effetto": "Vittoria: +4 fiducia in più. Sconfitta: −6 in più. Se perde uno sparring, il legame con chi l'ha battuto cala.",
+   "effetto": "Vittoria: +4 fiducia in più. Sconfitta: −6 in più. Se perde uno sparring, il legame con chi l'ha battuto cala. Sul ring non prende ordini volentieri: iniziative proprie +25%.",
    "bio": "Non ha mai accettato di perdere.",
-   "mod": {"fiducia_vittoria": 4, "fiducia_sconfitta": -6, "rancore": 1},
+   "mod": {"iniziativa": 1.25, "fiducia_vittoria": 4, "fiducia_sconfitta": -6, "rancore": 1},
    "ama": "ascolta", "odia": "rimprovera", "prezzo": 1.0, "peso": 1.0},
 
   {"id": "disciplinato", "nome": "Disciplinato",
    "descrizione": "Si allena come un orologio e pretende che lo faccia anche chi lo comanda.",
-   "effetto": "Allenamento +10% di punti. Stress accumulato −30%.",
+   "effetto": "Allenamento +10% di punti. Stress accumulato −30%. Sul ring dà retta: iniziative proprie -30%.",
    "bio": "Si alza alle cinque e non salta un giorno.",
-   "mod": {"punti": 1.1, "stress": 0.7},
+   "mod": {"iniziativa": 0.7, "punti": 1.1, "stress": 0.7},
    "ama": "rimprovera", "odia": "incoraggia", "prezzo": 1.1, "peso": 1.0},
 
   {"id": "pigro", "nome": "Pigro",
@@ -29,9 +29,9 @@
 
   {"id": "leale", "nome": "Leale",
    "descrizione": "Resta, anche quando conviene andarsene.",
-   "effetto": "Non rifiuta mai un duello. La fiducia cresce di 1 a settimana da sola.",
+   "effetto": "Non rifiuta mai un duello. La fiducia cresce di 1 a settimana da sola. Sul ring dà retta: iniziative proprie -50%.",
    "bio": "Ha un solo capo, e non è cambiato mai.",
-   "mod": {"rifiuto": 0, "fiducia_settimana": 1},
+   "mod": {"iniziativa": 0.5, "rifiuto": 0, "fiducia_settimana": 1},
    "ama": "ascolta", "odia": null, "prezzo": 1.1, "peso": 0.8},
 
   {"id": "fragile", "nome": "Fragile",
@@ -43,9 +43,9 @@
 
   {"id": "cocciuto", "nome": "Cocciuto",
    "descrizione": "Quando decide una cosa non c'è verso, nemmeno se sta male.",
-   "effetto": "Si allena anche ferito (il riposo automatico non lo ferma). +10% punti, infortuni +25%.",
+   "effetto": "Si allena anche ferito (il riposo automatico non lo ferma). +10% punti, infortuni +25%. Sul ring fa di testa sua: iniziative proprie +40%.",
    "bio": "Non ha mai ascoltato un consiglio, nemmeno quelli buoni.",
-   "mod": {"ignora_riposo": 1, "punti": 1.1, "infortunio": 1.25},
+   "mod": {"iniziativa": 1.4, "ignora_riposo": 1, "punti": 1.1, "infortunio": 1.25},
    "ama": "rimprovera", "odia": "ascolta", "prezzo": 1.0, "peso": 0.9},
 
   {"id": "carismatico", "nome": "Carismatico",
@@ -71,9 +71,9 @@
 
   {"id": "veterano", "nome": "Veterano di strada",
    "descrizione": "Ha già visto tutto quello che il ring sa fare, e ne porta i segni.",
-   "effetto": "Parte con +10 Toughness. Stress −20%, sconfitta: −4 fiducia in meno. Impara il 15% più piano.",
+   "effetto": "Parte con +10 Toughness. Stress −20%, sconfitta: −4 fiducia in meno. Impara il 15% più piano. Sul ring sa il fatto suo: iniziative proprie -20%.",
    "bio": "Ha più cicatrici che anni di allenamento.",
-   "mod": {"punti": 0.85, "stress": 0.8, "fiducia_sconfitta": 4, "tempra": 10},
+   "mod": {"iniziativa": 0.8, "punti": 0.85, "stress": 0.8, "fiducia_sconfitta": 4, "tempra": 10},
    "ama": "ascolta", "odia": "incoraggia", "prezzo": 1.0, "peso": 0.7},
 
   {"id": "fanatico", "nome": "Fanatico",
