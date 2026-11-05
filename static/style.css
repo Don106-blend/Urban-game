@@ -1199,3 +1199,127 @@ a.pal-tab { text-decoration: none; display: inline-block; }
 .tratto-iniz { margin-top: 6px; font-size: 12.5px; }
 .tratto-iniz summary { cursor: pointer; color: var(--teal); font-weight: 700; }
 .tratto-iniz ul { margin: 6px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; }
+
+/* ---------- torneo evo: la corsa (carte, porte, HUD, schede) ---------- */
+.evo-intro > * { margin-left: auto; margin-right: auto; }
+.evo-nota { max-width: 560px; font-size: 13px; margin-bottom: 14px; }
+.evo-errore { max-width: 520px; margin: 12px auto; padding: 8px 14px; border: 1px solid var(--danger); border-radius: 8px;
+              color: var(--danger); background: rgba(255, 70, 85, .08); font-size: 13px; }
+.evo-avviso { max-width: 560px; margin: 8px auto 14px; padding: 8px 14px; border-left: 3px solid var(--volt); background: var(--panel-2);
+              border-radius: 0 8px 8px 0; font-size: 13px; text-align: left; }
+
+/* la striscia in alto */
+.evo-hud { display: flex; align-items: center; justify-content: center; gap: 18px; flex-wrap: wrap; max-width: 760px; margin: 0 auto 8px;
+           padding: 8px 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; font-size: 13px; }
+.evo-hud-eroe { display: flex; align-items: center; gap: 10px; }
+.evo-track { display: flex; align-items: center; gap: 4px; }
+.evo-track i { width: 14px; height: 2px; background: var(--line); }
+.evo-tappa { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--line); color: var(--muted); font-size: 11px; font-weight: 700;
+             display: inline-flex; align-items: center; justify-content: center; }
+.evo-tappa.fatta { background: var(--volt); color: #0b0d10; border-color: var(--volt); }
+.evo-tappa.qui { border-color: var(--volt); color: var(--volt); box-shadow: 0 0 10px rgba(215, 255, 62, .35); }
+.evo-gettoni { font-size: 15px; } .evo-gettoni b { color: var(--volt); font-size: 18px; }
+.evo-asc-chip { color: var(--warn); font-weight: 900; border: 1px solid var(--warn); border-radius: 10px; padding: 1px 7px; font-size: 12px; }
+.evo-hud-mut { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; max-width: 760px; margin: 0 auto 14px !important; }
+.evo-vita { display: flex; align-items: center; gap: 6px; min-width: 130px; font-size: 11px; color: var(--muted); }
+.evo-vita .hpbar { flex: 1; height: 8px; }
+.evo-vita.corta { min-width: 90px; }
+
+/* le chip delle mutazioni e degli impianti */
+.evo-chip { display: inline-block; padding: 2px 9px; border: 1px solid var(--line); border-radius: 12px; font-size: 12px; background: var(--panel-2);
+            text-align: left; }
+.evo-chip small { display: block; color: var(--muted); font-size: 11px; }
+.rar-comune { border-color: #4a5260; } .rar-rara { border-color: var(--teal); }
+.rar-leggendaria { border-color: var(--volt); box-shadow: 0 0 8px rgba(215, 255, 62, .25); } .rar-maledetta { border-color: var(--danger); }
+.evo-chip.rar-rara { color: var(--teal); } .evo-chip.rar-leggendaria { color: var(--volt); } .evo-chip.rar-maledetta { color: #ff8a93; }
+
+/* la scheda di un combattente */
+.evo-vsrow { display: flex; gap: 18px; justify-content: center; align-items: stretch; flex-wrap: wrap; margin: 16px auto; }
+.evo-vsrow.solo { margin-top: 20px; }
+.evo-vsmezzo { align-self: center; font-weight: 900; font-style: italic; font-size: 28px; color: var(--muted); }
+.evo-scheda { width: 340px; max-width: 100%; text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px;
+              display: flex; flex-direction: column; gap: 9px; }
+.evo-scheda.mio { border-color: var(--volt); box-shadow: 0 0 26px rgba(215, 255, 62, .10); }
+.evo-scheda.elite { border-color: var(--danger); box-shadow: 0 0 22px rgba(255, 70, 85, .18); }
+.evo-scheda .evo-eroe-sub { margin: 0; }
+.evo-scheda-testa { display: flex; gap: 12px; align-items: flex-end; }
+.evo-scheda-nome { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.evo-scheda .evo-eroe-nome { font-size: 20px; }
+.evo-elite { color: var(--danger); font-size: 10px; letter-spacing: 2px; border: 1px solid var(--danger); border-radius: 4px; padding: 0 4px; vertical-align: middle; }
+.evo-forza { font-size: 12px; }
+.evo-stats { justify-content: flex-start; margin: 0; }
+.evo-potere { display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; margin-bottom: 4px; }
+.evo-potere small { flex-basis: 100%; color: var(--muted); font-size: 11.5px; }
+.evo-rango { color: var(--volt); font-weight: 700; font-size: 12px; }
+.evo-riga { display: flex; flex-wrap: wrap; gap: 6px; } .evo-riga.colonna { flex-direction: column; }
+.evo-storia { font-size: 12px; color: var(--muted); } .evo-storia summary { cursor: pointer; }
+.evo-sagoma canvas { image-rendering: pixelated; width: 60px; height: 139px; display: block; }
+.evo-sagoma.piccola canvas { width: 42px; height: 97px; }
+.evo-candidati { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; margin: 14px 0; }
+.evo-candidato { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+
+/* regola d'arena e pronostico */
+.evo-regola { display: flex; flex-direction: column; gap: 2px; max-width: 520px; margin: 8px auto; padding: 8px 14px; border: 1px solid var(--warn); border-radius: 10px;
+              background: rgba(255, 176, 32, .07); font-size: 13px; } .evo-regola span { color: var(--muted); font-size: 12px; }
+.evo-regola.std { border-color: var(--line); background: transparent; color: var(--muted); flex-direction: row; justify-content: center; }
+.evo-pron { display: flex; align-items: center; gap: 10px; max-width: 420px; margin: 8px auto; font-size: 13px; }
+.evo-pron span { min-width: 82px; text-align: right; } .evo-pron b { min-width: 40px; text-align: left; }
+.evo-pron-barra { flex: 1; height: 8px; border-radius: 4px; background: var(--panel-2); overflow: hidden; }
+.evo-pron-barra i { display: block; height: 100%; background: var(--teal); }
+.evo-pron.ok span, .evo-pron.ok b { color: var(--volt); } .evo-pron.ok i { background: var(--volt); }
+.evo-pron.low span, .evo-pron.low b { color: var(--danger); } .evo-pron.low i { background: var(--danger); }
+
+/* carte: bottino, mercato, allenamento, porte */
+.evo-carte, .evo-porte { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin: 14px auto; }
+.evo-carta, .evo-porta { width: 214px; min-height: 250px; background: var(--panel); color: var(--text); border: 2px solid var(--line); border-radius: 14px;
+                         padding: 14px 12px; cursor: pointer; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px;
+                         font: inherit; transition: transform .15s, border-color .15s, box-shadow .15s; animation: cartaIn .5s cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes cartaIn { from { transform: translateY(30px) scale(.94); opacity: 0; } to { transform: none; opacity: 1; } }
+.evo-carta:hover:not(:disabled), .evo-porta:hover { transform: translateY(-4px); border-color: var(--volt); }
+.evo-carta:focus-visible, .evo-porta:focus-visible, .evo-asc:focus-visible { outline: 2px solid var(--volt); outline-offset: 2px; }
+.evo-carta:disabled { opacity: .45; cursor: not-allowed; } .evo-carta.comprata { opacity: .35; }
+.evo-carta.rar-comune { border-color: #4a5260; } .evo-carta.rar-rara { border-color: var(--teal); box-shadow: 0 0 14px rgba(33, 208, 178, .14); }
+.evo-carta.rar-leggendaria { border-color: var(--volt); box-shadow: 0 0 22px rgba(215, 255, 62, .28); background: rgba(215, 255, 62, .05); }
+.evo-carta.rar-maledetta { border-color: var(--danger); box-shadow: 0 0 14px rgba(255, 70, 85, .18); }
+.evo-carta-icona { font-size: 38px; line-height: 1; } .evo-carta-icona.grande { font-size: 58px; margin: 6px 0; }
+.evo-carta-sotto { color: var(--muted); font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; }
+.evo-carta-titolo { font-weight: 900; font-style: italic; font-size: 17px; }
+.evo-carta-desc { font-size: 12px; color: var(--muted); line-height: 1.45; }
+.evo-carta-mosse { font-size: 11.5px; color: var(--teal); } .evo-carta-umanita { font-size: 11px; }
+.evo-prezzo { margin-top: auto; font-weight: 900; color: var(--volt); font-size: 16px; }
+.evo-garantita { color: var(--volt); font-size: 11px; letter-spacing: 2px; }
+.evo-porta { min-height: 200px; } .evo-porta.tipo-sparring { border-color: var(--danger); width: 280px; } .evo-porta.tipo-riposo { border-color: var(--teal); }
+.evo-porta-elite { display: flex; gap: 8px; align-items: flex-end; text-align: left; margin-top: 6px; }
+.evo-porta-elite small { display: block; color: var(--muted); font-size: 11px; }
+
+/* evento */
+.evo-testo-evento { max-width: 560px; margin: 0 auto 16px; color: var(--muted); line-height: 1.55; }
+.evo-scelte-evento { display: flex; flex-direction: column; gap: 10px; max-width: 560px; margin: 0 auto; }
+.evo-esito { max-width: 560px; margin: 8px auto; padding: 14px 18px; background: var(--panel); border: 1px solid var(--volt); border-radius: 12px; }
+.evo-effetto { color: var(--volt); font-weight: 700; margin-top: 6px; }
+
+/* record e riepilogo */
+.evo-meta { display: flex; gap: 28px; justify-content: center; margin: 4px 0 20px; }
+.evo-meta div { display: flex; flex-direction: column; } .evo-meta b { font-size: 26px; color: var(--volt); } .evo-meta span { font-size: 11px; color: var(--muted); letter-spacing: 1px; }
+.evo-asc-scelta { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin: 6px auto 4px; max-width: 900px; }
+.evo-asc { width: 160px; padding: 10px; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 10px; cursor: pointer; font: inherit;
+           display: flex; flex-direction: column; gap: 3px; text-align: left; }
+.evo-asc small { color: var(--muted); font-size: 11px; } .evo-asc small.volt { color: var(--volt); }
+.evo-asc.scelta { border-color: var(--volt); box-shadow: 0 0 14px rgba(215, 255, 62, .25); }
+.evo-asc:disabled { opacity: .4; cursor: not-allowed; }
+.evo-storico, .evo-riepilogo { margin: 22px auto 6px; border-collapse: collapse; font-size: 13px; min-width: 320px; }
+.evo-storico caption, .evo-riepilogo caption { color: var(--muted); letter-spacing: 3px; font-size: 11px; margin-bottom: 6px; text-transform: uppercase; }
+.evo-storico td, .evo-riepilogo td { padding: 4px 12px; border-bottom: 1px solid var(--line); text-align: left; }
+.evo-riepilogo td:last-child { text-align: right; font-weight: 700; } .evo-riepilogo tr.tot td { color: var(--volt); font-size: 20px; font-weight: 900; border-bottom: none; }
+.evo-riepilogo tr.mol td { color: var(--warn); }
+.evo-record { color: var(--volt); font-weight: 900; letter-spacing: 2px; margin: 10px 0; animation: trofeo 1s both; }
+.evo-tabellone { margin: 22px auto 0; max-width: 980px; } .evo-tabellone summary { cursor: pointer; color: var(--muted); font-size: 12px; letter-spacing: 2px; text-transform: uppercase; }
+@media (max-width: 640px) {
+  .evo-title { font-size: 40px; } .evo-carta, .evo-porta { width: 100%; min-height: 0; } .evo-vsmezzo { display: none; } .evo-scheda { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { .evo-carta, .evo-porta { animation: none; } }
+
+/* nella pagina del duello: la regola d'arena e le mutazioni */
+.regola-chip { padding: 2px 10px; border: 1px solid var(--warn); border-radius: 12px; font-size: 12px; color: var(--warn); }
+.regola-chip:empty { display: none; }
+.pi.mut-rara { border-color: var(--teal); } .pi.mut-leggendaria { border-color: var(--volt); } .pi.mut-maledetta { border-color: var(--danger); }

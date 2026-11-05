@@ -1,0 +1,95 @@
+[
+  {"id": "medico", "titolo": "Il medico clandestino", "icona": "🩺",
+   "testo": "Dietro una porta di ferro, un uomo in camice sporco ti squadra: «Ti rimetto in piedi, ma i gettoni li voglio prima.»",
+   "scelte": [
+     {"testo": "Paga 3 gettoni: cura completa", "costo": 3, "esiti": [{"p": 1, "righe": ["Ti rattoppa meglio di quanto sperassi: sei come nuovo."], "ops": [{"op": "cura", "frazione": 1.0}]}]},
+     {"testo": "Fatti ricucire a metà prezzo (1 gettone)", "costo": 1, "esiti": [
+       {"p": 0.7, "righe": ["Un lavoro grossolano, ma regge."], "ops": [{"op": "cura", "frazione": 0.5}]},
+       {"p": 0.3, "righe": ["Gli trema la mano: peggio di prima."], "ops": [{"op": "danno", "frazione": 0.15}]}]},
+     {"testo": "Passa oltre", "esiti": [{"p": 1, "righe": ["Tiri dritto."], "ops": []}]}]},
+  {"id": "scommettitore", "titolo": "Il bookmaker", "icona": "🎲",
+   "testo": "Un uomo in gessato sventola un mazzo di carte: «Testa o croce. Il doppio o niente. Quanto ti senti fortunato?»",
+   "scelte": [
+     {"testo": "Gioca 3 gettoni: 50% li raddoppi", "costo": 3, "esiti": [
+       {"p": 0.5, "righe": ["Vinci! Ti ridà la puntata e altrettanto."], "ops": [{"op": "gettoni", "valore": 6}]},
+       {"p": 0.5, "righe": ["Perdi. Il bookmaker sorride."], "ops": []}]},
+     {"testo": "Gioca 6 gettoni: 35% di vincerne 24", "costo": 6, "esiti": [
+       {"p": 0.35, "righe": ["Un colpo di fortuna pazzesco!"], "ops": [{"op": "gettoni", "valore": 24}]},
+       {"p": 0.65, "righe": ["Hai buttato via tutto."], "ops": []}]},
+     {"testo": "Rifiuta", "esiti": [{"p": 1, "righe": ["Ti allontani con le tasche piene d'aria, ma intatte."], "ops": []}]}]},
+  {"id": "altare", "titolo": "L'altare di ferro", "icona": "🩸",
+   "testo": "In un magazzino senza luce, un altare di lamiere arrugginite. Una voce: «Un po' di sangue, e ti dono qualcosa di raro.»",
+   "scelte": [
+     {"testo": "Offri il sangue: perdi il 30% della vita, ottieni una mutazione rara", "esiti": [
+       {"p": 1, "righe": ["Il metallo beve. Qualcosa cambia dentro di te."], "ops": [{"op": "danno", "frazione": 0.3}, {"op": "mutazione", "rarita": "rara"}]}]},
+     {"testo": "Offri molto sangue: perdi il 50% della vita, mutazione leggendaria (50%) o rara", "esiti": [
+       {"p": 0.5, "righe": ["L'altare ruggisce. È un dono enorme."], "ops": [{"op": "danno", "frazione": 0.5}, {"op": "mutazione", "rarita": "leggendaria"}]},
+       {"p": 0.5, "righe": ["L'altare si accontenta. Poco più del solito."], "ops": [{"op": "danno", "frazione": 0.5}, {"op": "mutazione", "rarita": "rara"}]}]},
+     {"testo": "Non è cosa tua", "esiti": [{"p": 1, "righe": ["Ti allontani senza voltarti."], "ops": []}]}]},
+  {"id": "collezionista", "titolo": "Il collezionista", "icona": "🎭",
+   "testo": "Una donna con troppi anelli ti mostra una teca: «Questo non lo vuole nessuno. A te lo regalo, con qualcosa in più.»",
+   "scelte": [
+     {"testo": "Accetta: una mutazione maledetta e 5 gettoni", "esiti": [
+       {"p": 1, "righe": ["Il pegno è tuo. Per il bene o per il male."], "ops": [{"op": "mutazione", "rarita": "maledetta"}, {"op": "gettoni", "valore": 5}]}]},
+     {"testo": "Rifiuta educatamente", "esiti": [{"p": 1, "righe": ["Lei alza le spalle."], "ops": []}]}]},
+  {"id": "vecchio_campione", "titolo": "Il vecchio campione", "icona": "🥋",
+   "testo": "Un ex campione, zoppo e ubriaco, si offre di allenarti: «Ti insegno quel che so. Ma non sarà piacevole.»",
+   "scelte": [
+     {"testo": "Allenamento duro: perdi il 20% della vita, +1 a una statistica a caso", "esiti": [
+       {"p": 1, "righe": ["Ti spezza le ossa e te le rimette a posto più forti."], "ops": [{"op": "danno", "frazione": 0.2}, {"op": "stat", "stat": "casuale", "delta": 1}]}]},
+     {"testo": "Solo una chiacchierata (nessun rischio): +2 gettoni", "esiti": [
+       {"p": 1, "righe": ["Un consiglio, un bicchiere e una mancia."], "ops": [{"op": "gettoni", "valore": 2}]}]}]},
+  {"id": "rissa", "titolo": "Rissa nel vicolo", "icona": "👊",
+   "testo": "Tre tizi stanno pestando un fattorino. Se intervieni, probabilmente ti ringrazierà. O ti rimetterai le ossa.",
+   "scelte": [
+     {"testo": "Intervieni", "esiti": [
+       {"p": 0.6, "righe": ["Li metti in fuga. Il fattorino ti dà quello che ha."], "ops": [{"op": "gettoni", "valore": 4}]},
+       {"p": 0.4, "righe": ["Erano più duri del previsto. Torni a casa a pezzi."], "ops": [{"op": "danno", "frazione": 0.25}]}]},
+     {"testo": "Tira dritto", "esiti": [{"p": 1, "righe": ["Non sono affari tuoi."], "ops": []}]}]},
+  {"id": "fontana", "titolo": "La fontana strana", "icona": "⛲",
+   "testo": "In un cortile abbandonato, una fontana con un'acqua dal colore sbagliato. Nessuno la tocca da anni.",
+   "scelte": [
+     {"testo": "Bevi", "esiti": [
+       {"p": 0.35, "righe": ["Un fuoco gentile ti scorre dentro: ti senti ricostruito."], "ops": [{"op": "cura", "frazione": 0.6}]},
+       {"p": 0.25, "righe": ["La testa gira e poi si schiarisce. Qualcosa è cambiato."], "ops": [{"op": "stat", "stat": "casuale", "delta": 1}]},
+       {"p": 0.25, "righe": ["Un sapore metallico. Niente di che."], "ops": []},
+       {"p": 0.15, "righe": ["Veleno! Ti piegano i crampi."], "ops": [{"op": "danno", "frazione": 0.3}]}]},
+     {"testo": "Riempi una borraccia e vendila (+3 gettoni)", "esiti": [{"p": 1, "righe": ["Qualcuno comprerà qualunque cosa."], "ops": [{"op": "gettoni", "valore": 3}]}]},
+     {"testo": "Lasciala stare", "esiti": [{"p": 1, "righe": ["La prudenza non è mai troppa."], "ops": []}]}]},
+  {"id": "cassa", "titolo": "La cassa dimenticata", "icona": "📦",
+   "testo": "Una cassa di legno sigillata, dietro il ring. Ha un lucchetto vecchio.",
+   "scelte": [
+     {"testo": "Forzala", "esiti": [
+       {"p": 0.45, "righe": ["Dentro ci sono gettoni, una vera sorpresa."], "ops": [{"op": "gettoni", "valore": 5}]},
+       {"p": 0.2, "righe": ["Un impianto, ancora imballato!"], "ops": [{"op": "equip"}]},
+       {"p": 0.2, "righe": ["Vuota, a parte della segatura."], "ops": []},
+       {"p": 0.15, "righe": ["È una trappola: una piccola esplosione."], "ops": [{"op": "danno", "frazione": 0.2}]}]},
+     {"testo": "Lasciala dov'è", "esiti": [{"p": 1, "righe": ["Magari è una trappola."], "ops": []}]}]},
+  {"id": "laboratorio", "titolo": "Il laboratorio abbandonato", "icona": "🧪",
+   "testo": "Un laboratorio sotterraneo. Una barella con cinghie, e sul tavolo un fascio di cavi e provette etichettate «prova».",
+   "scelte": [
+     {"testo": "Prova l'impianto sperimentale: ottieni un impianto, ma perdi il 20% della vita", "esiti": [
+       {"p": 1, "righe": ["Dolore, scintille, e poi un nuovo pezzo di te."], "ops": [{"op": "danno", "frazione": 0.2}, {"op": "equip"}]}]},
+     {"testo": "Prova un siero: mutazione rara 50%, maledetta 50%", "esiti": [
+       {"p": 0.5, "righe": ["Funziona. Meglio di quanto sperassi."], "ops": [{"op": "mutazione", "rarita": "rara"}]},
+       {"p": 0.5, "righe": ["Funziona, ma ha un prezzo."], "ops": [{"op": "mutazione", "rarita": "maledetta"}]}]},
+     {"testo": "Non toccare niente", "esiti": [{"p": 1, "righe": ["Esci a mani vuote."], "ops": []}]}]},
+  {"id": "pozzo", "titolo": "Il pozzo dei desideri", "icona": "🪙",
+   "testo": "Un pozzo in mezzo a una piazza vuota, pieno di monete. Un cartello scritto a mano: «2 gettoni, un desiderio.»",
+   "scelte": [
+     {"testo": "Getta 2 gettoni", "costo": 2, "esiti": [
+       {"p": 0.4, "righe": ["Un +1 a una statistica scende dall'alto, quasi."], "ops": [{"op": "stat", "stat": "casuale", "delta": 1}]},
+       {"p": 0.3, "righe": ["Il pozzo ti restituisce una mutazione."], "ops": [{"op": "mutazione", "rarita": "comune"}]},
+       {"p": 0.3, "righe": ["Silenzio. I desideri non sono sempre ascoltati."], "ops": []}]},
+     {"testo": "Prendi le monete dal fondo (+3 gettoni, il 25% di rischio ferite)", "esiti": [
+       {"p": 0.75, "righe": ["Qualche moneta, nessuno guarda."], "ops": [{"op": "gettoni", "valore": 3}]},
+       {"p": 0.25, "righe": ["Ti cade addosso un pezzo di cornicione."], "ops": [{"op": "gettoni", "valore": 3}, {"op": "danno", "frazione": 0.2}]}]},
+     {"testo": "Prosegui", "esiti": [{"p": 1, "righe": ["Il tuo viaggio continua."], "ops": []}]}]},
+  {"id": "allenatore", "titolo": "L'allenatore in disgrazia", "icona": "📋",
+   "testo": "Un allenatore, cacciato da ogni palestra, ti propone un allenamento mirato su uno dei tuoi poteri, a pagamento.",
+   "scelte": [
+     {"testo": "Paga 4 gettoni: +1 rango a un potere", "costo": 4, "esiti": [
+       {"p": 0.8, "righe": ["Il suo metodo funziona: un potere sale di rango."], "ops": [{"op": "rango"}]},
+       {"p": 0.2, "righe": ["Era un truffatore. I gettoni sono spariti."], "ops": []}]},
+     {"testo": "Declina", "esiti": [{"p": 1, "righe": ["Ognuno per la sua strada."], "ops": []}]}]}
+]

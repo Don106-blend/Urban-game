@@ -593,5 +593,43 @@
         "valore": -2
       }
     ]
+  },
+  {
+    "id": 30,
+    "nome": "Rigenerazione lenta",
+    "descrizione": "Cura 6 hp a tutte le locazioni all'inizio di ogni turno.",
+    "tipo": "cura",
+    "tipo_danno": "",
+    "split": false,
+    "formula": {
+      "dadi": [],
+      "flat": 6,
+      "mult": 1
+    },
+    "modificatori": []
+  },
+  {
+    "id": 31,
+    "nome": "Furia misurata",
+    "descrizione": "Adrenalina sotto controllo: +2 ai tiri per colpire e +1 ai riflessi.",
+    "tipo": "modificatore",
+    "tipo_danno": "",
+    "split": false,
+    "formula": {
+      "dadi": [],
+      "flat": 0,
+      "mult": 1
+    },
+    "modificatori": [
+      {
+        "tipo": "colpire",
+        "flat": 2
+      },
+      {
+        "tipo": "flat_risultato",
+        "statistica": "riflessi",
+        "valore": 1
+      }
+    ]
   }
 ]

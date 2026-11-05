@@ -16,6 +16,7 @@ import math
 
 import aspetto
 import azzardo
+import evo
 import iniziativa
 import nemesi
 import palestra
@@ -440,8 +441,9 @@ def pannello(p, turno, altro=None):
                     "cooldown": p.stato_stance(s)["cooldown"],
                     "usi_rimasti": p.stato_stance(s)["usi_rimasti"]}
                    for s in p.stance_conosciute],
-        "effetti": [{"nome": e["def"]["nome"], "turni": e["turni"]}
+        "effetti": [{"nome": e["def"]["nome"], "turni": e["turni"], "loc": e.get("loc")}      # (dove: il sangue cola dalla ferita)
                     for e in p.effetti_attivi],
+        "mutazioni": list(p.mutazioni),
         "emp_turni": p.emp_turni, "ddos_turni": p.ddos_turni,
         "modificatori": p.modificatori_tiri(altro),     # bonus e malus ai tiri di adesso (arti feriti, stance, effetti)
     }
@@ -904,7 +906,8 @@ class DuelloWeb:
         self.mortale = mortale    # l'imboscata di una nemesi: chi perde muore, niente resa e niente azzardo (v. avvia_imboscata)
         self.luogo = "vicolo" if mortale else None    # lo sfondo dell'arena (static/arena.js)
         self.destino = None       # dopo una vittoria mortale: "risparmia" | "uccidi" (v. risolvi_destino)
-        self.torneo = torneo  # riferimento al TorneoEvo, se questo duello ne fa parte
+        self.torneo = torneo  # la Corsa del Torneo Evo (evo.py), se questo duello ne fa parte
+        self.regola = None    # la regola d'arena del Torneo Evo (dict di data/regole_arena.json): solo informativa, gli effetti sono gia' sui personaggi
         self.posta = dict(POSTA_BASE, **(posta or {}))   # quanto paga la vittoria e quanto e' pericolosa la morte
         self.rivale = None       # il rivale persistente di questo duello (Nemesis system), se c'e'
         self._segno_rivincita = 0
@@ -1090,6 +1093,13 @@ class DuelloWeb:
             self.nuovo_round()
 
     def check_sconfitta(self, chi, vincitore):
+        if chi.sconfitto() and chi.ultima_chance and not self.finito:       # mutazione Ultima chance: una volta sola si resta in piedi al 30%
+            chi.ultima_chance = False
+            for l in ("testa", "busto"):
+                if chi.hp[l] <= 0:
+                    chi.hp[l] = max(1, round(chi.hp_max[l] * 0.3))
+            self.scriv(f"✦ {chi.nome} non cade: ultima chance!", "crit")
+            return
         if chi.sconfitto() and not self.finito:
             self.finito = True
             self.fase = "fine"
@@ -1122,23 +1132,27 @@ class DuelloWeb:
 
     # il portafoglio del tavolo: crediti veri nel duello della palestra, punti virtuali nel Torneo Evo
     def fondi(self):
-        """Il tetto di una puntata: i crediti che hai (palestra) o il massimo per puntata (torneo)."""
-        return STATO["crediti"] if self.rec is not None else MAX_SCOMMESSA_TORNEO
+        """Il tetto di una puntata: i crediti che hai (palestra), i gettoni della corsa (Torneo Evo) o il massimo per puntata (harness)."""
+        if self.rec is not None:
+            return STATO["crediti"]
+        return self.torneo.gettoni if self.torneo is not None else MAX_SCOMMESSA_TORNEO
 
     def preleva(self, importo):
         """La posta lascia subito il portafoglio (e il salvataggio: chiudere il gioco a meta' duello non la restituisce)."""
         if self.rec is not None:
             STATO["crediti"] -= importo
             salva_stato()
+        elif self.torneo is not None:
+            self.torneo.gettoni -= importo
 
     def accredita(self, importo):
-        """Soldi che tornano subito al giocatore (incasso anticipato): crediti veri, o punti del torneo."""
+        """Soldi che tornano subito al giocatore (incasso anticipato): crediti veri, o gettoni della corsa."""
         if self.rec is not None:
             STATO["crediti"] += importo
             salva_stato()
         elif self.torneo is not None:
-            self.torneo.bonus_accumulato += importo
-            self.torneo.log_arena.append(f"🎰 +{importo} punti (incasso anticipato).")
+            self.torneo.gettoni += importo
+            self.torneo.log_arena.append(f"🎰 +{importo} gettoni (incasso anticipato).")
 
     def rischio_morte(self, chi):
         """Chance che un crollo sia mortale: solo un allievo della palestra puo' morire (v. chiudi_duello); None per gli altri."""
@@ -1158,8 +1172,8 @@ class DuelloWeb:
         if self.tavolo is None or not self.arena_attiva:
             return None
         info = self.tavolo.info()
-        # nel torneo le vincite sono soltanto un punteggio: non toccano i crediti veri
-        info["torneo_pot"] = self.torneo.bonus_accumulato if self.torneo is not None else None
+        # nel torneo si punta con i gettoni della corsa: non toccano i crediti veri
+        info["torneo_pot"] = self.torneo.gettoni if self.torneo is not None else None
         return info
 
     # ---------- azioni comuni ----------
@@ -1544,6 +1558,8 @@ class DuelloWeb:
                 extra = int(danno * bers)
                 danno += extra
                 self.scriv(f"Berserker: +{round(bers * 100)}% ai danni (+{extra}).")
+            if danno > 0 and (a.mult_danno != 1.0 or d.mult_subiti != 1.0):      # mutazioni del Torneo Evo
+                danno = max(1, round(danno * a.mult_danno * d.mult_subiti))
             if self.tavolo is not None:
                 danno = self.tavolo.danno_rilanciato(a, d, loc, danno)     # ...e se e' a segno la posta paga
             if mitiga_meta:
@@ -1561,6 +1577,13 @@ class DuelloWeb:
                 d.ddos_turni = max(d.ddos_turni, n + 1)
                 self.scriv(f"  {d.nome} subisce un DDOS: nessun augment attivabile per {n} turni (quelli già accesi restano accesi).")
             danno_reale = hp_prima - sum(d.hp.values())
+            if a.vampiro > 0 and danno_reale > 0 and not a.sconfitto():       # mutazione Vampiro: una parte del danno torna come vita (sul busto)
+                cura = int(danno_reale * a.vampiro)
+                loc = min(("testa", "busto"), key=lambda l: a.hp[l] / a.hp_max[l])
+                prima = a.hp[loc]
+                a.hp[loc] = min(a.hp_max[loc], a.hp[loc] + cura)
+                if a.hp[loc] > prima:
+                    self.scriv(f"  {a.nome} si ricura di {a.hp[loc] - prima} hp ({loc}).")
             assorbito = max(0, arm_prima - sum(d.armatura.values()))
             for r in d.applica_effetti(att.get("effetti_applicati", []),
                                        DB["effetti"], loc=loc):
@@ -1947,6 +1970,7 @@ class DuelloWeb:
             "mira_pen": MIRA_PENALITA, "mira_schivata_sicura": MIRA_SCHIVATA_SICURA, "mira_parata_sposta": MIRA_PARATA_SPOSTA,
             "survey_fatto": self.survey_fatto,
             "torneo": self.rec is None,
+            "regola": self.regola,
             "arena": self.info_arena(),
             "rivale": self.info_rivale(),
             "mortale": self.mortale, "luogo": self.luogo,
@@ -2211,257 +2235,8 @@ PROVA = None   # ponytail: una sola palestra di prova alla volta (single-player 
 
 
 # ---------------------------------------------------------------- torneo evo
-class TorneoEvo:
-    """Eliminazione diretta a 16: si parte da eroi base che evolvono a ogni turno.
-    Il giocatore usa un eroe casuale (non della palestra). E' una modalita' a parte: vincere non da' nulla (v. _premia).
-    ponytail: vive in memoria come DUELLO — riavviare il server azzera il torneo."""
-
-    NOMI_TURNI = ["Ottavi", "Quarti", "Semifinale", "Finale"]
-    STATS_POTENZIABILI = ("fisico", "riflessi", "mente", "sociale")
-
-    def __init__(self):
-        usati = set()
-        self.eroi = []
-        for _ in range(16):
-            e = eroe_base(DB["attacchi"], DB["poteri"], DB["stances"], usati)
-            usati.add(e.nome)
-            e.aspetto = aspetto.genera(e.nome, [x.aspetto for x in self.eroi])   # 16 aspetti tutti diversi
-            self.eroi.append(e)
-        self.io = random.randrange(16)
-        ordine = list(range(16))
-        random.shuffle(ordine)
-        self.turni = [[{"a": ordine[i], "b": ordine[i + 1], "win": None}
-                       for i in range(0, 16, 2)]]
-        self.round = 0
-        self.fase = "intro"  # intro | pronto | duello | risultato | oggetto | vittoria | eliminato
-        self.scelte = None
-        self.scelte_item = None
-        self.campione = None
-        # arena: le vincite di puntate/clausole di ogni round si sommano qui. Il Torneo Evo e' una modalita' a parte:
-        # non da' premi (ne' crediti, ne' l'eroe nella palestra), quindi e' soltanto un punteggio
-        self.bonus_accumulato = 0
-        self.log_arena = []
-
-    # ---------- bracket ----------
-    def mio_match(self):
-        return next((m for m in self.turni[self.round]
-                     if self.io in (m["a"], m["b"])), None)
-
-    def avversario_idx(self):
-        m = self.mio_match()
-        return m["b"] if m["a"] == self.io else m["a"]
-
-    def _vince_cpu(self, a, b):
-        """Scontro tra due CPU: stessa logistica delle quote (chi ha 30 punti di valuta in piu'
-        vince ~75%, non il 59% del vecchio rapporto va/(va+vb))."""
-        dv = valuta(self.eroi[a]) - valuta(self.eroi[b])
-        return a if random.random() < 1 / (1 + math.exp(-K_VALUTA * dv)) else b
-
-    # ---------- crescita ----------
-    def _cura_totale(self, e):
-        """Fine round: tutti i danni del round vengono curati (anche gli arti CRIPPLED), stamina piena."""
-        for l in e.hp:
-            e.hp[l] = e.hp_max[l]
-        e.crippled = set()
-        e.danni_tipo = {}
-        e.init_stamina()
-
-    def _reset_combattimento(self, e):
-        """Riporta l'eroe fuori dallo stato di duello (poteri spenti, effetti puliti)."""
-        for slot in e.poteri:
-            if slot.get("attivo"):
-                e.disattiva_potere(slot)
-        for slot in e.augments:
-            # solo gli Attivi innescati a mano: i Passivi restano sempre accesi
-            if slot["attivo"] and slot["def"].get("attivo", True):
-                e.disattiva_potere(slot)
-        e.effetti_attivi = []
-        e.stance_attive = []
-        e.stance_stato = {}
-        e.attacco_stato = {}
-        e.swap_attivi = []
-        e.mira = None
-        e.emp_turni = 0
-
-    # ---------- equipaggiamento (protesi/augment, pool condivisa col negozio) ----------
-    def _pool_item_validi(self, e):
-        """Impianti che l'eroe può ancora ricevere ora: stesso vincolo di slot/umanità di
-        un personaggio vero (niente doppioni, una protesi per locazione, niente sforare l'umanità disponibile)."""
-        libera = umanita_max(e) - umanita_spesa_pg(e)
-        pool = [("protesi", pr) for pr in DB["protesi"]
-                if pr["locazione"] not in e.protesi_locazioni and pr.get("costo_umanita", 0) <= libera]
-        pool += [("augment", ag) for ag in DB["augments"]
-                 if ag.get("costo_umanita", 0) <= libera
-                 and all(s["def"]["id"] != ag["id"] for s in e.augments)]
-        return pool
-
-    def _evolvi_cpu(self, e, rango_nuovo):
-        """Le CPU vincitrici crescono come il giocatore, a ogni round: +1 Controllo, un potere nuovo, un
-        upgrade di statistica e un oggetto di equipaggiamento. Scelgono tra le stesse offerte del
-        giocatore (2 statistiche, 3 oggetti): la statistica a caso, l'oggetto di maggior valore.
-        `e.upgrade_torneo` tiene la storia, per mostrarla."""
-        e.stats["controllo"] = min(4, e.stats["controllo"] + 1)
-        noti = {s["def"]["id"] for s in e.poteri}
-        pool = [p for p in DB["poteri"] if p["id"] not in noti]
-        nuovi = []
-        if pool and len(e.poteri) < MAX_POTERI:
-            pw = random.choice(pool)
-            e.poteri.append({"def": pw, "rango": min(rango_nuovo, e.stats["controllo"]), "attivo": False})
-            nuovi.append(f"potere {pw['nome']}")
-        su = [s for s in self.STATS_POTENZIABILI if e.stats[s] < 4]
-        random.shuffle(su)
-        if su:
-            stat = random.choice(su[:2])
-            e.stats[stat] += 1
-            nuovi.append(f"+1 {stat}")
-        pool_item = self._pool_item_validi(e)
-        random.shuffle(pool_item)
-        offerti = pool_item[:3]
-        if offerti:
-            categoria, item = max(offerti, key=lambda t: t[1].get("valore", 0))
-            _applica_item_a(e, categoria, item)
-            nuovi.append(f"{categoria} {item['nome']}")
-        if not hasattr(e, "upgrade_torneo"):
-            e.upgrade_torneo = []
-        e.upgrade_torneo.append({"round": self.round, "novita": nuovi})
-        self._cura_totale(e)
-
-    # ---------- arena: puntate e clausole valgono soltanto come punteggio ----------
-    def _risolvi_arena(self, d):
-        """Paga le puntate ancora aperte del duello appena finito: le vincite si sommano al punteggio del torneo."""
-        if d.tavolo is None or not d.tavolo.banco:
-            return
-        liq = d.tavolo.liquida(d.vincitore is d.p)
-        self.bonus_accumulato += liq["totale"]
-        self.log_arena.extend(testo for testo, _ in liq["righe"])
-
-    # ---------- flusso ----------
-    def risolvi_duello(self, vinto, duello=None):
-        if duello is not None:
-            self._risolvi_arena(duello)
-        m = self.mio_match()
-        m["win"] = self.io if vinto else self.avversario_idx()
-        for match in self.turni[self.round]:
-            if match["win"] is None:
-                match["win"] = self._vince_cpu(match["a"], match["b"])
-        vincitori = [x["win"] for x in self.turni[self.round]]
-        if not vinto:
-            # eliminato: simula il resto del torneo per incoronare comunque un campione
-            while len(vincitori) > 1:
-                prossimo = [{"a": vincitori[i], "b": vincitori[i + 1], "win": None}
-                            for i in range(0, len(vincitori), 2)]
-                for match in prossimo:
-                    match["win"] = self._vince_cpu(match["a"], match["b"])
-                self.turni.append(prossimo)
-                vincitori = [x["win"] for x in prossimo]
-            self.campione = self.eroi[vincitori[0]].nome
-            self.fase = "eliminato"
-            return
-        if len(vincitori) == 1:
-            self.campione = self.eroi[self.io].nome
-            self.fase = "vittoria"
-            self._premia()
-            return
-        # turno superato: ad ogni vittoria il controllo sale da solo
-        rango_nuovo = self.round + 2
-        for idx in vincitori:
-            if idx != self.io:
-                self._evolvi_cpu(self.eroi[idx], rango_nuovo)
-        e = self.eroi[self.io]
-        e.stats["controllo"] = min(4, e.stats["controllo"] + 1)
-        self._reset_combattimento(e)
-        self._cura_totale(e)
-        noti = {s["def"]["id"] for s in e.poteri}
-        pool = [p for p in DB["poteri"] if p["id"] not in noti]
-        random.shuffle(pool)
-        su = [s for s in self.STATS_POTENZIABILI if e.stats[s] < 4]
-        random.shuffle(su)
-        self.scelte = {"rango": rango_nuovo, "poteri": pool[:3], "stats": su[:2]}
-        pool_item = self._pool_item_validi(e)
-        random.shuffle(pool_item)
-        self.scelte_item = pool_item[:3] or None
-        self.turni.append([{"a": vincitori[i], "b": vincitori[i + 1], "win": None}
-                           for i in range(0, len(vincitori), 2)])
-        self.round += 1
-        self.fase = "risultato"
-
-    def scegli(self, potere_id, stat):
-        if self.fase != "risultato" or not self.scelte:
-            return "nessuna scelta in corso"
-        pw = next((p for p in self.scelte["poteri"] if p["id"] == potere_id), None)
-        if pw is None or (self.scelte["stats"] and stat not in self.scelte["stats"]):
-            return "scelta non valida"
-        e = self.eroi[self.io]
-        e.poteri.append({"def": pw, "rango": min(self.scelte["rango"],
-                                                 e.stats["controllo"], 4),
-                         "attivo": False})
-        if stat in self.scelte["stats"]:
-            e.stats[stat] = min(4, e.stats[stat] + 1)
-        self.scelte = None
-        self.fase = "oggetto" if self.scelte_item else "pronto"
-        return None
-
-    def scegli_item(self, categoria, item_id):
-        if self.fase != "oggetto" or not self.scelte_item:
-            return "nessuna scelta di equipaggiamento in corso"
-        item = next((it for cat, it in self.scelte_item
-                    if cat == categoria and it["id"] == item_id), None)
-        if item is None:
-            return "scelta non valida"
-        _applica_item_a(self.eroi[self.io], categoria, item)
-        self.scelte_item = None
-        self.fase = "pronto"
-        return None
-
-    def salta_item(self):
-        if self.fase != "oggetto":
-            return "nessuna scelta di equipaggiamento in corso"
-        self.scelte_item = None
-        self.fase = "pronto"
-        return None
-
-    def _premia(self):
-        """Il Torneo Evo e' una modalita' a parte: chi lo vince non porta a casa niente. Niente eroe nel box, niente crediti
-        (il punteggio resta il punteggio). Qui si rimette solo a posto l'eroe, per la schermata finale."""
-        self._reset_combattimento(self.eroi[self.io])
-        self._cura_totale(self.eroi[self.io])
-
-    # ---------- api ----------
-    def stato(self):
-        return {
-            "attivo": True, "fase": self.fase, "round": self.round,
-            "nome_turno": self.NOMI_TURNI[min(self.round, 3)],
-            "io": self.io,
-            "partecipanti": [{"nome": e.nome, "potenza": valuta(e)} for e in self.eroi],
-            "turni": self.turni,
-            "eroe": {"nome": self.eroi[self.io].nome,
-                     "stats": dict(self.eroi[self.io].stats),
-                     "poteri": [{"nome": s["def"]["nome"], "rango": s["rango"]}
-                                for s in self.eroi[self.io].poteri],
-                     "protesi": [pr["nome"] for pr in DB["protesi"]
-                                 if pr["id"] in self.eroi[self.io].protesi_equip],
-                     "augments": [s["def"]["nome"] for s in self.eroi[self.io].augments]},
-            "avversario": (self.eroi[self.avversario_idx()].nome
-                           if self.fase in ("pronto", "duello") and self.mio_match() else None),
-            "avversario_upgrade": (getattr(self.eroi[self.avversario_idx()], "upgrade_torneo", [])
-                                   if self.fase in ("pronto", "duello") and self.mio_match() else []),
-            "scelte": ({"rango": self.scelte["rango"],
-                        "poteri": [{"id": p["id"], "nome": p["nome"],
-                                    "descrizione": p.get("descrizione", "")}
-                                   for p in self.scelte["poteri"]],
-                        "stats": self.scelte["stats"]} if self.scelte else None),
-            "scelte_item": ([{"categoria": cat, "id": it["id"], "nome": it["nome"],
-                              "descrizione": it.get("descrizione", "")}
-                             for cat, it in self.scelte_item] if self.scelte_item else None),
-            "campione": self.campione,
-            "pool_nomi": [p["nome"] for p in DB["poteri"]],
-            "pool_nomi_item": [it["nome"] for it in DB["protesi"] + DB["augments"]],
-            "bonus_accumulato": self.bonus_accumulato,
-            "log_arena": self.log_arena[-6:],
-        }
-
-
-TORNEO = None
+# La corsa roguelike vive in evo.py (stato JSON, salvato in save/evo.json: riavviando il server si riprende da dov'era). Qui il collegamento.
+TORNEO = evo.collega(DB, record_to_pg, lambda *a, **k: _controlla_equip(*a, **k), os.path.join(SAVE_DIR, "evo.json"))
 
 
 def abbandona_duello():
@@ -2678,9 +2453,9 @@ def api_tattiche():
 @app.route("/torneo")
 def torneo():
     global DUELLO
-    # un duello di torneo concluso (o abbandonato) fa avanzare il bracket
-    if (TORNEO is not None and TORNEO.fase == "duello"
-            and DUELLO is not None and DUELLO.finito and DUELLO.rec is None):
+    # un duello di torneo concluso (o abbandonato) fa avanzare la corsa
+    if (TORNEO is not None and TORNEO.fase == "duello" and DUELLO is not None and DUELLO.finito
+            and DUELLO.rec is None and DUELLO.torneo is TORNEO):
         TORNEO.risolvi_duello(DUELLO.vincitore is DUELLO.p, DUELLO)
         DUELLO = None
     return render_template("torneo.html")
@@ -2689,8 +2464,23 @@ def torneo():
 @app.route("/api/torneo/stato")
 def api_torneo_stato():
     if TORNEO is None:
-        return jsonify({"attivo": False})
+        return jsonify(evo.stato_iniziale())
     return jsonify(TORNEO.stato())
+
+
+# azione del client -> metodo della Corsa (con l'argomento che gli passa)
+AZIONI_TORNEO = {
+    "campione": lambda t, d: t.scegli_campione(d.get("indice")),
+    "carta": lambda t, d: t.scegli_carta(d.get("indice")),
+    "rilancia": lambda t, d: t.rilancia(),
+    "salta": lambda t, d: t.salta_bottino(),
+    "porta": lambda t, d: t.scegli_porta(d.get("indice")),
+    "compra": lambda t, d: t.compra(d.get("indice")),
+    "esci_mercato": lambda t, d: t.esci_mercato(),
+    "allena": lambda t, d: t.allena(d.get("indice")),
+    "evento": lambda t, d: t.scegli_evento(d.get("indice")),
+    "chiudi_evento": lambda t, d: t.chiudi_evento(),
+}
 
 
 @app.route("/api/torneo/azione", methods=["POST"])
@@ -2699,31 +2489,35 @@ def api_torneo_azione():
     dati = request.get_json(silent=True) or {}
     tipo = dati.get("tipo")
     if tipo == "inizia":
-        TORNEO = TorneoEvo()
+        asc = dati.get("ascensione", 0)
+        if not isinstance(asc, int) or isinstance(asc, bool) or not 0 <= asc <= evo.META["ascensione_max"]:
+            return jsonify({"errore": "ascensione non sbloccata"}), 400
+        TORNEO = evo.Corsa(asc)
+        evo.salva(TORNEO)
     elif TORNEO is None:
         return jsonify({"errore": "nessun torneo in corso"}), 400
-    elif tipo == "avanti" and TORNEO.fase == "intro":
-        TORNEO.fase = "pronto"
-    elif tipo == "combatti" and TORNEO.fase == "pronto":
-        avv = TORNEO.eroi[TORNEO.avversario_idx()]
-        DUELLO = DuelloWeb(pg=TORNEO.eroi[TORNEO.io], avversario=avv, torneo=TORNEO)
-        TORNEO.fase = "duello"
+    elif tipo == "combatti":
+        pronto = TORNEO.prepara_duello()
+        if pronto is None:
+            return jsonify({"errore": "non è il momento di combattere"}), 400
+        eroe, nemico, regola = pronto
+        DUELLO = DuelloWeb(pg=eroe, avversario=nemico, torneo=TORNEO)
+        DUELLO.regola = {k: regola[k] for k in ("id", "nome", "icona", "descrizione")}
+        if regola["id"] != "standard":
+            DUELLO.scriv(f"{regola['icona']} Regola d'arena: {regola['nome']}. {regola['descrizione']}", "round")
         return jsonify({"vai": url_for("duello")})
-    elif tipo == "scegli":
-        err = TORNEO.scegli(dati.get("potere"), dati.get("stat"))
+    elif tipo == "chiudi":
+        err = TORNEO.chiudi()
         if err:
             return jsonify({"errore": err}), 400
-    elif tipo == "scegli_item":
-        err = TORNEO.scegli_item(dati.get("categoria"), dati.get("id"))
-        if err:
-            return jsonify({"errore": err}), 400
-    elif tipo == "salta_item":
-        err = TORNEO.salta_item()
-        if err:
-            return jsonify({"errore": err}), 400
-    elif tipo == "chiudi" and TORNEO.fase in ("vittoria", "eliminato"):
         TORNEO = None
-        return jsonify({"attivo": False})
+        return jsonify(evo.stato_iniziale())
+    elif tipo in AZIONI_TORNEO:
+        err = AZIONI_TORNEO[tipo](TORNEO, dati)
+        if err:
+            return jsonify({"errore": err}), 400
+    else:
+        return jsonify({"errore": "azione sconosciuta"}), 400
     return jsonify(TORNEO.stato())
 
 

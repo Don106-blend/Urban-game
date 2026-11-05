@@ -361,6 +361,14 @@ const Pupazzo = (() => {
           p.scalaBraccio[l] = 1.9;
         }
         p.busto += 0.12 * k; p.sprofonda += 1.6 * k;
+      } else if (this.tipo === "raccoglie") {                  // le due mani si uniscono davanti al petto e tremano: si carica un fulmine
+        const k = liscio(Math.min(1, this.t / 0.3)) * Math.min(1, Math.max(0, (this.dur - this.t) / 0.12));
+        for (const l of LATI) {
+          const g = p.mani[l];
+          p.mani[l] = [lerp(g[0], (l === "dx" ? 13 : 10) + Math.sin(this.t * 46) * 0.6, k), lerp(g[1], (l === "dx" ? 4 : 7) + Math.cos(this.t * 40) * 0.5, k)];
+          p.scalaBraccio[l] = 1.6;
+        }
+        p.busto += 0.1 * k; p.sprofonda += 2 * k;
       } else if (this.tipo === "potere") {                     // si raccoglie e si espande: pugni al petto, poi braccia aperte
         p.sprofonda += 2.5 * Math.sin(PI * Math.min(1, u * 1.4)); p.busto += -0.12 * k;
         const chiuso = Math.min(1, u / 0.45), aperto = Math.max(0, (u - 0.45) / 0.3) * (u > 0.8 ? Math.max(0, (1 - u) / 0.2) : 1);

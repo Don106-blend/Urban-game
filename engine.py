@@ -239,6 +239,16 @@ class Personaggio:
         self.ddos_turni = 0            # >0: nessun augment si puo' accendere (Modulo DDOS); quelli gia' accesi restano accesi
         self.reazioni_bloccate = False  # True nel turno di chi usa il Modulo di IA predittiva: niente schivata
         self.cuscinetto_usato = False  # il Cuscinetto di emergenza scatta una volta sola per combattimento
+        # ganci del Torneo Evo (mutazioni e regole d'arena, evo.py): a zero o falsi non cambiano niente
+        self.stamina_extra = 0         # stamina massima in piu'
+        self.mult_danno = 1.0          # moltiplicatore dei danni che infligge
+        self.mult_subiti = 1.0         # ...e di quelli che subisce
+        self.vampiro = 0.0             # frazione dei danni inflitti che si ricurano (su testa o busto, il piu' ferito)
+        self.ultima_chance = False     # la prima volta che testa o busto andrebbero a zero resta in piedi al 30%
+        self.no_mira = False           # regola d'arena "nebbia": nessuno puo' mirare
+        self.no_schivata = False       # regola d'arena "pavimento viscido": nessuno puo' schivare
+        self.mutazioni = []            # le mutazioni attive: {nome, icona, rarita, descrizione} (il pannello le mostra)
+        self.valuta_extra = 0          # quanto impianti e mutazioni aggiungono alla valuta (le quote del Banco ne tengono conto)
 
     # ---------- la mira ----------
     @property
@@ -422,11 +432,12 @@ class Personaggio:
 
     def puo_schivare(self):
         """Una gamba CRIPPLED toglie la schivata, e anche il Modulo di IA predittiva dell'avversario (per tutto il suo turno)."""
-        return not self.reazioni_bloccate and not any(l in self.crippled for l in self.hp if l.startswith("gamba"))
+        return (not self.reazioni_bloccate and not self.no_schivata
+                and not any(l in self.crippled for l in self.hp if l.startswith("gamba")))
 
     def puo_mirare(self):
         risorsa = self.bonus if self.mira_bonus else self.azioni
-        if risorsa <= 0 or not any(att.get("can_aim") for att in self.attacchi):
+        if self.no_mira or risorsa <= 0 or not any(att.get("can_aim") for att in self.attacchi):
             return False
         # un braccio CRIPPLED toglie la mira (il potere 2x2 compensa con gli arti extra)
         braccio_rotto = any(l in self.crippled for l in self.hp if l.startswith("braccio"))
@@ -441,7 +452,7 @@ class Personaggio:
 
     # ---------- stamina ----------
     def stamina_max(self):
-        return (self.stats["fisico"] + self.stats["riflessi"] + self.stats["mente"]) * 2
+        return (self.stats["fisico"] + self.stats["riflessi"] + self.stats["mente"]) * 2 + self.stamina_extra
 
     def init_stamina(self):
         self.stamina = self.stamina_max()
@@ -1263,7 +1274,7 @@ PESI_VALUTA = (3, 1, 2)
 def valuta(p):
     """Punteggio di forza approssimativo di un personaggio, per quote e matchmaking."""
     return (PESI_VALUTA[0] * sum(p.stats.values()) + PESI_VALUTA[1] * sum(p.skills.values())
-            + PESI_VALUTA[2] * sum(s["rango"] for s in p.poteri))
+            + PESI_VALUTA[2] * sum(s["rango"] for s in p.poteri) + p.valuta_extra)
 
 
 def umanita_max(p):

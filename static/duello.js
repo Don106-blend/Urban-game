@@ -77,6 +77,9 @@ document.addEventListener("keydown", e => {
 /* ---------- render ---------- */
 function render() {
   el("d-round").textContent = "ROUND " + S.round;
+  const reg = el("d-regola");
+  reg.textContent = S.regola && S.regola.id !== "standard" ? `${S.regola.icona} ${S.regola.nome}` : "";
+  reg.title = S.regola ? S.regola.descrizione : "";
   // prima si mettono in coda i colpi nuovi: finche' la loro animazione non arriva al contatto, `Arena.vista` tiene indietro i loro danni
   // (hp dei pannelli, pelle e sangue sui corpi, scheda dello scambio, numeri): il server ha gia' deciso, la scena li mostra quando accadono
   effettiNuoviEventi();
@@ -134,7 +137,7 @@ let importoBozza = null;        // l'importo che si sta scrivendo: sopravvive ai
 let erroreBanco = null;         // il rifiuto del server all'ultima puntata/incasso (S.errore), mostrato nella finestra del Banco
 let erroreAzione = null;        // ...e all'ultima azione di combattimento, mostrato nel menu
 
-const unitaTesto = () => (S.arena && S.arena.unita === "pt") ? " pt" : "¤";
+const unitaTesto = () => (S.arena && S.arena.unita === "🪙") ? "🪙" : "¤";
 const percento = x => Math.round(x * 100) + "%";
 
 /* la barra della folla: a sinistra il giocatore (volt), a destra l'avversario (danger); parte dal centro verso chi la folla ama.
@@ -167,7 +170,7 @@ function renderArena() {
       <span class="pi" title="Quanto paga ogni ${u.trim()} puntato su di te, adesso">su di te <b class="quota-val">${ar.quota}x</b></span>
       <span class="pi" title="La probabilità di vittoria stimata dal banco">${percento(ar.p_vittoria)}</span>
       ${ar.serie ? `<span class="pi" title="Ogni azzardo riuscito alza il pagamento delle puntate aperte; il primo che va male lo spezza">serie ×${ar.moltiplicatore}</span>` : ""}
-      ${ar.torneo_pot != null ? `<span class="pi" title="Il punteggio del torneo: non sono crediti">punteggio ${ar.torneo_pot}</span>` : ""}</div>
+      ${ar.torneo_pot != null ? `<span class="pi" title="I gettoni della corsa: non sono crediti">gettoni ${ar.torneo_pot}</span>` : ""}</div>
     <div class="arena-riga muted">${aperte.length ? `${aperte.length} ${aperte.length > 1 ? "puntate" : "puntata"} · ${inGioco}${u} in gioco` : "Nessuna puntata."}</div>
     <button type="button" class="btn btn-ghost btn-sm" onclick="apriBanco()">🎰 ${aperte.length ? "Il Banco" : "Punta"}</button>
   </div>`;
@@ -197,7 +200,7 @@ function renderBanco() {
   const pieno = aperte.length >= ar.max_schedine;
   d.innerHTML = `
     <div class="pal-dlg-testa"><div class="pal-dlg-titolo"><h2>Il Banco</h2>
-      <div class="fc-liv">${ar.unita === "pt" ? "Punti del torneo, non crediti" : `Hai ${ar.fondi}¤`} · su di te ${ar.quota}x · ${percento(ar.p_vittoria)}</div></div>
+      <div class="fc-liv">${ar.unita === "🪙" ? `Gettoni della corsa: ${ar.fondi}🪙, non crediti` : `Hai ${ar.fondi}¤`} · su di te ${ar.quota}x · ${percento(ar.p_vittoria)}</div></div>
       <button type="button" class="pal-icona" onclick="chiudiBanco()" aria-label="Chiudi">×</button></div>
     <div class="pal-dlg-corpo">
       ${erroreBanco ? `<div class="pal-avviso-card" role="alert">${esc(erroreBanco)}</div>` : ""}
@@ -312,6 +315,7 @@ function renderPannello(dove, p, mira_su) {
       : `${m.tiro} ${segno(m.valore)}${m.unita ? " " + m.unita : ""}${m.dado ? " +dado" : ""}`,
     m.fonte, m.valore == null || m.valore < 0 ? "chip-crip" : "tag-attiva")).join("");
   const riga = (et, v) => v ? `<div class="pan-inline"><b>${et}</b>${v}</div>` : "";
+  const mutazioni = (p.mutazioni || []).map(m => `<span class="pi mut-${m.rarita}" title="${esc(m.nome)}: ${esc(m.descrizione)}">${m.icona} ${esc(m.nome)}</span>`).join("");
   // gli azzardi: un rilancio da giocare, l'Ultima Puntata gia' usata, la spinta della folla sul dado (uguale e contraria per i due lati)
   const az = p.azzardo || {};
   const azzardo = [az.rilancio ? chip(`Rilancio ×${az.mult}`, "da giocare") : "", az.ultima ? chip("Ultima Puntata", "giocata", "muted") : "",
@@ -332,7 +336,7 @@ function renderPannello(dove, p, mira_su) {
       ${p.ddos_turni > 0 ? `<span class="chip-crip" title="Nessun augment si può accendere">⛓DDOS: ${p.ddos_turni}t</span>` : ""}
     </div>
     <div class="pan-sec pan-locs">${hp}</div>
-    ${riga("Poteri", poteri)}${riga("Augment", augments)}${riga("Stance", stance)}${riga("Effetti", effetti)}${riga("Tiri", tiri)}${riga("Azzardo", azzardo)}${riga("Iniziativa", ini)}
+    ${riga("Poteri", poteri)}${riga("Mutazioni", mutazioni)}${riga("Augment", augments)}${riga("Stance", stance)}${riga("Effetti", effetti)}${riga("Tiri", tiri)}${riga("Azzardo", azzardo)}${riga("Iniziativa", ini)}
     ${dove === "pan-player" ? renderArena() : renderRivale()}
   `;
 }

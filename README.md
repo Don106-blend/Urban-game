@@ -1,7 +1,7 @@
 # Urban
 
 Gioco di combattimento a duelli in cui si e' l'**allenatore**: una palestra clandestina con un calendario, aspiranti da ingaggiare,
-allenamenti, carattere, eventi, ring con il Banco (puntate, folla, azzardi). A parte, il Torneo Evo (16 eroi con draft, senza premi).
+allenamenti, carattere, eventi, ring con il Banco (puntate, folla, azzardi). A parte, il Torneo Evo (una corsa roguelike in 16: bottino, mutazioni, porte, sparring d'élite, eventi; senza premi, solo punteggio e ascensioni).
 Server Flask + editor dei dati in Tkinter. Nessuna dipendenza oltre a Flask.
 
 ## Come si usa
@@ -77,7 +77,9 @@ python balance.py decisioni      # nessuna scelta del kit base è dominata
 python balance.py equip          # ogni oggetto contro un eroe nudo
 python balance.py poteri         # round-robin dei 20 poteri (--rango 1..4, --solo "Nome", --matrice)
 python balance.py matchmaking    # eroe senza equip contro la CPU di pari livello
-python balance.py torneo         # tornei Evo interi con draft a caso
+python balance.py torneo         # corse intere del Torneo Evo (scelte a caso e da giocatore furbo)
+python balance.py mutazioni      # quanto vale ogni mutazione del Torneo Evo (eroe con contro il gemello senza)
+python balance.py carte          # ...e ogni altra carta del bottino
 python balance.py fuzz           # 100.000 duelli casuali: nessuna eccezione, nessun duello infinito
 python balance.py azzardo        # il Banco: azzardi, folla, quote, clausole (v. AZZARDO.md)
 python balance.py tutto
@@ -89,7 +91,7 @@ Opzioni: `--n` (duelli per cella), `--seed`, `--jobs`. Per prove "what-if" senza
 
 ## Struttura
 
-`engine.py` regole e `Personaggio` · `app.py` server, duello web, torneo, IA, economia · `palestra.py` la vita fuori dal ring
+`engine.py` regole e `Personaggio` · `app.py` server, duello web, IA, economia · `evo.py` il Torneo Evo · `palestra.py` la vita fuori dal ring
 (calendario, allenamento, tratti, eventi: logica pura, senza Flask) · `azzardo.py` il Banco: puntate, folla e azzardi del ring (logica pura) · `nemesi.py` i rivali che tornano, la loro memoria e i soprannomi (logica pura) · `balance.py` harness · `editor.py` editor dati ·
 `iniziativa.py` cosa fa un atleta di testa sua sul ring (logica pura) · `static/`, `templates/` interfaccia · `data/` contenuti (anche `tratti.json`, `iniziative.json`,
 `eventi_palestra.json`, `attrezzi.json`, `anagrafica.json`, `soprannomi.json`).
@@ -117,9 +119,9 @@ punto colpito, attaccate al corpo, e spariscono da sole. Il server decide com'e'
 gioco segna danni, numeri e knockback: `Arena.vista()` tiene indietro gli hp dei pannelli, la pelle e il sangue sui corpi, la scheda dello scambio e i numeri, i menu e la CPU
 aspettano che la scena abbia finito. Per aggiungerne una basta una funzione in `TAB` (id dell'attacco -> coreografia); `node test_mosse.js` prova ogni coreografia con
 ogni esito (un solo contatto, poi la fine). Il **Corpo di Fiamma** (stance di Pirocinesi r4) rende il corpo fuoco luminoso (`Poteri.fuoco`, come l'acqua ma additivo, con aura)
-e brucia chi lo colpisce da vicino (trigger `vieni_colpito_mischia`: come le Spine, ma non contro i colpi a distanza). Lo **sfondo del ring** e il **mirino** (con "Mira" si clicca la parte del corpo dell'avversario sull'arena, alla Fallout VATS) sono in `STILE_SPRITE.md`, sez. 19.
+e brucia chi lo colpisce da vicino (trigger `vieni_colpito_mischia`: come le Spine, ma non contro i colpi a distanza). Hanno la loro animazione anche Elettrocinesi (scarica elettrica, fulmine, **Corpo Elettrico** e **Riflessi Fulminei**, che raddoppia la velocita' delle animazioni), Appendici Affilate (i tre colpi, le **Spine** che crescono dalla schiena, il **sanguinamento**) e Anatema (**rune** rosse, affamare, affaticare e assorbi caratteristica come il dreno vitale). Lo **sfondo del ring** e il **mirino** (con "Mira" si clicca la parte del corpo dell'avversario sull'arena, alla Fallout VATS) sono in `STILE_SPRITE.md`, sez. 19.
 
-Torneo Evo (modalita' a parte: non tocca la palestra, non dà crediti e **non dà l'eroe**; puntate e clausole sono soltanto un punteggio): a fine round tutti i danni vengono curati (anche gli arti CRIPPLED) e la stamina torna piena. Dopo ogni round anche le CPU vincitrici crescono come il giocatore: +1 Controllo, un potere, un upgrade di statistica e un oggetto di equipaggiamento (sempre, scelti tra le stesse offerte; `upgrade_torneo` e `avversario_upgrade` nello stato dicono cosa hanno preso).
+**Torneo Evo** (modalita' a parte: non tocca la palestra, non dà crediti e **non dà l'eroe**). Una corsa roguelike (`evo.py`, progetto e numeri in `TORNEO_EVO.md`): si sceglie un eroe tra tre, dopo ogni vittoria si pesca un bottino di tre carte (potere, rango, statistica, impianto, **mutazione**) e si sceglie una porta (riposo, mercato, allenamento, sparring d'élite, incontro); la vita **non** si ricarica da sola (torna il 45% di quella mancante), i **gettoni** sono la moneta (mercato, rilanci, puntate del Banco), ogni duello ha una **regola d'arena**, e a fine corsa ci sono un punteggio, un record e cinque **ascensioni** (`save/evo.json`; si riprende da dov'era). `python test_evo.py`, `node test_torneo.js`.
 
 **Aspetto.** Ogni personaggio (box, contratti, avversari, eroi del torneo) ha la sua capigliatura (16, con tag M/F), la sua maglia (canottiera, t-shirt, maniche lunghe) e i suoi pantaloni (corti, tre quarti, lunghi), con colori presi da due texture a gradiente a partire da un seed; nessuna combinazione si ripete (`aspetto.py`, STILE_SPRITE.md sez. 13). I vestiti stanno sopra le ferite e si strappano con i danni: a 15% degli hp di una locazione l'indumento di quella parte non c'è più.
 
@@ -135,7 +137,7 @@ prova con `python test_azzardo.py` e `python balance.py azzardo`). E' tutto opt-
 - **Puntate.** Fino a 4 sul proprio allievo, a quota viva `0,9 / p` (a 50% paga 1,8x: la casa trattiene il 10%), anche tutto il portafoglio; il tetto si
   stringe quando l'esito e' quasi scritto. Si puo' **incassare** prima della fine (puntata x quota x p, meno il 10%). Le **clausole** (Lampo, Stoico,
   Incassatore) sono scommesse speciali con una posta, firmabili nel round 1. Non si punta contro il proprio allievo. Nel Torneo le
-  puntate sono punti virtuali (500 al massimo), mai crediti. La finestra del Banco (`dialog.pal-dlg`) si apre dalla striscia nella scheda del giocatore.
+  puntate sono gettoni della corsa, mai crediti. La finestra del Banco (`dialog.pal-dlg`) si apre dalla striscia nella scheda del giocatore.
 - **La folla.** Un tifo da −100 a +100 che segue chi batte le quote (un colpo improbabile a segno lo sposta, sbagliare l'ovvio lo fa fischiare), a media
   zero: premia la fortuna, non la forza. Sposta il dado degli azzardi (±1/2/3 pip) e a ±65 scatta l'**Ovazione** (+1 a colpire e ai riflessi per 2 turni, a
   chi la folla ama). Si vede nella barra in testata e nelle sagome in alto nell'arena, che tifano o siedono mogie.

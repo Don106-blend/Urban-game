@@ -44,7 +44,9 @@ function prova(id, esito) {
 
 const IDS = {9: "scintilla", 4: "palla di fuoco", 5: "lanciafiamme", 43: "eruzione", 7: "scheggie", 28: "scheggia di ghiaccio",
               45: "getto d'acqua", 46: "onda anomala", 47: "maremoto", 3: "colpo devastante", 41: "ondata sismica", 42: "frana",
-              52: "raffica controllata", 53: "tiro di precisione", 37: "tocco debilitante", 38: "dreno vitale", 39: "falce delle anime", 40: "pugno di roccia"};
+              52: "raffica controllata", 53: "tiro di precisione", 37: "tocco debilitante", 38: "dreno vitale", 39: "falce delle anime", 40: "pugno di roccia",
+              8: "scarica elettrica", 10: "fulmine", 11: "artigli affilati", 12: "artigli sanguinari", 13: "braccio lama", 15: "affamare", 16: "affaticare",
+              24: "assorbi caratteristica"};
 ok(JSON.stringify(Mosse.ids().sort((a, b) => a - b)) === JSON.stringify(Object.keys(IDS).map(Number).sort((a, b) => a - b)), "le animazioni sono quelle del Compendio dei poteri");
 ok(Mosse.ha({att_id: 9}) && !Mosse.ha({att_id: 1}) && !Mosse.ha({}) && !Mosse.ha(null), "ha() riconosce solo gli attacchi con la loro animazione");
 
@@ -60,6 +62,11 @@ for (const [id, nome] of Object.entries(IDS)) {
 // le animazioni a tempo: l'eruzione e' la piu' lunga, la scintilla la piu' breve tra i proiettili (la palombella vola piano: si vede)
 ok(prova(43, "colpito").tContatto > 0.9, "l'eruzione: le braccia al cielo, poi la lava");
 ok(prova(5, "colpito").tFine > 1.0, "il lanciafiamme dura quanto il getto");
+// elettrocinesi: il fulmine si carica con un gesto a mani unite prima del fascio, la scarica sono sei colpi di fulmine che arrivano uno dopo l'altro
+ok(prova(10, "colpito").gesti >= 1, "il fulmine carica le mani (gesto)");
+ok(prova(10, "colpito").tContatto > prova(8, "colpito").tContatto, "il fulmine si prende il tempo di caricare, la scarica parte subito");
+// anatema: affamare e affaticare sono il dreno vitale al contrario, assorbi caratteristica il dreno vitale: stessa durata, stessa struttura
+ok(Math.abs(prova(15, "colpito").tContatto - prova(38, "colpito").tContatto) < 0.05 && Math.abs(prova(24, "colpito").tFine - prova(38, "colpito").tFine) < 0.05, "il dreno rosso dura come il verde");
 // niente resta in giro: dopo l'animazione gli effetti proprio finiscono (le schegge conficcate sono le ultime a sparire)
 Mosse.reset();
 console.log(`OK - ${n} check passati`);

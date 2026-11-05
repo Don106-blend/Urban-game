@@ -705,54 +705,8 @@ def main():
     voce_pot = next(u for u in upg if u["tipo"] == "potere")
     assert not voce_pot["ok"] and "controllo" in voce_pot["motivo"]
 
-    # ---- Torneo Evo ----
-    t = webapp.TorneoEvo()
-    assert len(t.eroi) == 16 and len(t.turni[0]) == 8 and t.fase == "intro"
-    e = t.eroi[t.io]
-    assert len(e.poteri) == 1 and e.stats["controllo"] == 1
-    # danni prima della vittoria: a fine round si curano tutti
-    e.hp["busto"] -= 100
-    t.fase = "duello"
-    t.risolvi_duello(True)
-    assert t.fase == "risultato" and t.round == 1
-    assert len(t.turni) == 2 and len(t.turni[1]) == 4
-    assert e.stats["controllo"] == 2          # sale da solo a ogni vittoria
-    assert e.hp["busto"] == LOCAZIONI["busto"]        # a fine round si cura tutto
-    assert not e.crippled
-    assert e.stamina == e.stamina_max()       # stamina piena a ogni turno
-    assert len(t.scelte["poteri"]) == 3 and t.scelte["rango"] == 2
-    assert len(t.scelte["stats"]) == 2 and "controllo" not in t.scelte["stats"]
-    assert t.scegli(-99, t.scelte["stats"][0]) is not None  # scelta non valida
-    st0 = t.scelte["stats"][0]
-    prima = e.stats[st0]
-    assert t.scegli(t.scelte["poteri"][0]["id"], st0) is None
-    assert len(e.poteri) == 2 and e.poteri[1]["rango"] == 2
-    assert e.stats[st0] == prima + 1
-    assert t.fase in ("oggetto", "pronto")  # "oggetto": bottino di un item su 3, poi "pronto"
-    if t.fase == "oggetto":
-        assert t.salta_item() is None
-    assert t.fase == "pronto"
-    # sconfitta: eliminato, bracket completato in simulazione con un campione
-    t.fase = "duello"
-    t.risolvi_duello(False)
-    assert t.fase == "eliminato" and t.campione and len(t.turni) == 4
-
-    # vittoria completa: 4 turni vinti, 4 poteri. Il Torneo Evo e' a parte: il campione NON entra in palestra
-    t2 = webapp.TorneoEvo()
-    n_prima = len(webapp.STATO["personaggi"])
-    crediti_t2 = webapp.STATO["crediti"]
-    for _ in range(4):
-        t2.fase = "duello"
-        t2.risolvi_duello(True)
-        if t2.fase == "risultato":
-            t2.scegli(t2.scelte["poteri"][0]["id"],
-                      t2.scelte["stats"][0] if t2.scelte["stats"] else None)
-    assert t2.fase == "vittoria" and t2.campione == t2.eroi[t2.io].nome
-    assert len(t2.eroi[t2.io].poteri) == 4
-    assert t2.eroi[t2.io].stats["controllo"] == 4
-    assert len(webapp.STATO["personaggi"]) == n_prima, "il campione del torneo non entra in palestra"
-    assert webapp.STATO["crediti"] == crediti_t2, "e il torneo non da' crediti"
-    assert t2.eroi[t2.io].hp == t2.eroi[t2.io].hp_max, "(a fine torneo l'eroe e' a posto, per la schermata finale)"
+    # ---- Torneo Evo: la corsa vive in evo.py e i suoi check sono in test_evo.py (qui solo il collegamento con l'app) ----
+    assert webapp.evo.META is not None and hasattr(webapp, "TORNEO")
 
     # 5 poteri elementali completi (rango 1-4): sblocco attacchi + immunità permanente r4
     db5 = carica_db()
@@ -1277,33 +1231,7 @@ def main():
             n_equip_alto += 1
     assert n_equip_alto >= 15, n_equip_alto  # a livello 10 quasi sempre equipaggiata
 
-    # ================= Torneo Evo: draft di 1 item su 3 ad ogni round vinto =================
-    tt = webapp.TorneoEvo()
-    tt.fase = "duello"
-    tt.risolvi_duello(True)
-    assert tt.fase in ("risultato", "vittoria")
-    if tt.fase == "risultato":
-        eroe_t = tt.eroi[tt.io]
-        assert eroe_t.protesi_equip == [] and not eroe_t.augments  # nulla ancora scelto
-        pw = tt.scelte["poteri"][0]
-        stat = tt.scelte["stats"][0] if tt.scelte["stats"] else None
-        err_scelta = tt.scegli(pw["id"], stat)
-        assert err_scelta is None
-        assert tt.fase == "oggetto" if tt.scelte_item else tt.fase == "pronto"
-        if tt.fase == "oggetto":
-            pool_prima = tt.scelte_item
-            assert 1 <= len(pool_prima) <= 3
-            categoria, item = pool_prima[0]
-            err_item = tt.scegli_item(categoria, item["id"])
-            assert err_item is None
-            assert tt.fase == "pronto" and tt.scelte_item is None
-            # l'item si vede davvero sull'eroe, coerentemente con la categoria scelta
-            if categoria == "protesi":
-                assert item["id"] in eroe_t.protesi_equip
-            else:
-                assert any(s["def"] is item for s in eroe_t.augments)
-            # una seconda chiamata a scegli_item senza una scelta in corso viene rifiutata
-            assert tt.scegli_item(categoria, item["id"]) is not None
+    # (il bottino del Torneo Evo -- potere, rango, statistica, impianto, mutazione -- e' in test_evo.py)
 
     overhaul(webapp)  # regole dell'overhaul del gameplay (v. sotto)
 
@@ -1717,36 +1645,35 @@ def overhaul(webapp):
     assert 1.1 <= dq.quota_attuale() <= 10.0
     qa.hp = dict(qa.hp_max)
     assert webapp.valuta(qb) > webapp.valuta(qa)
-    # lo scontro tra CPU del torneo segue la stessa logistica: +30 di valuta = ~75-80%
-    tq = webapp.TorneoEvo()
+    # lo scontro tra CPU del torneo segue la stessa logistica: +30 di forza = ~75-80%
+    tq = webapp.evo.Corsa(0)
     random.seed(8)
     forte, debole = tq.eroi[0], tq.eroi[1]
     for tipo in ("fisico", "riflessi", "mente", "sociale", "controllo"):
-        forte.stats[tipo] = 4
-    dv = webapp.valuta(forte) - webapp.valuta(debole)
-    atteso = 1 / (1 + math.exp(-webapp.K_VALUTA * dv))
+        forte["stats"][tipo] = 4
+    dv = webapp.evo.forza(forte) - webapp.evo.forza(debole)
+    atteso = 1 / (1 + math.exp(-webapp.evo.K_FORZA * dv))
     vinte = sum(tq._vince_cpu(0, 1) == 0 for _ in range(4000)) / 4000
     assert abs(vinte - atteso) < 0.03 and vinte > 0.7, (vinte, atteso)  # la logistica, non va/(va+vb)
 
-    # ---- torneo: ogni CPU vincitrice cresce come il giocatore (statistica + equipaggiamento garantiti) ----
+    # ---- torneo: ogni CPU vincitrice cresce come il giocatore (controllo, un miglioramento e un impianto) ----
     random.seed(21)
-    tu = webapp.TorneoEvo()
-
-    def n_oggetti(x):
-        return len(x.protesi_equip) + len(x.augments)
-    for e_cpu in [x for i, x in enumerate(tu.eroi) if i != tu.io][:6]:
-        stat0, ogg0 = sum(e_cpu.stats[s] for s in tu.STATS_POTENZIABILI), n_oggetti(e_cpu)
-        tu._evolvi_cpu(e_cpu, 2)
-        assert sum(e_cpu.stats[s] for s in tu.STATS_POTENZIABILI) == stat0 + 1, "un upgrade di statistica"
-        assert n_oggetti(e_cpu) == ogg0 + 1, "un oggetto di equipaggiamento, sempre"
-        assert e_cpu.upgrade_torneo[-1]["novita"], "la storia degli upgrade e' tenuta"
+    tu = webapp.evo.Corsa(0)
+    for rec_cpu in [x for i, x in enumerate(tu.eroi) if i != tu.candidati[0]][:6]:
+        f0, c0, n_imp0 = webapp.evo.forza(rec_cpu), rec_cpu["stats"]["controllo"], len(rec_cpu["protesi"]) + len(rec_cpu["augments"])
+        webapp.evo.evolvi_cpu(rec_cpu, 2)
+        assert rec_cpu["stats"]["controllo"] == c0 + 1 and webapp.evo.forza(rec_cpu) > f0
+        assert rec_cpu["storia"][-1]["novita"], "la storia dei miglioramenti e' tenuta"
+    tu.scegli_campione(tu.candidati[0])
+    while tu.fase == "bottino":
+        tu.scegli_carta(0)
     tu.fase = "duello"
     tu.risolvi_duello(True)
     vincitori_cpu = [m["win"] for m in tu.turni[0] if m["win"] != tu.io]
-    assert vincitori_cpu and all(n_oggetti(tu.eroi[i]) >= 1 and tu.eroi[i].upgrade_torneo for i in vincitori_cpu)
+    assert vincitori_cpu and all(tu.eroi[i]["storia"] for i in vincitori_cpu)
     avv_i = tu.avversario_idx()
-    tu.fase = "pronto"
-    assert tu.stato()["avversario_upgrade"] == tu.eroi[avv_i].upgrade_torneo   # il giocatore vede cosa ha preso
+    tu.fase = "bracket"
+    assert tu.stato()["avversario"]["storia"] == tu.eroi[avv_i]["storia"][-5:]   # il giocatore vede cosa ha preso
 
     # ---- tattiche: registro degli incontri e modello appreso (tattiche.py) ----
     import tattiche as tt
@@ -1917,11 +1844,11 @@ def overhaul(webapp):
     stato_asp = d_asp.stato()
     assert stato_asp["player"]["aspetto"] == rec_a["aspetto"] and stato_asp["cpu"]["aspetto"] == d_asp.cpu.aspetto
     assert asp.valido(webapp.record_to_pg(dict(rec_a, aspetto=None)).aspetto)   # un record senza aspetto non rompe il duello
-    # torneo: 16 eroi, tutti con un aspetto valido e una combinazione diversa; il campione se lo porta nel box
-    tasp = webapp.TorneoEvo()
-    assert len({asp.combinazione(e.aspetto) for e in tasp.eroi}) == 16
-    assert all(asp.valido(e.aspetto) and tag[e.aspetto["capelli"]] == asp.sesso_da_nome(e.nome) for e in tasp.eroi)
-    assert webapp.nuovo_record(tasp.eroi[0])["aspetto"] == tasp.eroi[0].aspetto
+    # torneo: 16 eroi, tutti con un aspetto valido e una combinazione diversa
+    tasp = webapp.evo.Corsa(0)
+    assert len({asp.combinazione(e["aspetto"]) for e in tasp.eroi}) == 16
+    assert all(asp.valido(e["aspetto"]) and tag[e["aspetto"]["capelli"]] == asp.sesso_da_nome(e["nome"]) for e in tasp.eroi)
+    assert webapp.evo.crea_pg(tasp.eroi[0]).aspetto == tasp.eroi[0]["aspetto"]      # e il combattente se lo porta nel duello
 
     # ---- texture delle ferite (tipo di danno per locazione) e extra (ali, braccia, volo) nel pannello ----
     from engine import Personaggio as _P
@@ -2019,7 +1946,12 @@ def overhaul(webapp):
     assert d_ev.eventi[-1]["tipo"] == "potere" and d_ev.eventi[-1]["poteri"] == [1]
     lama = next(a for a in ev_a.attacchi if a["nome"] == "Braccio Lama")
     sdef = next(s for s in ev_a.stance_conosciute if s["nome"] == "Paladino")
-    d_ev.usa_stance(ev_a, sdef, ev_d)
+    for _ in range(40):          # (la stance e' una prova contrapposta: si ritenta finche' prende)
+        ev_a.azioni, ev_a.bonus = 3, 2
+        ev_a.stance_stato.clear()
+        d_ev.usa_stance(ev_a, sdef, ev_d)
+        if any(x["def"]["id"] == sdef["id"] for x in ev_a.stance_attive):
+            break
     ev_st = d_ev.eventi[-1]
     assert ev_st["tipo"] == "stance" and ev_st["poteri"] == [1], "Paladino e' di Pelle Invincibile"
     pugno = next(a for a in ev_a.attacchi if a["nome"] == "Pugno")
@@ -2030,11 +1962,8 @@ def overhaul(webapp):
     ev_a.azioni = 2
     d_ev.usa_attacco(pugno)
     assert [e for e in d_ev.eventi if e["tipo"] == "colpo"][-1]["poteri"] == [], "il Pugno e' di tutti: nessun potere"
-    # il torneo cura tutto (anche la memoria dei tipi di danno)
-    tcura = webapp.TorneoEvo()
-    tcura.eroi[0].applica_danno("busto", 30, "fuoco")
-    tcura._cura_totale(tcura.eroi[0])
-    assert tcura.eroi[0].danni_tipo == {}
+    # ogni duello del torneo parte da un Personaggio nuovo (la memoria dei tipi di danno e' vuota)
+    assert webapp.evo.crea_pg(webapp.evo.Corsa(0).eroi[0]).danni_tipo == {}
     # i vestiti nuovi: 33 maglie (10 cyberpunk) e 23 pantaloni, e un aspetto puo' sceglierli
     assert len(man_asp["maglie"]) == 44 and len(man_asp["pantaloni"]) == 23 and "ali" in man_asp
     cyber = {"led", "tattico", "impermeabile", "circuiti", "spallacci", "cromato", "rete", "tuta", "borchie", "olo"}

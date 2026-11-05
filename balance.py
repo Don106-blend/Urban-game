@@ -8,7 +8,9 @@ metriche M1-M10 di OVERHAUL_GAMEPLAY.md §3 con la fascia di accettazione e PASS
     python balance.py equip       # M5: ogni oggetto contro un eroe nudo, ranghi pari
     python balance.py poteri      # M6: round-robin dei poteri (--rango 1..4, --solo "Nome", --matrice)
     python balance.py matchmaking # M9: eroe di livello L senza equip contro la CPU di pari livello
-    python balance.py torneo      # tornei Evo interi con draft a caso: robustezza e % di vittoria
+    python balance.py torneo      # corse intere del Torneo Evo (draft a caso e giocatore furbo): robustezza e % di titoli
+    python balance.py mutazioni   # quanto vale ogni mutazione del Torneo Evo (eroe con contro il gemello senza)
+    python balance.py carte       # ...e ogni altra carta del bottino: statistiche, ranghi, poteri nuovi, impianti
     python balance.py fuzz        # M10: duelli casuali, nessuna eccezione, nessun duello infinito
     python balance.py azzardo     # Z1-Z7: il Banco (azzardi, folla, quote, clausole), v. AZZARDO.md
     python balance.py tutto       # tutto quanto sopra
@@ -24,6 +26,7 @@ Nessuna dipendenza esterna: multiprocessing della libreria standard.
 import argparse
 import atexit
 import copy
+import math
 import os
 import random
 import shutil
@@ -52,7 +55,7 @@ import engine as E  # noqa: E402
 
 
 _COST_ORIG = {}   # (nome modulo, costante) -> valore originale
-_MODULI = {"engine": E, "app": app}
+_MODULI = {"engine": E, "app": app, "evo": app.evo}
 WHAT_IF = os.environ.get("BALANCE_SET", "")   # propagato a ogni lavoro (vedi partite)
 # chiavi speciali: {id attacco: valore} -> campo dell'attacco ("danno" = danno.flat)
 CAMPI_ATT = {"DANNO_ATT": "danno", "CD_ATT": "cooldown_turni", "COSTO_ATT": "costo_azioni",
@@ -662,75 +665,325 @@ def m_fuzz(es, a, rep):
         print(esempi[firma])
 
 
+# quanto vale una carta per chi gioca i duelli con l'IA (balance.py carte e mutazioni): le mutazioni e le protesi, i riflessi; un potere nuovo o un rango
+# in piu' li brucia in azioni e stamina (e' per questo che il bot 'furbo' non e' un giocatore vero: un umano i poteri li sa usare)
+VALORE_CARTA = {"mutazione:leggendaria": 25, "mutazione:rara": 13, "mutazione:maledetta": 10, "mutazione:comune": 6, "protesi": 7, "augment": 1,
+                "stat:riflessi": 10, "stat": 1, "potere": -10, "rango": -6}
+
+
+def _voto_carta(t, c):
+    d = t.descrivi(c)
+    if d["tipo"] == "mutazione":
+        return VALORE_CARTA[f"mutazione:{d['rarita']}"]
+    if d["tipo"] == "equip":
+        return VALORE_CARTA[c["cat"]]
+    if d["tipo"] == "stat":
+        return VALORE_CARTA.get("stat:" + c["stat"], VALORE_CARTA["stat"])
+    return VALORE_CARTA[d["tipo"]]
+
+
+def _gioca_duello_evo(t):
+    """Il duello della fase corrente (bracket o sparring): il giocatore e' pilotato dalla stessa IA della CPU."""
+    eroe, nemico, _regola = t.prepara_duello()
+    d = app.DuelloWeb(pg=eroe, avversario=nemico, torneo=t)
+    while not d.finito and d.round < CAP_ROUND:
+        if d.fase == "risposta":
+            difendi(d)
+        elif d.fase in ("player", "cpu"):
+            d.cpu_step()
+        else:
+            break
+    infinito = not d.finito
+    if infinito:       # duello infinito = sconfitta (e lo segnaliamo)
+        d.finito, d.vincitore = True, d.cpu
+    t.risolvi_duello(d.vincitore is d.p, d)
+    return infinito
+
+
+def _scelte_evo(t, politica):
+    """Una mossa del giocatore nelle fasi che non sono duelli. 'caso' sceglie sempre a caso; 'furbo' gioca come un buon giocatore:
+    la carta di maggior valore, riposo quando serve, il mercato per mutazioni e impianti, mai uno sparring da sfavorito."""
+    furbo = politica == "furbo"
+    E_ = app.evo
+    eroe = t.eroe() if t.io is not None else None
+    f = t.fase
+    if f == "campioni":
+        i = max(t.candidati, key=lambda k: E_.forza(t.eroi[k])) if furbo else random.choice(t.candidati)
+        t.scegli_campione(i)
+    elif f == "bottino":
+        carte = t.bottino["carte"]
+        if furbo and max(_voto_carta(t, c) for c in carte) <= 6 and t.gettoni >= 6 and t.bottino["rilanci"] == 0 and t.bottino["tipo"] != "elite":
+            t.rilancia()
+            carte = t.bottino["carte"]
+        t.scegli_carta(max(range(len(carte)), key=lambda i: _voto_carta(t, carte[i])) if furbo else random.randrange(len(carte)))
+    elif f == "porte":
+        porte = t.porte
+        tipi = [p["tipo"] for p in porte]
+        if not furbo:
+            t.scegli_porta(random.randrange(len(porte)))
+            return
+        frac = E_.salute(eroe)[0]
+
+        def voto(p):
+            k = p["tipo"]
+            if k == "riposo":
+                return 10 if frac < 0.6 else 2
+            if k == "sparring":
+                return 8 if frac >= 0.8 and E_.prob_vittoria(eroe, p["rec"]) >= 0.4 else 0
+            return {"allenamento": 7, "mercato": 6 if t.gettoni >= 8 else 3, "evento": 5}[k]
+        t.scegli_porta(max(range(len(porte)), key=lambda i: voto(porte[i])))
+    elif f == "mercato":
+        offerte = t.mercato["offerte"]
+        if furbo:
+            frac = E_.salute(eroe)[0]
+            def voto(o):
+                if o["tipo"] == "medikit":
+                    return 9 if frac < 0.5 else -1
+                if o["tipo"] == "mutazione":
+                    return {"leggendaria": 10, "rara": 8, "comune": 4, "maledetta": 5}[E_.MUTAZIONI[o["id"]]["rarita"]]
+                return 7 if o["cat"] == "protesi" else 2
+            for i in sorted(range(len(offerte)), key=lambda i: -voto(offerte[i])):
+                if voto(offerte[i]) > 0:
+                    t.compra(i)
+        else:
+            for i in random.sample(range(len(offerte)), len(offerte)):
+                if random.random() < 0.5:
+                    t.compra(i)
+        t.esci_mercato()
+    elif f == "allenamento":
+        opz = t.allenamento["opzioni"]
+        ranghi = [i for i, o in enumerate(opz) if o["tipo"] == "rango"]
+        t.allena((random.choice(ranghi) if ranghi else 0) if furbo else random.randrange(len(opz)))
+    elif f == "evento":
+        if t.evento["esito"] is None:
+            ok = [i for i, s in enumerate(t.evento["scelte"]) if t.gettoni >= s["costo"]]
+            t.scegli_evento(ok[0] if furbo else random.choice(ok))
+        else:
+            t.chiudi_evento()
+    else:
+        raise RuntimeError(f"fase torneo inattesa: {f}")
+
+
 def _lavoro_torneo(args):
-    """Un lotto di tornei interi: il giocatore pilotato dalla stessa IA della CPU, scelte del
-    draft (potere, statistica, oggetto) a caso. Ritorna (vinti, eccezioni, round superati)."""
-    n, seed = args
+    """Un lotto di corse intere del Torneo Evo con una politica ('caso' o 'furbo') e un'ascensione. Ritorna un dizionario di misure."""
+    n, seed, politica, asc = args
     applica_what_if(WHAT_IF)
     random.seed(seed)
     profilo_neutro()
-    vinti, eccezioni, superati = 0, Counter(), []
+    app.evo.PERCORSO = None
+    out = {"corse": 0, "titoli": 0, "eccezioni": Counter(), "round": [], "sparring": [0, 0], "mutazioni": [], "gettoni": []}
     for _ in range(n):
         try:
-            t = app.TorneoEvo()
+            t = app.evo.Corsa(asc)
             app.TORNEO = t
-            t.fase = "pronto"
-            giro = 0
+            passi = 0
             while t.fase not in ("vittoria", "eliminato"):
-                if t.fase == "pronto":
-                    avv = t.eroi[t.avversario_idx()]
-                    d = app.DuelloWeb(pg=t.eroi[t.io], avversario=avv, torneo=t)
-                    while not d.finito and d.round < CAP_ROUND:
-                        if d.fase == "risposta":
-                            difendi(d)
-                        elif d.fase in ("player", "cpu"):
-                            d.cpu_step()
-                        else:
-                            break
-                    if not d.finito:       # duello infinito = sconfitta (e lo segnaliamo)
-                        eccezioni["duello infinito nel torneo"] += 1
-                        d.finito, d.vincitore = True, d.cpu
-                    t.risolvi_duello(d.vincitore is d.p, d)
-                    giro += 1
-                elif t.fase == "risultato":
-                    pw = random.choice(t.scelte["poteri"])
-                    stat = random.choice(t.scelte["stats"]) if t.scelte["stats"] else None
-                    t.scegli(pw["id"], stat)
-                elif t.fase == "oggetto":
-                    cat, it = random.choice(t.scelte_item)
-                    t.scegli_item(cat, it["id"])
+                passi += 1
+                if passi > 200:
+                    raise RuntimeError(f"corsa bloccata in {t.fase}")
+                if t.fase in ("bracket", "sparring"):
+                    sparring = t.fase == "sparring"
+                    prima = t.conta["sparring"]
+                    if _gioca_duello_evo(t):
+                        out["eccezioni"]["duello infinito nel torneo"] += 1
+                    if sparring:
+                        out["sparring"][0] += t.conta["sparring"] > prima
+                        out["sparring"][1] += 1
                 else:
-                    raise RuntimeError(f"fase torneo inattesa: {t.fase}")
-            vinti += t.fase == "vittoria"
-            superati.append(giro)
+                    _scelte_evo(t, politica)
+            out["corse"] += 1
+            out["titoli"] += t.fase == "vittoria"
+            out["round"].append(t.conta["vittorie"])
+            out["mutazioni"].append(len(t.eroe()["mutazioni"]))
+            out["gettoni"].append(t.gettoni)
         except Exception as ex:  # noqa: BLE001
             tb = traceback.extract_tb(ex.__traceback__)[-1]
-            eccezioni[f"{type(ex).__name__}: {ex} @ {os.path.basename(tb.filename)}:{tb.lineno}"] += 1
+            out["eccezioni"][f"{type(ex).__name__}: {ex} @ {os.path.basename(tb.filename)}:{tb.lineno}"] += 1
     app.TORNEO = None
-    return vinti, eccezioni, superati
+    return out
 
 
 def m_torneo(es, a, rep):
-    print("\n[Torneo Evo] tornei interi, draft a caso (attesa: 1/16 = 6,25% di vincerlo)")
+    print("\n[Torneo Evo] corse intere: draft a caso (atteso ~1/16 = 6%) e giocatore furbo")
     blocchi = es.jobs * 2
-    per = max(10, a.n // blocchi // 4)
-    ris = es.mappa(_lavoro_torneo, [(per, a.seed * 13 + i) for i in range(blocchi)])
-    vinti = sum(r[0] for r in ris)
-    eccez = Counter()
-    giri = []
-    for r in ris:
-        eccez.update(r[1])
-        giri += r[2]
-    tot = per * blocchi
-    v = 100.0 * vinti / tot
-    rep.riga("T", f"vittoria del torneo ({tot} tornei)", f"{v:.1f}%", "3-12% (attesa ~6%)",
-             _entro(v, 3, 12))
-    rep.riga("T", "eccezioni / duelli infiniti nei tornei", str(sum(eccez.values())), "0",
-             sum(eccez.values()) == 0)
-    if giri:
-        rep.info(f"round giocati in media {statistics.mean(giri):.2f} su 4")
-    for firma, c in eccez.most_common(5):
-        rep.info(f"{c}x {firma}")
+    per = max(10, a.n // blocchi // 8)
+    tot_ecc = 0
+    for politica, fascia, nome in (("caso", (4, 14), "scelte a caso"), ("furbo", (15, 45), "scelte da giocatore furbo")):
+        ris = es.mappa(_lavoro_torneo, [(per, a.seed * 13 + i, politica, 0) for i in range(blocchi)])
+        corse = sum(r["corse"] for r in ris)
+        titoli = sum(r["titoli"] for r in ris)
+        ecc = Counter()
+        for r in ris:
+            ecc.update(r["eccezioni"])
+        tot_ecc += sum(ecc.values())
+        v = 100.0 * titoli / max(1, corse)
+        rep.riga("T", f"titolo del Torneo Evo, {nome} ({corse} corse)", f"{v:.1f}%", f"{fascia[0]}-{fascia[1]}%", _entro(v, *fascia))
+        vittorie = [x for r in ris for x in r["round"]]
+        if vittorie:
+            rep.info(f"{nome}: vittorie per corsa in media {statistics.mean(vittorie):.2f} su 4; "
+                     f"mutazioni a fine corsa {statistics.mean(x for r in ris for x in r['mutazioni']):.1f}; "
+                     f"gettoni avanzati {statistics.mean(x for r in ris for x in r['gettoni']):.1f}")
+        sp = [sum(r["sparring"][0] for r in ris), sum(r["sparring"][1] for r in ris)]
+        if sp[1]:
+            rep.info(f"{nome}: sparring d'elite giocati {sp[1]}, vinti {100.0 * sp[0] / sp[1]:.0f}%")
+        for firma, c in ecc.most_common(5):
+            rep.info(f"{c}x {firma}")
+    rep.riga("T", "eccezioni / duelli infiniti nel torneo", str(tot_ecc), "0", tot_ecc == 0)
+
+
+# fasce di vittoria (%) di un eroe con UNA mutazione contro il suo gemello senza: quanto vale per rarita'
+FASCE_MUTAZIONI = {"comune": (51, 63), "rara": (55, 75), "leggendaria": (65, 82), "maledetta": (54, 72)}
+
+
+def _rec_evo_casuale():
+    """Un combattente del Torneo Evo a meta' corsa: eroe base con 1-3 miglioramenti (senza mutazioni)."""
+    ev = app.evo
+    p = E.eroe_base(app.DB["attacchi"], app.DB["poteri"], app.DB["stances"], ())
+    rec = ev.rec_da_pg(p, app.aspetto.genera(p.nome))
+    for g in range(random.choice((1, 2, 3))):
+        ev.evolvi_cpu(rec, g + 2, giro=0)
+    return rec
+
+
+def _lavoro_mutazioni(args):
+    """Per ogni mutazione: n duelli tra due gemelli (stessa scheda), uno con la mutazione. Ritorna {id: vittorie del mutato}."""
+    mids, n, seed = args
+    applica_what_if(WHAT_IF)
+    profilo_neutro()
+    app.evo.PERCORSO = None
+    ev = app.evo
+    out = {}
+    for mid in mids:
+        vinti = 0
+        for k in range(n):
+            random.seed(seed * 100003 + k)              # lo stesso eroe e gli stessi dadi per ogni mutazione (e per il controllo): il confronto e' alla pari
+            base = _rec_evo_casuale()
+            random.seed(seed * 7919 + k + 1)
+            a, b = copy.deepcopy(base), copy.deepcopy(base)
+            a["nome"], b["nome"] = "Mutato", "Gemello"
+            if mid:
+                ev.dai_mutazione(a, mid)
+            d = app.DuelloWeb(pg=ev.crea_pg(a), avversario=ev.crea_pg(b))
+            while not d.finito and d.round < CAP_ROUND:
+                if d.fase == "risposta":
+                    difendi(d)
+                elif d.fase in ("player", "cpu"):
+                    d.cpu_step()
+                else:
+                    break
+            vinti += d.vincitore is d.p
+        out[mid] = vinti
+    return out
+
+
+def m_mutazioni(es, a, rep):
+    ev = app.evo
+    print("\n[Mutazioni] eroe con una mutazione contro il suo gemello senza (a parita' di tutto il resto)")
+    mids = [None] + [m for m, d in ev.MUTAZIONI.items() if not d.get("corsa") or any(o["op"] != "corsa" for o in d["ops"])]
+    n = max(1000, a.n // 4)        # (sotto i 1000 duelli per mutazione la misura balla di troppo)
+    lotti = [(mids[i::es.jobs * 2], n, a.seed) for i in range(es.jobs * 2)]
+    vinti = Counter()
+    for r in es.mappa(_lavoro_mutazioni, lotti):
+        vinti.update(r)
+    base = 100.0 * vinti[None] / n
+    rep.riga("MU", "controllo: due gemelli senza mutazioni", f"{base:.1f}%", "45-55%", _entro(base, 45, 55))
+    for mid in mids[1:]:
+        m = ev.MUTAZIONI[mid]
+        v = 100.0 * vinti[mid] / n - (base - 50)       # (la sede 'player' vince un po' di piu': si toglie)
+        lo, hi = FASCE_MUTAZIONI[m["rarita"]]
+        punti = math.log(max(0.01, v) / max(0.01, 100 - v)) / ev.K_FORZA
+        if any(o["op"] == "corsa" for o in m["ops"]):       # vale anche (o soprattutto) fuori dal duello: gettoni, recupero, sconti
+            rep.info(f"{m['nome']} ({m['rarita']}): {v:.1f}% in duello, ~{punti:+.0f} forza (il resto e' nella corsa)")
+            continue
+        rep.riga("MU", f"{m['nome']} ({m['rarita']})", f"{v:.1f}%  ~{punti:+.0f} forza", f"{lo}-{hi}%", _entro(v, lo, hi))
+
+
+def _rec_carte():
+    """Un combattente del Torneo Evo dopo un paio di vittorie: un potere al rango 2, controllo 3, due miglioramenti di statistica."""
+    ev = app.evo
+    p = E.eroe_base(app.DB["attacchi"], app.DB["poteri"], app.DB["stances"], ())
+    rec = ev.rec_da_pg(p, app.aspetto.genera(p.nome))
+    rec["stats"]["controllo"] = 3
+    rec["poteri"][0]["rango"] = 2
+    for _ in range(2):
+        s_ = random.choice(ev.stat_su(rec))
+        rec["stats"][s_] += 1
+    return rec
+
+
+def _specifiche_carte():
+    """Le carte da misurare: +1 a ogni statistica, un rango in piu', ogni potere come nuovo (rango 2), ogni impianto."""
+    ev = app.evo
+    out = [("stat " + s, {"tipo": "stat", "stat": s}) for s in ev.STAT_POT]
+    out.append(("rango +1 al potere", {"tipo": "rango"}))
+    out += [("potere " + p["nome"], {"tipo": "potere", "id": p["id"], "rango": 2}) for p in app.DB["poteri"]]
+    out += [("protesi " + x["nome"], {"tipo": "equip", "cat": "protesi", "id": x["id"]}) for x in app.DB["protesi"]]
+    out += [("augment " + x["nome"], {"tipo": "equip", "cat": "augment", "id": x["id"]}) for x in app.DB["augments"]]
+    return out
+
+
+def _lavoro_carte(args):
+    """Per ogni carta: n duelli tra due gemelli (stessa scheda, stessi dadi), uno con la carta. Ritorna {nome: [vinti, validi]}."""
+    specs, n, seed = args
+    applica_what_if(WHAT_IF)
+    profilo_neutro()
+    app.evo.PERCORSO = None
+    ev = app.evo
+    out = {}
+    for nome, spec in specs:
+        vinti = validi = 0
+        for k in range(n):
+            random.seed(seed * 100003 + k)
+            base = _rec_carte()
+            a, b = copy.deepcopy(base), copy.deepcopy(base)
+            a["nome"], b["nome"] = "Mutato", "Gemello"
+            carta = dict(spec)
+            if carta["tipo"] == "rango":
+                carta["id"] = a["poteri"][0]["id"]
+            elif carta["tipo"] == "potere" and (carta["id"] in {p["id"] for p in a["poteri"]} or len(a["poteri"]) >= E.MAX_POTERI):
+                continue
+            elif carta["tipo"] == "stat" and a["stats"][carta["stat"]] >= 4:
+                continue
+            elif carta["tipo"] == "equip" and not app._controlla_equip(a, carta["cat"], ev._def_item(carta["cat"], carta["id"]), False)[0]:
+                continue
+            ev.applica_carta(a, carta)
+            random.seed(seed * 7919 + k + 1)
+            d = app.DuelloWeb(pg=ev.crea_pg(a), avversario=ev.crea_pg(b))
+            while not d.finito and d.round < CAP_ROUND:
+                if d.fase == "risposta":
+                    difendi(d)
+                elif d.fase in ("player", "cpu"):
+                    d.cpu_step()
+                else:
+                    break
+            validi += 1
+            vinti += d.vincitore is d.p
+        out[nome] = [vinti, validi]
+    return out
+
+
+def m_carte(es, a, rep):
+    ev = app.evo
+    print("\n[Carte del Torneo Evo] eroe con la carta contro il suo gemello senza (info: serve a tarare forza() e il bot 'furbo')")
+    specs = _specifiche_carte()
+    n = max(40, a.n // 8)
+    lotti = [(specs[i::es.jobs * 2], n, a.seed) for i in range(es.jobs * 2)]
+    ris = {}
+    for r in es.mappa(_lavoro_carte, lotti):
+        ris.update(r)
+    righe = []
+    for nome, (vinti, validi) in ris.items():
+        if validi < 10:
+            continue
+        v = 100.0 * vinti / validi - 3.0           # (la sede 'player' vince ~3 punti in piu')
+        righe.append((v, nome, validi))
+    tipi = {}
+    for v, nome, validi in sorted(righe, reverse=True):
+        punti = math.log(max(0.01, v) / max(0.01, 100 - v)) / ev.K_FORZA
+        rep.info(f"{v:5.1f}%  {punti:+5.0f} forza  {nome} (n={validi})")
+        tipi.setdefault(nome.split()[0], []).append(punti)
+    for t, xs in tipi.items():
+        rep.info(f"MEDIA {t}: {statistics.mean(xs):+.1f} forza su {len(xs)} carte")
 
 
 # ------------------------------------------------------------------ il Banco (AZZARDO.md)
@@ -962,7 +1215,7 @@ def _lavoro_fuzz_azzardo(args):
 COMANDI = {"lunghezza": m_lunghezza, "ladder": m_ladder, "mira": m_mira,
            "decisioni": m_decisioni, "equip": m_equip,
            "poteri": m_poteri, "matchmaking": m_matchmaking, "torneo": m_torneo, "fuzz": m_fuzz,
-           "azzardo": m_azzardo}
+           "azzardo": m_azzardo, "mutazioni": m_mutazioni, "carte": m_carte}
 
 
 def main():

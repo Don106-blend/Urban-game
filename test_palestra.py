@@ -638,17 +638,29 @@ def main():
     # ============================================================ il Torneo Evo e' a parte: nessun premio
     nuova_partita()
     S["crediti"] = 777
-    t = webapp.TorneoEvo()
-    t.bonus_accumulato = 321
+    t = webapp.evo.Corsa(0)
     n_pers = len(S["personaggi"])
-    for _ in range(4):
-        t.fase = "duello"
-        t.risolvi_duello(True)
-        if t.fase == "risultato":
-            t.scegli(t.scelte["poteri"][0]["id"], t.scelte["stats"][0] if t.scelte["stats"] else None)
+    t.scegli_campione(t.candidati[0])
+    for _ in range(200):          # il pilota automatico: prima carta, prima porta, si vince ogni duello
+        if t.fase in ("vittoria", "eliminato"):
+            break
+        if t.fase in ("bracket", "sparring"):
+            t.duello_tipo = "sparring" if t.fase == "sparring" else "torneo"
+            t.fase = "duello"
+            t.risolvi_duello(True)
+        elif t.fase == "bottino":
+            t.scegli_carta(0)
+        elif t.fase == "porte":
+            t.scegli_porta(0)
+        elif t.fase == "mercato":
+            t.esci_mercato()
+        elif t.fase == "allenamento":
+            t.allena(0)
+        elif t.fase == "evento":
+            t.scegli_evento(len(t.evento["scelte"]) - 1) if t.evento["esito"] is None else t.chiudi_evento()
     ok(t.fase == "vittoria", t.fase)
     ok(len(S["personaggi"]) == n_pers, "il campione non entra in palestra")
-    ok(S["crediti"] == 777, "e il montepremi non e' denaro vero")
+    ok(S["crediti"] == 777, "e i gettoni non sono denaro vero")
     ok(client.get("/api/torneo/stato").status_code == 200, "stato del torneo")
 
     # ============================================================ un salvataggio vecchio si porta al nuovo formato

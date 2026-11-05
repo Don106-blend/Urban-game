@@ -3,5 +3,6 @@
 {% block nav_mode %}completa{% endblock %}
 {% block content %}
 <div id="evo-app"></div>
-<script src="{{ url_for('static', filename='torneo.js') }}"></script>
+<script src="{{ url_for('static', filename='arena.js') }}"></script>
+<script src="{{ url_for('static', filename='torneo.js') }}?v={{ asset_v }}"></script>
 {% endblock %}

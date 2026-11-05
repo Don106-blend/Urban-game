@@ -11,7 +11,8 @@
    Sono animazioni a pixel come il resto: pochi colori, luce additiva per il fuoco, niente antialiasing voluto. Le prime sono quelle di Pirocinesi
    (scintilla, palla di fuoco, lanciafiamme, eruzione), poi le Scheggie e la Scheggia di Ghiaccio, poi quelle di Idrocinesi (getto, onda anomala,
    maremoto) e di Super Forza (colpo devastante, ondata sismica, frana), poi Super Soldato (raffica controllata e tiro di precisione, con le armi in mano),
-   Necromanzia (tocco debilitante, dreno vitale, falce delle anime: fuoco verde) e Geocinesi (pugno di roccia). Gli sprite dell'onda, dei massi e delle
+   Necromanzia (tocco debilitante, dreno vitale, falce delle anime: fuoco verde), Geocinesi (pugno di roccia), Elettrocinesi (scarica elettrica, fulmine),
+   Appendici Affilate (artigli affilati, artigli sanguinari, braccio lama) e Anatema (affamare, affaticare, assorbi caratteristica: il dreno vitale, rosso). Gli sprite dell'onda, dei massi e delle
    armi: static/sprites/mosse (tools/sprites/mosse_sprite.px.js). */
 const Mosse = (() => {
   const lim = (x, a, b) => Math.min(b, Math.max(a, x));
@@ -720,12 +721,18 @@ const Mosse = (() => {
     }});
   }
 
-  /* dreno vitale: il braccio si tende, un filo di luce verde guizza dalla mano al bersaglio e da li' un flusso di fuoco verde viene risucchiato verso chi
-     lo usa: palline di fiamma che seguono un arco e svuotano chi e' afflitto. Parato: il flusso parte e si spegne a un quarto di strada; mancato: il filo
-     cerca e non trova niente. */
-  function dreno(ev, h) {
+  /* le palette del drenaggio: il verde della Necromanzia e il rosso di Anatema. Ognuna dice le fiamme (`cols`), la mano, il guizzo all'arrivo (`lampo`), il filo e le palline */
+  const ROSSO = ["#fff0e8", "#ffa090", "#ff4a3a", "#c01820", "#5a0a10"];
+  const PAL_VERDE = {cols: VERDE, mano: VERDE_MANO, lampo: ["#2ed45c", "#d8ffb0"], filo: ["#7dff78", "#e2ffc2"], mote: ["#35d65e", "#e2ffc2"]};
+  const PAL_ROSSO = {cols: ROSSO, mano: {cols: ROSSO, glow: ["#e02a2a", "#ffd0c0"]}, lampo: ["#e02a2a", "#ffd0c0"], filo: ["#ff6a60", "#ffd8d0"], mote: ["#ff3a3a", "#ffd0c0"]};
+
+  /* drenaggio (dreno vitale, assorbi caratteristica, affamare, affaticare): il braccio si tende, un filo di luce guizza dalla mano al bersaglio e da li' un
+     flusso di fuoco viene risucchiato verso chi lo usa: palline di fiamma che seguono un arco e svuotano chi e' afflitto. Parato: il flusso parte e si spegne
+     a un quarto di strada; mancato: il filo cerca e non trova niente. `inverso`: il flusso va dall'altra parte, e' chi lo usa che espelle (affamare e
+     affaticare: le palline partono dalla mano e vanno a riversarsi sul bersaglio). `P` = la palette (verde per la Necromanzia, rosso per Anatema). */
+  function drenaggio(ev, h, P = PAL_VERDE, inverso = false) {
     const DUR = 1.15, tFilo = 0.16, colpito = h.colpito, parato = h.parato;
-    fiammeMano(h, 0.5 + tFilo + DUR * 0.85, 1, ["dx"], VERDE_MANO);
+    fiammeMano(h, 0.5 + tFilo + DUR * 0.85, 1, ["dx"], P.mano);
     h.attacca({distanza: true, carica: 0.28, colpo: 0.12, tenuta: DUR + 0.25, recupero: 0.34, alFine: () => {},
       alColpoInizio() {
         const durata = tFilo + (colpito ? DUR : parato ? 0.45 : 0.3);
@@ -746,13 +753,13 @@ const Mosse = (() => {
             for (let i = mote.length - 1; i >= 0; i--) {
               const q = mote[i];
               q.t += dt;
-              const u = Math.pow(q.t / q.vita, 1.35), tope = parato ? 0.28 : 1;
-              q.p = bez(q.a, q.c, m, Math.min(1, u));
+              const u = Math.pow(q.t / q.vita, 1.35), tope = parato && !inverso ? 0.28 : 1;
+              q.p = inverso ? bez(m, q.c, q.a, Math.min(1, u)) : bez(q.a, q.c, m, Math.min(1, u));
               q.hist.push(q.p); if (q.hist.length > 5) q.hist.shift();
-              if (Math.random() < 0.5) fiamma(h, q.p[0], q.p[1], rnd(-8, 8), rnd(-18, -4), {g: -30, vita: rnd(0.18, 0.32), s: 1, cols: VERDE});
+              if (Math.random() < 0.5) fiamma(h, q.p[0], q.p[1], rnd(-8, 8), rnd(-18, -4), {g: -30, vita: rnd(0.18, 0.32), s: 1, cols: P.cols});
               if (u >= tope) {
-                if (u >= 1) lampo(m[0], m[1], 5, 0.18, "#2ed45c", "#d8ffb0");                    // arriva alla mano: un guizzo
-                else h.particella({x: q.p[0], y: q.p[1], vx: rnd(-30, 30), vy: rnd(-40, 0), g: 200, s: 1, vita: 0.2, fade: 0.1, cols: VERDE, luce: true, davanti: true});    // parato: si spegne
+                if (u >= 1) { const e = inverso ? q.a : m; lampo(e[0], e[1], 5, 0.18, P.lampo[0], P.lampo[1]); }       // arriva: un guizzo (alla mano se risucchia, sul bersaglio se espelle)
+                else h.particella({x: q.p[0], y: q.p[1], vx: rnd(-30, 30), vy: rnd(-40, 0), g: 200, s: 1, vita: 0.2, fade: 0.1, cols: P.cols, luce: true, davanti: true});    // parato: si spegne
                 mote.splice(i, 1);
               }
             }
@@ -764,24 +771,25 @@ const Mosse = (() => {
             ctx.globalCompositeOperation = "lighter";
             if (al > 0) for (let i = 0; i <= 26; i++) {
               const u = i / 26 * testa, x = m[0] + (a[0] - m[0]) * u, y = m[1] + (a[1] - m[1]) * u, w = Math.sin(u * 14 + t * 55) * 2.2 * Math.sin(u * 3.14);
-              ctx.globalAlpha = al; ctx.fillStyle = i % 3 ? "#7dff78" : "#e2ffc2";
+              ctx.globalAlpha = al; ctx.fillStyle = i % 3 ? P.filo[0] : P.filo[1];
               ctx.fillRect(Math.round(x), Math.round(y + w), 1, 1);
             }
             for (const q of mote) {
               if (!q.p) continue;
-              q.hist.forEach((p, i) => disco(ctx, p[0], p[1], 0.8 + 0.5 * i / q.hist.length, "#35d65e", 0.4 * (i + 1) / q.hist.length, true));
-              disco(ctx, q.p[0], q.p[1], 3.6, "#35d65e", 0.3, true); disco(ctx, q.p[0], q.p[1], 1.5, "#e2ffc2", 0.75, true);
+              q.hist.forEach((p, i) => disco(ctx, p[0], p[1], 0.8 + 0.5 * i / q.hist.length, P.mote[0], 0.4 * (i + 1) / q.hist.length, true));
+              disco(ctx, q.p[0], q.p[1], 3.6, P.mote[0], 0.3, true); disco(ctx, q.p[0], q.p[1], 1.5, P.mote[1], 0.75, true);
             }
             ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
           }});
         h.futuro(tFilo, () => {
           h.contatto(null);
-          if (colpito) bruciaCorpo(h, h.dif, DUR * 0.8, VERDE);
-          else if (parato) h.particella({x: h.bersaglio()[0], y: h.bersaglio()[1], vx: 0, vy: 0, s: 3, vita: 0.14, fade: 0.1, col: "#7dff78", luce: true, davanti: true});
+          if (colpito) bruciaCorpo(h, h.dif, DUR * 0.8, P.cols);
+          else if (parato) h.particella({x: h.bersaglio()[0], y: h.bersaglio()[1], vx: 0, vy: 0, s: 3, vita: 0.14, fade: 0.1, col: P.filo[0], luce: true, davanti: true});
           h.futuro(colpito ? DUR + 0.2 : 0.55, h.fine);
         });
       }});
   }
+  const dreno = (ev, h) => drenaggio(ev, h, PAL_VERDE, false);
 
   /* falce delle anime: nella mano destra compare una falce di fuoco verde, semitrasparente, che brucia lungo la lama; un fendente dall'alto, e al
      contatto la lama lascia nell'aria un arco di fuoco verde e dal colpito salgono anime. Poi la falce si dissolve in fiamme. */
@@ -844,6 +852,274 @@ const Mosse = (() => {
   }
 
   /* ---------------------------------------------------------------------------------------------------------------------------------- */
+  /* ELETTROCINESI E APPENDICI AFFILATE: scarica elettrica, fulmine, artigli affilati, artigli sanguinari, braccio lama */
+  const ELETTRO = ["#ffffff", "#fff6a0", "#ffe250", "#ffb020"];                       // le scintille elettriche: dal bianco al giallo-arancio
+  /* un rumore deterministico: i fulmini guizzano cambiando seme ogni tanto, non a ogni disegno (altrimenti tremolerebbero senza senso) */
+  const sr = (s, i) => { const x = Math.sin(s * 127.1 + i * 311.7) * 43758.5453; return x - Math.floor(x); };
+
+  /* la linea spezzata di un fulmine da (x0, y0) a (x1, y1): scarti di lato (`amp` px al massimo) che si spengono alle due estremita' */
+  function spezzata(x0, y0, x1, y1, amp, seme) {
+    const dx = x1 - x0, dy = y1 - y0, d = Math.hypot(dx, dy) || 1, n = Math.max(3, Math.round(d / 6)), ux = dx / d, uy = dy / d, pts = [[x0, y0]];
+    for (let i = 1; i < n; i++) {
+      const u = i / n, o = (sr(seme, i) - 0.5) * 2 * amp * Math.min(1, u * 5, (1 - u) * 5);
+      pts.push([x0 + dx * u - uy * o, y0 + dy * u + ux * o]);
+    }
+    pts.push([x1, y1]);
+    return pts;
+  }
+  function linea(ctx, x0, y0, x1, y1, w) {                           // una retta a pixel (Bresenham), spessa `w`
+    x0 = Math.round(x0); y0 = Math.round(y0); x1 = Math.round(x1); y1 = Math.round(y1);
+    const dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1, o = w >> 1;
+    let e = dx - dy;
+    for (let n = 0; n < 400; n++) {
+      ctx.fillRect(x0 - o, y0 - o, w, w);
+      if (x0 === x1 && y0 === y1) break;
+      const e2 = 2 * e;
+      if (e2 > -dy) { e -= dy; x0 += sx; }
+      if (e2 < dx) { e += dx; y0 += sy; }
+    }
+  }
+  function traccia(ctx, pts, w, col, a) {
+    ctx.globalAlpha = a; ctx.fillStyle = col;
+    for (let i = 0; i < pts.length - 1; i++) linea(ctx, pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1], w);
+  }
+  function disegnaFulmine(ctx, pts, w, a = 1) {                       // l'alone (additivo), il corpo giallo e l'anima bianca
+    ctx.globalCompositeOperation = "lighter";
+    traccia(ctx, pts, w + 4, "#ff9a20", 0.14 * a); traccia(ctx, pts, w + 2, "#ffd23a", 0.3 * a);
+    ctx.globalCompositeOperation = "source-over";
+    traccia(ctx, pts, w, "#fff27a", 0.95 * a); traccia(ctx, pts, Math.max(1, w - 2), "#ffffff", a);
+    ctx.globalAlpha = 1;
+  }
+  /* un fulmine vivo da `getA()` a `getB()` per `durata` secondi: parte dalla mano e arriva in `cresce` secondi, guizza (nuovo disegno ogni `ritmo`), con rami */
+  function fulmineVivo(getA, getB, durata, o = {}) {
+    const w = o.w ?? 2, amp = o.amp ?? 6, rami = o.rami ?? 2, cresce = o.cresce ?? 0.05, ritmo = o.ritmo ?? 0.04, dissolvi = o.dissolvi ?? 0.12, base = o.seme ?? 0;
+    fx.push({t: 0, passo(dt) { this.t += dt; return this.t < durata; },
+      disegna(ctx) {
+        const A = getA(), B = getB(), seme = Math.floor(this.t / ritmo) + base, u = lim(this.t / cresce, 0, 1), al = lim((durata - this.t) / dissolvi, 0, 1);
+        const E = [A[0] + (B[0] - A[0]) * u, A[1] + (B[1] - A[1]) * u], pts = spezzata(A[0], A[1], E[0], E[1], amp, seme);
+        disegnaFulmine(ctx, pts, w, al);
+        for (let k = 0; k < rami && pts.length > 3; k++) {              // i rami: brevi diramazioni da punti a caso
+          const i = 1 + Math.floor(sr(seme, 50 + k) * (pts.length - 2)), p = pts[i], q = pts[i + 1];
+          const an = Math.atan2(q[1] - p[1], q[0] - p[0]) + (sr(seme, 60 + k) < 0.5 ? -1 : 1) * (0.5 + 0.9 * sr(seme, 70 + k)), L = 9 + 14 * sr(seme, 80 + k);
+          disegnaFulmine(ctx, spezzata(p[0], p[1], p[0] + Math.cos(an) * L, p[1] + Math.sin(an) * L, 2.5, seme + k), 1, al * 0.9);
+        }
+      }});
+  }
+  function scint(h, x, y, vx, vy, o = {}) {                           // una scintilla elettrica
+    h.particella({x, y, vx, vy, g: o.g ?? 0, attrito: o.attrito ?? 3, s: o.s ?? 1, vita: o.vita ?? rnd(0.08, 0.2), fade: 0.06, cols: ELETTRO, luce: true, davanti: true});
+  }
+  function raggiera(h, x, y, n, forza = 1) {                          // una raggiera di scintille e il bagliore: dove cade una scarica
+    for (let i = 0; i < n; i++) { const a = rnd(0, 6.2832), v = rnd(50, 200) * forza; scint(h, x, y, Math.cos(a) * v, Math.sin(a) * v - 20, {s: Math.random() < 0.3 ? 2 : 1, vita: rnd(0.1, 0.28), g: 300}); }
+    lampo(x, y, 8 * forza + 3, 0.18, "#ffd23a", "#ffffff");
+  }
+  /* la mano di chi lancia elettricita' crepita: scintille e un bagliore finche' dura la mossa */
+  function scintilleMano(h, durata, forza = 1, lati = ["dx"]) {
+    emettitore(durata, (dt, t) => {
+      const f = lim((durata - t) / 0.3, 0, 1) * lim(t / 0.1, 0, 1) * forza;
+      for (const l of lati) { const m = h.mano(l); if (Math.random() < 0.8 * f) scint(h, m[0] + rnd(-2, 2), m[1] + rnd(-2, 2), rnd(-40, 40), rnd(-50, 10), {vita: rnd(0.1, 0.22)}); }
+    }, (ctx, t) => {
+      const f = lim((durata - t) / 0.3, 0, 1) * lim(t / 0.1, 0, 1) * forza, seme = Math.floor(t / 0.05);
+      ctx.globalCompositeOperation = "source-over";
+      for (const [i, l] of lati.entries()) {
+        const m = h.mano(l);
+        disco(ctx, m[0], m[1], 5 + Math.sin(t * 50), "#ffd23a", 0.25 * f, true); disco(ctx, m[0], m[1], 2.4, "#ffffff", 0.4 * f, true);
+        for (let j = 0; j < 2; j++) { const an = sr(seme, i * 5 + j) * 6.2832; if (sr(seme, i * 5 + j + 20) < 0.75 * f) disegnaFulmine(ctx, spezzata(m[0], m[1], m[0] + Math.cos(an) * 8, m[1] + Math.sin(an) * 8, 1.5, seme + j), 1, f); }
+      }
+    });
+  }
+  /* il corpo di chi e' colpito e' attraversato dalla corrente: archi corti e un bagliore sui pezzi indicati (di norma tutto il corpo) */
+  function elettrizza(h, L, durata, pezzi) {
+    pezzi = pezzi || ["testa", "busto_sup", "busto_inf", "avambraccio_dx", "avambraccio_sx", "coscia_dx", "coscia_sx", "stinco_dx", "stinco_sx"];
+    const centro = (nome) => { const b = h.pose(L, nome); return h.aMondo(L, [b[0], b[1]]); };
+    fx.push({t: 0, passo(dt) { this.t += dt; return this.t < durata; },
+      disegna(ctx) {
+        const k = lim((durata - this.t) / 0.25, 0, 1) * lim(this.t / 0.05, 0, 1), seme = Math.floor(this.t / 0.05);
+        pezzi.forEach((nome, i) => {
+          const c = centro(nome);
+          disco(ctx, c[0], c[1], 7, "#ffd23a", 0.15 * k, true);
+          for (let j = 0; j < 2; j++) {
+            const a = sr(seme, i * 7 + j) * 6.2832, a2 = a + (sr(seme, i * 7 + j + 5) - 0.5) * 1.6, r = 6 + 7 * sr(seme, i * 7 + j + 3);
+            disegnaFulmine(ctx, spezzata(c[0] + Math.cos(a) * 2, c[1] + Math.sin(a) * 2, c[0] + Math.cos(a2) * r, c[1] + Math.sin(a2) * r, 2, seme + i + j), 1, k);
+          }
+        });
+        ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+      }});
+    emettitore(durata, (dt, t) => {
+      const f = lim((durata - t) / 0.3, 0, 1);
+      if (Math.random() < 0.7 * f) { const c = centro(pezzi[Math.floor(Math.random() * pezzi.length)]); scint(h, c[0] + rnd(-4, 4), c[1] + rnd(-5, 5), rnd(-70, 70), rnd(-90, 10), {g: 200, vita: rnd(0.12, 0.3)}); }
+    });
+  }
+
+  /* scarica elettrica: chi la usa tende il braccio e una serie di scariche parte dalla mano e si pianta, una dopo l'altra, su ogni parte del corpo
+     dell'avversario (testa, busto, le due braccia, le due gambe), con una raggiera di scintille e il corpo percorso dalla corrente. Parata: le scariche
+     si schiantano sulla mano che para; schivata: si piantano a terra tutt'attorno a dove stava. */
+  function scarica(ev, h) {
+    const PARTI = ["testa", "busto_sup", "avambraccio_dx", "avambraccio_sx", "coscia_dx", "coscia_sx"], PASSO = 0.085;
+    scintilleMano(h, 0.45 + PARTI.length * PASSO + 0.3, 1.1);
+    h.attacca({distanza: true, carica: 0.3, colpo: 0.12, tenuta: 0.55, recupero: 0.36, alFine: () => {},
+      alColpoInizio() {
+        h.att.pup.spingiTutto(-30, 0);
+        h.futuro(0.02, () => h.reazione());
+        const b0 = h.bersaglio();
+        PARTI.forEach((nome, i) => h.futuro(0.06 + i * PASSO, () => {
+          let P;
+          if (h.colpito) { const b = h.pose(h.dif, nome); P = h.aMondo(h.dif, [b[0], b[1]]); }
+          else if (h.parato) { const a = h.bersaglio(); P = [a[0] + rnd(-5, 5), a[1] + rnd(-9, 9)]; }
+          else P = [b0[0] + rnd(-24, 24), 109 + rnd(-1, 1)];
+          fulmineVivo(() => h.mano("dx"), () => P, 0.22, {w: 1 + (i % 2), amp: 7, rami: 1, seme: i * 13});
+          raggiera(h, P[0], P[1], h.colpito ? 8 : 5, 0.8);
+          if (h.colpito) elettrizza(h, h.dif, 0.5, [nome]);
+          if (i === 2) h.contatto(null);
+          if (i === PARTI.length - 1) h.futuro(0.5, h.fine);
+        }));
+      }});
+  }
+
+  /* fulmine: chi lo usa unisce le mani davanti al petto e le carica di tanti fulmini (archi fra le due mani e attorno a ciascuna, scintille che convergono,
+     il bagliore che cresce); poi tende il braccio e rilascia un unico fascio di fulmine, spesso e ramificato, che va a colpire l'avversario (e a
+     scuoterlo da capo a piedi). Parato: il fascio si schianta sulla mano; schivato: passa oltre, dove stava. */
+  function fulmine(ev, h) {
+    const TC = 0.8, colpisce = h.colpito || h.parato;
+    h.gesto("raccoglie", {durata: TC + 0.12});
+    emettitore(TC, (dt, t) => {                                               // le scintille corrono verso le mani
+      const k = lim(t / TC, 0, 1);
+      for (const l of ["dx", "sx"]) {
+        const m = h.mano(l);
+        if (Math.random() < 0.3 + 0.7 * k) { const a = rnd(0, 6.2832), r = rnd(10, 20); scint(h, m[0] + Math.cos(a) * r, m[1] + Math.sin(a) * r, -Math.cos(a) * rnd(50, 110), -Math.sin(a) * rnd(50, 110), {vita: r / 80, attrito: 0}); }
+      }
+    }, (ctx, t) => {
+      const k = lim(t / TC, 0, 1), seme = Math.floor(t / 0.045), mm = [h.mano("dx"), h.mano("sx")];
+      ctx.globalCompositeOperation = "source-over";
+      mm.forEach((m, i) => {
+        disco(ctx, m[0], m[1], 4 + 8 * k, "#ffd23a", 0.18 + 0.2 * k, true); disco(ctx, m[0], m[1], 2 + 2.5 * k, "#ffffff", 0.35 + 0.3 * k, true);
+        for (let j = 0, n = 2 + Math.floor(5 * k); j < n; j++) {
+          const an = sr(seme, i * 9 + j) * 6.2832, L = 5 + 13 * k * (0.5 + sr(seme, i * 9 + j + 40));
+          disegnaFulmine(ctx, spezzata(m[0], m[1], m[0] + Math.cos(an) * L, m[1] + Math.sin(an) * L, 2, seme + j), 1, 0.9);
+        }
+      });
+      if (dist(mm[0], mm[1]) > 2) for (let j = 0; j < 1 + Math.floor(2 * k); j++) disegnaFulmine(ctx, spezzata(mm[0][0], mm[0][1], mm[1][0], mm[1][1], 2 + 3 * k, seme * 3 + j), 1 + (j === 0 ? 1 : 0), 0.95);
+      ctx.globalAlpha = 1;
+    });
+    h.futuro(TC - 0.2, () => h.attacca({distanza: true, carica: 0.2, colpo: 0.1, tenuta: 0.95, recupero: 0.4, alFine: () => {},
+      alColpoInizio() {
+        const T = 0.62, tv = 0.07, a0 = h.bersaglio(), m0 = h.mano("dx"), d0 = dist(a0, m0) || 1, ux = (a0[0] - m0[0]) / d0, uy = (a0[1] - m0[1]) / d0;
+        const fine = () => colpisce ? h.bersaglio() : [a0[0] + ux * 130, a0[1] + uy * 130];
+        h.att.pup.spingiTutto(-70, 0);
+        h.scuoti(2);
+        h.reazione();
+        raggiera(h, m0[0], m0[1], 14, 1.2);
+        fulmineVivo(() => h.mano("dx"), fine, T, {w: 3, amp: 5, rami: 4, cresce: tv, seme: 5, ritmo: 0.035, dissolvi: 0.2});
+        fulmineVivo(() => h.mano("dx"), fine, T - 0.1, {w: 1, amp: 11, rami: 1, cresce: tv, seme: 77});
+        emettitore(T, (dt, t) => {                                              // scintille lungo il fascio
+          const A = h.mano("dx"), B = fine(), f = lim((T - t) / 0.2, 0, 1);
+          for (let i = 0; i < 3; i++) if (Math.random() < f) { const u = Math.random(); scint(h, A[0] + (B[0] - A[0]) * u + rnd(-3, 3), A[1] + (B[1] - A[1]) * u + rnd(-3, 3), rnd(-70, 70), rnd(-70, 70)); }
+        });
+        h.futuro(tv, () => {
+          h.contatto(null);
+          const B = fine();
+          raggiera(h, B[0], B[1], colpisce ? 22 : 10, colpisce ? 1.5 : 0.9);
+          lampo(B[0], B[1], 20, 0.35, "#ffd23a", "#ffffff");
+          if (h.colpito) elettrizza(h, h.dif, 1.0);
+          h.scuoti(3);
+          emettitore(T - tv, (dt, t) => { if (Math.random() < 0.8) { const P = fine(); scint(h, P[0], P[1], rnd(-90, 90), rnd(-110, 0), {g: 300, vita: rnd(0.12, 0.3)}); } });
+          h.futuro(T + 0.2, h.fine);
+        });
+      }}));
+  }
+
+  /* una striscia luminosa lasciata nell'aria da un fendente: i punti `pts` (a un pixel l'uno dall'altro) si accendono uno dopo l'altro (la testa corre in
+     `corsa` secondi, dopo `ritardo`), la striscia e' sottile alle estremita' e piu' spessa a meta' (`sp`), poi svanisce */
+  function striscia(pts, {ritardo = 0, corsa = 0.1, dur = 0.38, sp = 3, cols = ["#ffffff", "#bfe8ff", "#5fb8ff"], luce = true} = {}) {
+    fx.push({t: -ritardo, passo(dt) { this.t += dt; return this.t < dur; },
+      disegna(ctx) {
+        if (this.t < 0) return;
+        const testa = lim(this.t / corsa, 0, 1), al = lim((dur - this.t) / (dur * 0.7), 0, 1), n = pts.length;
+        ctx.globalCompositeOperation = luce ? "lighter" : "source-over";
+        for (let i = 0; i < n; i++) {
+          const u = i / (n - 1);
+          if (u > testa) break;
+          const s = Math.max(1, Math.round(sp * Math.pow(Math.sin(Math.PI * u), 0.6))), x = Math.round(pts[i][0]), y = Math.round(pts[i][1]), o = s >> 1;
+          ctx.fillStyle = cols[2]; ctx.globalAlpha = 0.4 * al; ctx.fillRect(x - s, y - s, s * 2 + 1, s * 2 + 1);
+          ctx.fillStyle = cols[1]; ctx.globalAlpha = 0.85 * al; ctx.fillRect(x - o, y - o, s, s);
+          ctx.fillStyle = cols[0]; ctx.globalAlpha = al; ctx.fillRect(x - (s > 2 ? 1 : 0), y - (s > 2 ? 1 : 0), s > 2 ? 2 : 1, s > 2 ? 2 : 1);
+        }
+        ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
+      }});
+  }
+  const rettaPunti = (a, b, bow = 0) => {                              // una retta (con un po' di curva) da a a b, a un punto per pixel
+    const dx = b[0] - a[0], dy = b[1] - a[1], d = Math.hypot(dx, dy) || 1, n = Math.ceil(d), pts = [];
+    for (let i = 0; i <= n; i++) { const u = i / n, o = bow * Math.sin(Math.PI * u); pts.push([a[0] + dx * u - dy / d * o, a[1] + dy * u + dx / d * o]); }
+    return pts;
+  };
+  const arcoPunti = (cx, cy, R, a0, a1, f) => {                       // un arco di cerchio (specchiato da `f`)
+    const n = Math.ceil(R * Math.abs(a1 - a0)), pts = [];
+    for (let i = 0; i <= n; i++) { const a = a0 + (a1 - a0) * i / n; pts.push([cx + f * Math.cos(a) * R, cy + Math.sin(a) * R]); }
+    return pts;
+  };
+  const SANGUE = ["#e03a2c", "#b3121b", "#7a0c10", "#4a0508"];
+  function spruzzoSangue(h, x, y, n, dir, forza = 1) {                 // gocce di sangue che saltano in un ventaglio e cadono
+    for (let i = 0; i < n; i++) {
+      const a = Math.atan2(dir[1], dir[0]) + rnd(-0.8, 0.8), v = rnd(40, 170) * forza;
+      h.particella({x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 30, g: 520, s: Math.random() < 0.3 ? 2 : 1, vita: rnd(0.4, 0.9), fade: 0.15, cols: SANGUE, davanti: true});
+    }
+  }
+  const sanguina = (h) => !h.ev.protesi && h.ev.hp_persi > 0;           // il colpo ferisce la carne (una protesi non sanguina)
+
+  /* artigli affilati: tre graffi paralleli in diagonale, sottili e chiari come lame, che si accendono uno dopo l'altro; scintille d'acciaio dove il colpo
+     arriva (e qualche goccia se ferisce) */
+  function artigliAffilati(ev, h) {
+    h.attacca({stile: "pugno", alFine: () => {}, alContatto(info) {
+      h.contatto(info);
+      const p = h.impatto(info), f = h.att.f;
+      for (const k of [-1, 0, 1]) {                                          // tre strisce parallele: la direzione e' in basso-avanti, le righe si spostano di lato
+        const o = k * 6, a = [p[0] + f * (-12 - o * 0.78), p[1] - 17 + o * 0.63], b = [p[0] + f * (13 - o * 0.78), p[1] + 16 + o * 0.63];
+        striscia(rettaPunti(a, b, 1.5), {ritardo: (k + 1) * 0.035, corsa: 0.08, dur: 0.34, sp: 2, cols: ["#ffffff", "#d7efff", "#7fb4e0"]});
+      }
+      const k = h.colpito ? 1 : h.parato ? 0.6 : 0.4;
+      for (let i = 0; i < 9 * k + 2; i++) { const a = rnd(-0.4, 1.6), v = rnd(60, 190) * k; h.particella({x: p[0], y: p[1], vx: Math.cos(a) * v * h.att.f, vy: Math.sin(a) * v - 30, g: 300, attrito: 1.2, s: 1, vita: rnd(0.12, 0.3), fade: 0.1, cols: ["#ffffff", "#cfe8ff", "#8ab8e0"], luce: true, davanti: true}); }
+      if (h.colpito && sanguina(h)) spruzzoSangue(h, p[0], p[1], 6, [-h.att.f * 0.4, -0.7], 0.8);
+      if (h.colpito || h.parato) h.scuoti(1.2);
+      h.futuro(0.5, h.fine);
+    }});
+  }
+
+  /* artigli sanguinari: due fendenti rosso sangue che si incrociano (una X), larghi e un po' curvi, col centro caldo; uno spruzzo di sangue nel ventaglio del
+     colpo e una macchia di gocce che cadono */
+  function artigliSanguinari(ev, h) {
+    h.attacca({alFine: () => {}, alContatto(info) {
+      h.contatto(info);
+      const p = h.impatto(info), f = h.att.f, col = ["#ffe6dc", "#ff4a3a", "#a01018"];
+      striscia(rettaPunti([p[0] + f * -16, p[1] - 18], [p[0] + f * 16, p[1] + 17], 4), {corsa: 0.09, dur: 0.46, sp: 3, cols: col});
+      striscia(rettaPunti([p[0] + f * -16, p[1] + 18], [p[0] + f * 16, p[1] - 17], -4), {ritardo: 0.09, corsa: 0.09, dur: 0.46, sp: 3, cols: col});
+      const k = h.colpito ? 1 : h.parato ? 0.55 : 0.35;
+      spruzzoSangue(h, p[0], p[1], Math.round(16 * k) + 3, [-f * 0.5, -0.6], 1.1 * k + 0.2);
+      for (let i = 0; i < 8 * k; i++) h.futuro(rnd(0.05, 0.4), () => h.particella({x: p[0] + rnd(-9, 9), y: p[1] + rnd(-12, 10), vx: rnd(-8, 8), vy: rnd(0, 20), g: 480, s: 1, vita: rnd(0.4, 0.8), fade: 0.15, cols: SANGUE, davanti: true}));
+      lampo(p[0], p[1], 12, 0.25, "#e02a2a", "#ffd0c0");
+      if (h.colpito || h.parato) h.scuoti(h.colpito ? 2 : 1);
+      h.futuro(0.55, h.fine);
+    }});
+  }
+
+  /* braccio lama: l'avambraccio e' una lama, e il fendente e' un solo grande arco metallico, azzurro e bianco, con due archi fantasma che lo inseguono; al
+     contatto un lampo orizzontale attraversa il bersaglio e saltano scintille d'acciaio */
+  function braccioLama(ev, h) {
+    h.attacca({stile: "affondo", alFine: () => {}, alContatto(info) {
+      h.contatto(info);
+      const p = h.impatto(info), f = h.att.f, cx = p[0] - f * 8, cy = p[1] - 22;
+      striscia(arcoPunti(cx, cy, 33, -2.35, 0.55, f), {corsa: 0.1, dur: 0.42, sp: 5, cols: ["#ffffff", "#bff3ff", "#4aa8e8"]});
+      striscia(arcoPunti(cx, cy, 29, -2.3, 0.5, f), {ritardo: 0.025, corsa: 0.1, dur: 0.34, sp: 3, cols: ["#e8fbff", "#7fd8ff", "#2f78c8"]});
+      striscia(arcoPunti(cx, cy, 37, -2.25, 0.45, f), {ritardo: 0.05, corsa: 0.1, dur: 0.3, sp: 2, cols: ["#ffffff", "#9fe6ff", "#2f78c8"]});
+      striscia(rettaPunti([p[0] - f * 22, p[1]], [p[0] + f * 22, p[1]]), {ritardo: 0.08, corsa: 0.05, dur: 0.2, sp: 2, cols: ["#ffffff", "#ffffff", "#9fe6ff"]});
+      const k = h.colpito ? 1 : h.parato ? 0.7 : 0.4;
+      for (let i = 0; i < 14 * k + 2; i++) { const a = rnd(0, 6.2832), v = rnd(60, 220) * k; h.particella({x: p[0], y: p[1], vx: Math.cos(a) * v, vy: Math.sin(a) * v - 30, g: 420, attrito: 1, s: Math.random() < 0.3 ? 2 : 1, vita: rnd(0.12, 0.32), fade: 0.1, cols: ["#ffffff", "#ffe9a0", "#ffc040"], luce: true, davanti: true}); }
+      if (h.colpito && sanguina(h)) spruzzoSangue(h, p[0], p[1], 7, [-f * 0.4, -0.6], 0.9);
+      lampo(p[0], p[1], 14, 0.2, "#7fd8ff", "#ffffff");
+      if (h.colpito || h.parato) h.scuoti(h.colpito ? 2.6 : 1.2);
+      h.futuro(0.55, h.fine);
+    }});
+  }
+
+  /* ---------------------------------------------------------------------------------------------------------------------------------- */
   /* chi ha un'animazione apposita, e le funzioni dell'arena */
   const TAB = {
     9: scintilla,                                              // Pirocinesi: scintilla
@@ -864,6 +1140,14 @@ const Mosse = (() => {
     38: dreno,                                                 // Necromanzia: Dreno vitale
     39: falce,                                                 // Necromanzia: Falce delle anime
     40: pugnoRoccia,                                           // Geocinesi: Pugno di roccia
+    8: scarica,                                                // Elettrocinesi: Scarica elettrica
+    10: fulmine,                                               // Elettrocinesi: Fulmine
+    11: artigliAffilati,                                       // Appendici Affilate: Artigli Affilati
+    12: artigliSanguinari,                                     // Appendici Affilate: Artigli Sanguinari
+    13: braccioLama,                                           // Appendici Affilate: Braccio Lama
+    15: (ev, h) => drenaggio(ev, h, PAL_ROSSO, true),          // Anatema: Affamare (come il dreno vitale, ma rosso e al contrario: espelle)
+    16: (ev, h) => drenaggio(ev, h, PAL_ROSSO, true),          // Anatema: Affaticare
+    24: (ev, h) => drenaggio(ev, h, PAL_ROSSO, false),         // Anatema: Assorbi caratteristica (come il dreno vitale, ma rosso)
   };
   const ha = (ev) => ev && ev.att_id != null && ev.att_id in TAB;
   function avvia(ev, h) { TAB[ev.att_id](ev, h); }

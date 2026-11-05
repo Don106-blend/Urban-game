@@ -12,7 +12,7 @@ const Poteri = (() => {
   const DT = 1 / 60;
   const ID = {PELLE: 1, PIRO: 3, ASSORBI: 4, ELETTRO: 5, APPENDICI: 6, ANATEMA: 8, URLO: 9, CAMPO: 13, SOLDATO: 14, HYDRO: 15, CRIO: 16, ACIDO: 17,
               TELE: 18, NECRO: 19, GEO: 20};
-  const STANCE = {MANTO: 25, PIETRA: 27};                               // le stance che hanno un aspetto loro (id in data/stances.json): Manto d'Ombra, Pelle di Pietra
+  const STANCE = {MANTO: 25, PIETRA: 27, ELETTRICO: 7, SPINE: 10, FULMINEI: 12};      // le stance che hanno un aspetto loro (id in data/stances.json): Manto d'Ombra, Pelle di Pietra, Corpo Elettrico, Spine, Riflessi Fulminei (quest'ultima: la velocita', in arena.js)
   const GRIGI = {38: "k", 106: "a", 142: "b", 178: "c", 216: "d"};     // gli indici dello sprite base (canale R), come in arena.js
   const CUCITURA = 70;                                                  // il sesto indice dei pezzi rinforzati: la commessura tra le piastre
   const TONI = ["k", "a", "b", "c", "d"], IDX = {k: 0, a: 1, b: 2, c: 3, d: 4};
@@ -444,7 +444,8 @@ const Poteri = (() => {
     for (const id of Object.keys(po.mossa)) { po.mossa[id] -= DT; if (po.mossa[id] <= 0) delete po.mossa[id]; }
     if (po.pugno) { po.pugno.t -= DT; if (po.pugno.t <= 0) { const nome = "avambraccio_" + po.pugno.lato; po.pugno = null; if (A.ridisegna) A.ridisegna(L, nome); } }
     const vivo = !L.ko && !(L.pup && L.pup.morto);
-    for (const [chiave, on] of [["mal", po.maledetto], ["manto", po.stanceIds.has(STANCE.MANTO)]])         // Maledizione e Manto d'Ombra: salgono e scendono piano
+    for (const [chiave, on] of [["mal", po.maledetto], ["manto", po.stanceIds.has(STANCE.MANTO)], ["ele", po.stanceIds.has(STANCE.ELETTRICO)],
+                                ["spine", po.stanceIds.has(STANCE.SPINE)]])         // Maledizione, Manto d'Ombra, Corpo Elettrico e Spine: salgono e scendono piano
       po.k[chiave] = (po.k[chiave] || 0) + ((vivo && on ? 1 : 0) - (po.k[chiave] || 0)) * (1 - Math.exp(-DT * (vivo && on ? 3.5 : 5)));
     for (const id of [ID.ASSORBI, ID.ANATEMA, ID.SOLDATO]) {                      // si accendono con una mossa o con una stance in corso
       const on = vivo && po.eff[id] && (po.stance.has(id) || po.mossa[id] > 0) ? 1 : 0;
@@ -472,6 +473,11 @@ const Poteri = (() => {
     }
     passoTeschi(L, A);
     passoNeve(L, A);
+    if ((po.k.ele || 0) > 0.3 && Math.random() < 0.7) {                          // Corpo Elettrico: scintille che saltano dal corpo
+      const c = A.pos(L, PEZZI_MANTO[Math.floor(Math.random() * PEZZI_MANTO.length)]);
+      particella(po, {x: c[0] + (Math.random() - 0.5) * 8, y: c[1] + (Math.random() - 0.5) * 10, vx: (Math.random() - 0.5) * 60, vy: -10 - Math.random() * 40, g: 120, vita: 0.25, fade: 0.12,
+                      col: Math.random() < 0.5 ? "#fff6a0" : "#ffffff"});
+    }
   }
 
   /* NEVE (criocinesi): fiocchi che cadono su tutta l'arena attorno all'eroe, dal cielo fino a terra dove si sciolgono. Coordinate di L. */
@@ -565,10 +571,67 @@ const Poteri = (() => {
     }
   }
 
+  /* SPINE (stance di Appendici Affilate): dalla schiena del corpo crescono aculei, come un istrice, su testa, busto, braccia e gambe. Ogni aculeo e' attaccato a
+     un pezzo del corpo (segue la posa) e punta all'indietro e in su; si allungano uno dopo l'altro quando la stance si accende e rientrano quando finisce.
+     [pezzo, dx, dy (dal centro del pezzo, +x verso l'avversario: la schiena e' a −x), angolo (y in basso: −π = dritto indietro, −π/2 = in su), lunghezza] */
+  const ACULEI = [
+    ["testa", -4.5, -5, -2.2, 9], ["testa", -5, -1, -2.7, 8], ["testa", -3, -6.5, -1.9, 7],
+    ["busto_sup", -5, -9, -2.1, 12], ["busto_sup", -5.5, -5, -2.5, 13], ["busto_sup", -5.5, -1, -2.9, 12], ["busto_sup", -5, 3, -3.1, 11],
+    ["busto_inf", -5, -4, -2.8, 12], ["busto_inf", -5, 0, -3.1, 12], ["busto_inf", -4.5, 4, -3.4, 10],
+    ["braccio_sup_sx", -2.5, -3, -2.5, 8], ["avambraccio_sx", -2.5, -1, -2.9, 8], ["braccio_sup_dx", -2, -3, -2.4, 8], ["avambraccio_dx", -2, 0, -2.7, 7],
+    ["coscia_dx", -3, -4, -3.0, 9], ["coscia_sx", -3, -4, -3.2, 9], ["stinco_dx", -2.5, -3, -3.3, 7], ["stinco_sx", -2.5, -3, -3.4, 7],
+  ];
+  function aculeo(ctx, x, y, an, lung) {                                              // una spina: scura alla base, chiara a meta', di nuovo scura in punta; si assottiglia
+    const ux = Math.cos(an), uy = Math.sin(an), larga = Math.abs(uy) > Math.abs(ux);
+    for (let s = 0; s < lung; s++) {
+      const u = s / lung, col = u < 0.35 ? "#4a3a30" : u < 0.78 ? "#e4d8bc" : "#2a1f1a", px = x + ux * s, py = y + uy * s;
+      pixel(ctx, px, py, col, 1);
+      if (u < 0.55) pixel(ctx, px + (larga ? 1 : 0), py + (larga ? 0 : 1), col, 1);
+    }
+  }
+  function aculei(ctx, L, A) {
+    const k = L.po.k.spine || 0;
+    if (k < 0.02) return;
+    ACULEI.forEach(([nome, dx, dy, ang, lung], i) => {
+      const g = lim(k * 1.7 - 0.7 * i / ACULEI.length, 0, 1), l = lung * (1 - Math.pow(1 - g, 2));      // si allungano a scatti, uno dopo l'altro
+      if (l < 1) return;
+      const b = A.pos(L, nome), c = Math.cos(b[2]), s = Math.sin(b[2]);
+      aculeo(ctx, b[0] + c * dx - s * dy, b[1] + s * dx + c * dy, ang + b[2], l);
+    });
+    ctx.globalAlpha = 1;
+  }
+
+  /* RUNE (Anatema): finche' il potere e' acceso, attorno all'eroe compaiono e scompaiono rune rosse: ognuna sfuma dentro, resta, sfuma fuori e ricompare
+     altrove con un altro segno. Appena acceso ce ne sono di piu' (la raffica dell'attivazione). Segni a tratti [x0, y0, x1, y1] su una griglia 5x9. */
+  const GLIFI = [
+    [[0, 0, 0, 8], [0, 3, 4, 0], [0, 6, 4, 3]], [[0, 0, 0, 8], [0, 0, 4, 3], [4, 3, 4, 8]], [[0, 0, 0, 8], [0, 2, 4, 4], [4, 4, 0, 6]],
+    [[0, 0, 0, 8], [0, 0, 4, 2], [0, 3, 4, 5]], [[0, 0, 0, 8], [0, 0, 4, 2], [4, 2, 0, 5], [0, 5, 4, 8]], [[3, 1, 0, 4], [0, 4, 3, 7]],
+    [[0, 1, 4, 7], [4, 1, 0, 7]], [[0, 0, 0, 8], [0, 0, 4, 2], [4, 2, 0, 4]], [[2, 8, 2, 0], [2, 4, 0, 1], [2, 4, 4, 1]],
+  ];
+  function rune(ctx, L, A) {
+    const po = L.po, v = vis(po, ID.ANATEMA);
+    if (!po.eff[ID.ANATEMA] || v < 0.03) return;
+    const c = centro(L, A), t = po.t, N = 6 + Math.round(8 * (1 - v));
+    for (let i = 0; i < N; i++) {
+      const per = 1.9 + 0.8 * hash(i, 2, 5), ph = t / per + hash(i, 3, 5), cic = Math.floor(ph), u = ph - cic;
+      const a = (u < 0.25 ? u / 0.25 : u > 0.65 ? (1 - u) / 0.35 : 1) * v;
+      if (a < 0.02) continue;
+      const ang = 6.2832 * hash(i, cic, 9), x = c[0] + Math.cos(ang) * (21 + 10 * hash(i, cic, 11)), y = c[1] + Math.sin(ang) * (34 + 12 * hash(i, cic, 12)) - 3 * u;
+      const g = GLIFI[Math.floor(hash(i, cic, 13) * GLIFI.length)];
+      FADE = a * 0.55; disegnaSprite(ctx, alone(6, [230, 40, 40]), x, y, 0.8, true);
+      FADE = a;
+      for (const [x0, y0, x1, y1] of g) segmento(ctx, x - 2 + x0, y - 4 + y0, x - 2 + x1, y - 4 + y1, "#ff4a3a", 1);
+      FADE = a * 0.6;
+      for (const [x0, y0, x1, y1] of g) segmento(ctx, x - 2 + (x0 + x1) / 2, y - 4 + (y0 + y1) / 2, x - 2 + (x0 + x1) / 2, y - 4 + (y0 + y1) / 2, "#ffd0c0", 1);
+    }
+    FADE = 1; ctx.globalAlpha = 1;
+  }
+
   function dietro(L, A) {
     const po = L.po;
     if (!po || L.ko || (L.pup && L.pup.morto)) return;
     const ctx = A.ctx;
+    aculei(ctx, L, A);
     manto(ctx, L, A, false);
     FADE = vis(po, ID.CRIO); disegnaNeve(ctx, po, true);
     FADE = vis(po, ID.NECRO); if (po.eff[ID.NECRO]) disegnaTeschi(ctx, L);
@@ -627,6 +690,17 @@ const Poteri = (() => {
       }
     }
     manto(ctx, L, A, true);
+    if (k("ele") > 0.02) {                                                   // Corpo Elettrico: fulmini che guizzano attorno e sul corpo
+      const n = Math.round(3 + 4 * k("ele"));
+      FADE = k("ele");
+      for (let i = 0; i < n; i++) {
+        const p = A.pos(L, PEZZI_MANTO[Math.floor(rnd(b, i, 9, 6) * PEZZI_MANTO.length)]), x = p[0] + (rnd(b, i, 9, 7) - 0.5) * 8, y = p[1] + (rnd(b, i, 9, 8) - 0.5) * 12;
+        disegnaSprite(ctx, alone(3, [255, 226, 110]), x, y, 0.6, true);
+        fulmine(ctx, x, y, 6.28 * rnd(b, i, 9, 9), 7 + 11 * rnd(b, i, 9, 10), b * 19 + i, FULM.elettro);
+      }
+      FADE = 1;
+    }
+    rune(ctx, L, A);
     FADE = 1; disegnaParticelle(ctx, po);
     FADE = vis(po, ID.CRIO); disegnaNeve(ctx, po, false);
     FADE = 1; ctx.globalAlpha = 1;
@@ -708,6 +782,38 @@ const Poteri = (() => {
     return dati;
   }
 
+  /* CORPO ELETTRICO (stance): come l'acqua e il fuoco, il corpo diventa un'altra cosa: energia. Il blu notte al contorno, il blu elettrico nelle ombre, l'azzurro nei
+     toni medi e, dove la luce e' alta, bianco-giallo; poi vene di fulmine (le creste di un rumore che scorre veloce) che attraversano il corpo e scintillii a caso.
+     Opaco e luminoso (arena.js lo somma alla scena, con un'aura azzurra). */
+  const ELETTRICO = [[4, 8, 30], [20, 36, 150], [60, 130, 245], [170, 225, 255], [255, 250, 200]];
+  function elettrico(dati, w, h, {cell = 2, ox = 0, oy = 0, t = 0, seme = 0} = {}) {
+    const gw = Math.ceil(w / cell) + 3, gh = Math.ceil(h / cell) + 3, ca = new Float32Array(gw * gh), cb = new Float32Array(gw * gh);
+    const gx0 = Math.floor(ox / cell), gy0 = Math.floor(oy / cell), tick = Math.floor(t * 22);
+    for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) {
+      const X = gx0 + i, Y = gy0 + j;
+      ca[j * gw + i] = vn(X * 0.34 + t * 0.6, Y * 0.34 - t * 1.7, seme + 211);           // le vene di fulmine: creste di un rumore che scorre
+      cb[j * gw + i] = vn(X * 0.9 - t * 0.4, Y * 0.9 + t * 5.5, seme + 227);              // il brillio fine, veloce
+    }
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4, a = dati[i + 3];
+      if (!a) continue;
+      const lum = (0.3 * dati[i] + 0.59 * dati[i + 1] + 0.11 * dati[i + 2]) / 255;
+      const ci = Math.floor((x + ox) / cell) - gx0, cj = Math.floor((y + oy) / cell) - gy0, k = cj * gw + ci;
+      const na = ca[k], nb = cb[k], vena = 1 - Math.min(1, Math.abs(na - 0.5) / 0.04);
+      let tono = lum < 0.12 ? 0 : lum < 0.3 ? 1 : lum < 0.66 ? 2 : lum < 0.9 ? 3 : 4;
+      const contorno = tono === 0 && lum < 0.2;
+      if (!contorno) {
+        if (vena > 0.5) tono = 4; else if (nb > 0.84) tono++; else if (nb < 0.14) tono--;
+        if (hash(x + gx0, y + gy0, tick) < 0.012) tono = 4;                              // uno scintillio a caso
+      }
+      tono = Math.max(contorno ? 0 : 1, Math.min(4, tono));
+      const c = ELETTRICO[tono];
+      dati[i] = c[0]; dati[i + 1] = c[1]; dati[i + 2] = c[2];
+      dati[i + 3] = contorno ? 235 : 255;
+    }
+    return dati;
+  }
+
   /* Maledizione: com'e' lo scheletro verde che traspare (k = intensita' 0..1, pulsa = il battito: due colpi e una pausa) */
   function maledizione(L) {
     const po = L.po, k = po ? po.k.mal || 0 : 0;
@@ -716,6 +822,6 @@ const Poteri = (() => {
     return {k, pulsa: Math.min(1, 0.22 + colpo(0.12, 0.07) + 0.75 * colpo(0.34, 0.07))};      // due battiti ravvicinati e una pausa
   }
 
-  return {ID, STANCE, acqua, fuoco, aggiorna, chiave, rangoPelle, pugno, pugnoSu, maledizione, lama, coloraMateriale, mossa, passo, dietro, davanti, disegnaOnda, CUCITURA};
+  return {ID, STANCE, acqua, fuoco, elettrico, aggiorna, chiave, rangoPelle, pugno, pugnoSu, maledizione, lama, coloraMateriale, mossa, passo, dietro, davanti, disegnaOnda, CUCITURA};
 })();
 if (typeof module !== "undefined") module.exports = Poteri;

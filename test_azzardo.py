@@ -564,8 +564,12 @@ def main():
             webapp.DUELLO = None
         ok(bool(d.rec.get("morto")) == morto, "il crollo dell'Ultima Puntata puo' uccidere l'allievo")
     # nel Torneo Evo non c'e' la morte: il rischio non esiste
-    t6 = webapp.TorneoEvo()
-    dt = webapp.DuelloWeb(pg=t6.eroi[t6.io], avversario=t6.eroi[t6.avversario_idx()], torneo=t6)
+    t6 = webapp.evo.Corsa(0)
+    t6.scegli_campione(t6.candidati[0])
+    while t6.fase == "bottino":
+        t6.scegli_carta(0)
+    pg6, nem6, _regola6 = t6.prepara_duello()
+    dt = webapp.DuelloWeb(pg=pg6, avversario=nem6, torneo=t6)
     ok(dt.rischio_morte(dt.p) is None)
 
     # ================================================================ la CPU azzarda con le stesse regole
@@ -662,35 +666,41 @@ def main():
     ok(r["errore"] == "non è il tuo turno")
     webapp.DUELLO = None
 
-    # ================================================================ il Torneo Evo: puntate in punti, mai in crediti
+    # ================================================================ il Torneo Evo: puntate in gettoni, mai in crediti
     S["crediti"] = 500
-    t7 = webapp.TorneoEvo()
-    t7.fase = "pronto"
-    dt = webapp.DuelloWeb(pg=t7.eroi[t7.io], avversario=t7.eroi[t7.avversario_idx()], torneo=t7)
-    tocca_a(dt, dt.p)
-    ok(dt.arena_attiva and dt.tavolo.banco and dt.info_arena()["unita"] == "pt" and dt.info_arena()["torneo_pot"] == 0)
-    ok(dt.azione_player({"tipo": "punta", "importo": 999999}) == "puntata massima nel torneo: 500 pt")
-    ok(dt.azione_player({"tipo": "punta", "importo": 100}) is None and S["crediti"] == 500, "i punti non sono crediti")
-    ok(dt.azione_player({"tipo": "clausola", "id": "lampo", "importo": 40}) is None and S["crediti"] == 500)
+
+    def duello_evo(gettoni):
+        t = webapp.evo.Corsa(0)
+        t.scegli_campione(t.candidati[0])
+        while t.fase == "bottino":
+            t.scegli_carta(0)
+        t.gettoni = gettoni
+        pg, nemico, _regola = t.prepara_duello()
+        d = webapp.DuelloWeb(pg=pg, avversario=nemico, torneo=t)
+        tocca_a(d, d.p)
+        return t, d
+    t7, dt = duello_evo(200)
+    ok(dt.arena_attiva and dt.tavolo.banco and dt.info_arena()["unita"] == "🪙" and dt.info_arena()["torneo_pot"] == 200)
+    ok(dt.azione_player({"tipo": "punta", "importo": 999999}) == "gettoni insufficienti (ne hai 200)")
+    ok(dt.azione_player({"tipo": "punta", "importo": 100}) is None and S["crediti"] == 500 and t7.gettoni == 100,
+       "i gettoni non sono crediti, e la puntata esce subito dal portafoglio")
+    ok(dt.azione_player({"tipo": "clausola", "id": "lampo", "importo": 40}) is None and S["crediti"] == 500 and t7.gettoni == 60)
     s = dt.tavolo.aperte()[0]
-    ok(dt.azione_player({"tipo": "incassa", "id": s.id}) is None and t7.bonus_accumulato == dt.tavolo.schedine[0].incassata > 0,
-       "l'incasso anticipato va nel punteggio")
-    pot = t7.bonus_accumulato
+    ok(dt.azione_player({"tipo": "incassa", "id": s.id}) is None and t7.gettoni == 60 + dt.tavolo.schedine[0].incassata and dt.tavolo.schedine[0].incassata > 0,
+       "l'incasso anticipato torna nei gettoni")
+    prima = t7.gettoni
     ql = dt.tavolo.aperte()[0].quota
     dt.round = 2                      # vince entro il round 3: la clausola Lampo paga
     dt.finito, dt.fase, dt.vincitore = True, "fine", dt.p
     t7.risolvi_duello(True, dt)
-    ok(t7.bonus_accumulato == pot + int(40 * ql), (t7.bonus_accumulato, pot, ql))
+    ok(t7.gettoni >= prima + int(40 * ql) + webapp.evo.GETTONI_VITTORIA, (t7.gettoni, prima, ql))
     ok(S["crediti"] == 500, "mai crediti veri")
     ok(any("vinta" in r for r in t7.log_arena))
-    t8 = webapp.TorneoEvo()
-    t8.fase = "pronto"
-    dt = webapp.DuelloWeb(pg=t8.eroi[t8.io], avversario=t8.eroi[t8.avversario_idx()], torneo=t8)
-    tocca_a(dt, dt.p)
+    t8, dt = duello_evo(200)
     dt.azione_player({"tipo": "punta", "importo": 100})
     dt.finito, dt.fase, dt.vincitore = True, "fine", dt.cpu
     t8.risolvi_duello(False, dt)
-    ok(t8.bonus_accumulato == 0 and S["crediti"] == 500 and t8.fase == "eliminato")
+    ok(t8.gettoni == 100 and S["crediti"] == 500 and t8.fase == "eliminato", "la puntata persa e' persa")
 
     print(f"OK: {n_check} verifiche")
 

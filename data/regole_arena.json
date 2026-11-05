@@ -1,0 +1,18 @@
+[
+  {"id": "standard", "nome": "Ring regolare", "icona": "🥊", "peso": 38, "descrizione": "Nessuna regola speciale.", "ops": []},
+  {"id": "folla_delirio", "nome": "Folla in delirio", "icona": "📣", "peso": 12,
+   "descrizione": "Il pubblico spinge tutti e due: +1 ai tiri per colpire e ai riflessi, per entrambi.",
+   "ops": [{"op": "effetto", "id": 18}]},
+  {"id": "ring_fiamme", "nome": "Ring in fiamme", "icona": "🔥", "peso": 8,
+   "descrizione": "Il ring brucia: entrambi prendono 10 danni da fuoco a inizio turno. Chi resiste al fuoco ringrazia.",
+   "ops": [{"op": "effetto", "id": 1}]},
+  {"id": "doppia_azione", "nome": "Doppia azione", "icona": "⏩", "peso": 8,
+   "descrizione": "Un'azione in più per turno, per tutti e due. Gli scambi sono molto più rapidi.",
+   "ops": [{"op": "azioni", "delta": 1}]},
+  {"id": "nebbia", "nome": "Nebbia fitta", "icona": "🌫️", "peso": 10,
+   "descrizione": "Non si vede un palmo: nessuno può mirare.",
+   "ops": [{"op": "no_mira"}]},
+  {"id": "pavimento_viscido", "nome": "Pavimento viscido", "icona": "🧊", "peso": 10,
+   "descrizione": "Si scivola: nessuno può schivare, solo parare o incassare.",
+   "ops": [{"op": "no_schivata"}]}
+]

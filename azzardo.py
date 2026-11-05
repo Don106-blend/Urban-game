@@ -207,7 +207,7 @@ class Tavolo:
         return p if chi is self.d.p else 1 - p
 
     def unita(self):
-        return "pt" if self.d.torneo is not None else "¤"
+        return "🪙" if self.d.torneo is not None else "¤"
 
     # ---------------------------------------------------------------- il banco: puntate
     def quota(self):
@@ -235,7 +235,7 @@ class Tavolo:
         if not isinstance(importo, int) or isinstance(importo, bool) or importo <= 0:
             return "importo non valido"
         if importo > self.d.fondi():
-            return "crediti insufficienti" if self.d.torneo is None else f"puntata massima nel torneo: {self.d.fondi()} pt"
+            return "crediti insufficienti" if self.d.torneo is None else f"gettoni insufficienti (ne hai {self.d.fondi()})"
         lim = self.limite()
         if importo > lim:
             return f"il banco accetta al massimo {lim}{self.unita()} adesso: l'incontro è già quasi deciso"
@@ -267,7 +267,7 @@ class Tavolo:
         if not isinstance(importo, int) or isinstance(importo, bool) or importo <= 0:
             return "importo non valido"
         if importo > self.d.fondi():
-            return "crediti insufficienti" if self.d.torneo is None else f"puntata massima nel torneo: {self.d.fondi()} pt"
+            return "crediti insufficienti" if self.d.torneo is None else f"gettoni insufficienti (ne hai {self.d.fondi()})"
         if importo > self.limite():
             return f"il banco accetta al massimo {self.limite()}{self.unita()} adesso"
         q = round(self.quota() * c["k"], 2)

@@ -812,6 +812,8 @@ const Arena = (() => {
   /* un'ala (vicina o lontana): appesa al busto alto nel punto d'attacco, ruota attorno al perno. In volo batte (angolo = riposo + ampiezza
      * sin), altrimenti sta rialzata dietro le spalle e si muove appena. */
   const VEL_RANGO = 0.25;                 // Supervelocita': animazioni piu' veloci del 25% per rango (il quarto: il doppio)
+  const STANCE_CORPO_ELETTRICO = 7, STANCE_RIFLESSI_FULMINEI = 12;      // id in data/stances.json
+  const conStance = (L, id) => !!(L.extra && (L.extra.stance_ids || []).includes(id));
   const FORZA_RANGO = 0.1875;             // Super Forza: braccia e busto piu' grandi del 18,75% per rango (il quarto: +75%)
   const ALI = {riposo: -1.0};            // l'angolo delle ali a riposo (rad, rispetto a come sono disegnate): su e indietro, non ripiegate in basso
   function disegnaAla(L, lontana) {
@@ -941,6 +943,7 @@ const Arena = (() => {
     if (!sagome && PO && L.po) PO.dietro(L, aiuti);                        // sfere e detriti che passano dietro, teschi, neve lontana
     if (!sagome && L.acq > 0.02) disegnaAcqua(L);                          // stance Forma d'acqua
     else if (!sagome && L.fuo > 0.02) disegnaFuoco(L);                     // stance Corpo di Fiamma
+    else if (!sagome && L.ele > 0.02) disegnaElettrico(L);                 // stance Corpo Elettrico
     else disegnaCorpo(L);
     if (!sagome && PO && L.po) { mondo(L); PO.davanti(L, aiuti); }         // campo di forza, sfere davanti, aure, fulmini, neve vicina
   }
@@ -952,7 +955,9 @@ const Arena = (() => {
   function disegnaAcqua(L) { disegnaTrasformato(L, L.acq, PO && PO.acqua, false); }
   /* Corpo di Fiamma: lo stesso procedimento dell'acqua, ma il corpo e' fuoco e LUMINOSO (si somma alla scena e ha un'aura) */
   function disegnaFuoco(L) { disegnaTrasformato(L, L.fuo, PO && PO.fuoco, true); }
-  function disegnaTrasformato(L, k, fn, luce) {
+  /* Corpo Elettrico: ancora lo stesso procedimento, ma il corpo e' energia (blu e bianco-giallo, con vene di fulmine) e l'aura e' azzurra */
+  function disegnaElettrico(L) { disegnaTrasformato(L, L.ele, PO && PO.elettrico, true, ["rgba(150,210,255,0.45)", "rgba(70,130,255,0.18)", "rgba(40,80,255,0)"]); }
+  function disegnaTrasformato(L, k, fn, luce, aura) {
     if (!fn) { disegnaCorpo(L); return; }
     // il riquadro attorno al corpo (px dello schermo, a risoluzione del dispositivo)
     let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
@@ -986,7 +991,8 @@ const Arena = (() => {
       ctx.globalAlpha = 0.3 * k;
       for (const [ox, oy] of [[-1.2, 0], [1.2, 0], [0, -1.6], [0, 1.2]]) ctx.drawImage(acq.out, 0, 0, dw, dh, dx0 + ox * S * dpr * 0.5, dy0 + oy * S * dpr * 0.5, dw, dh);
       const cx = (x0 + x1) / 2 * dpr, cy = (y0 + y1) / 2 * dpr, R = 50 * S * dpr, g = ctx.createRadialGradient(cx, cy, 2, cx, cy, R);
-      g.addColorStop(0, "rgba(255,150,40,0.4)"); g.addColorStop(0.55, "rgba(255,90,14,0.16)"); g.addColorStop(1, "rgba(255,60,8,0)");
+      const au = aura || ["rgba(255,150,40,0.4)", "rgba(255,90,14,0.16)", "rgba(255,60,8,0)"];
+      g.addColorStop(0, au[0]); g.addColorStop(0.55, au[1]); g.addColorStop(1, au[2]);
       ctx.globalAlpha = k; ctx.fillStyle = g; ctx.fillRect(cx - R, cy - R, 2 * R, 2 * R);
       ctx.globalCompositeOperation = "source-over";
     }
@@ -1288,7 +1294,9 @@ const Arena = (() => {
     // Supervelocita': il corpo vive piu' in fretta (+25% per rango, +100% al quarto): piu' passi di fisica per ogni passo di scena
     // (passi, schivate, respiro, colpi: tutto dura meno; le azioni di scena seguono, perche' partono dal pupazzo). Il disegno interpola
     // sull'intero tratto percorso, non solo sull'ultimo passo
-    L.velAcc = (L.velAcc || 0) + 1 + VEL_RANGO * (L.extra.velocita || 0);
+    // Riflessi Fulminei (stance di Elettrocinesi, id 12): finche' e' in corso le animazioni sono il 100% piu' veloci (come un quarto rango di Supervelocita')
+    const vel = (L.extra.velocita || 0) + (conStance(L, STANCE_RIFLESSI_FULMINEI) ? 1 / VEL_RANGO : 0);
+    L.velAcc = (L.velAcc || 0) + 1 + VEL_RANGO * vel;
     const n = Math.floor(L.velAcc); L.velAcc -= n;
     if (n <= 1) L.pup.passo(DT);
     else {
@@ -1296,7 +1304,7 @@ const Arena = (() => {
       for (let i = 0; i < n; i++) L.pup.passo(DT);
       for (const [b, x, y, a] of prima) { b.px = x; b.py = y; b.pa = a; }
     }
-    L.tAnim += DT * (1 + VEL_RANGO * (L.extra.velocita || 0));
+    L.tAnim += DT * (1 + VEL_RANGO * vel);
     {                                                        // Forma d'acqua: dissolvenza dentro e fuori, e gocce che cadono dal corpo
       const su = L.extra.acqua ? 1 : 0, v = L.acq || 0;
       L.acq = Math.abs(su - v) < 0.004 ? su : v + (su - v) * (1 - Math.exp(-DT * 4));
@@ -1313,6 +1321,21 @@ const Arena = (() => {
         particella({x: L.O + L.f * (b.x + (Math.random() - 0.5) * 6), y: b.y + (Math.random() - 0.5) * 6, vx: (Math.random() - 0.5) * 12, vy: -16 - Math.random() * 34,
                     g: -40, s: Math.random() < 0.25 ? 2 : 1, vita: 0.45 + Math.random() * 0.4, fade: 0.25, cols: FIAMMA, luce: true, davanti: true});
       }
+    }
+    {                                                        // Corpo Elettrico: dissolvenza dentro e fuori, e scintille che saltano dal corpo
+      const su = conStance(L, STANCE_CORPO_ELETTRICO) ? 1 : 0, v = L.ele || 0;
+      L.ele = Math.abs(su - v) < 0.004 ? su : v + (su - v) * (1 - Math.exp(-DT * 4));
+      if (L.ele > 0.4 && !L.ko) for (let i = 0; i < 2; i++) if (Math.random() < 0.45) {
+        const b = L.pup.corpi[["busto_sup", "busto_inf", "testa", "avambraccio_dx", "avambraccio_sx", "coscia_dx", "coscia_sx", "stinco_dx", "stinco_sx"][Math.floor(Math.random() * 9)]];
+        particella({x: L.O + L.f * (b.x + (Math.random() - 0.5) * 6), y: b.y + (Math.random() - 0.5) * 6, vx: (Math.random() - 0.5) * 90, vy: (Math.random() - 0.5) * 90,
+                    g: 0, attrito: 3, s: Math.random() < 0.25 ? 2 : 1, vita: 0.12 + Math.random() * 0.14, fade: 0.06, cols: ELETTRICO, luce: true, davanti: true});
+      }
+    }
+    if (L.sangue && L.sangue.length && !L.ko && Math.random() < 0.1 * Math.min(2, L.sangue.length)) {          // Sanguinamento: gocce di sangue dal punto ferito, che cadono e macchiano il pavimento
+      const loc = L.sangue[Math.floor(Math.random() * L.sangue.length)], nomi = Pupazzo.LOC[loc] || Pupazzo.LOC[Object.keys(Pupazzo.LOC)[Math.floor(Math.random() * 6)]];
+      const b = L.pup.corpi[nomi[Math.floor(Math.random() * nomi.length)]];
+      if (b) particella({x: L.O + L.f * (b.x + (Math.random() - 0.5) * 5), y: b.y + (Math.random() - 0.3) * 6, vx: (Math.random() - 0.5) * 14, vy: -6 + Math.random() * 14,
+                         s: Math.random() < 0.25 ? 2 : 1, vita: 1.4, fade: 0.2, macchia: true, g: 560, col: "rgb(" + SANGUE[["a", "b", "c", "d"][Math.floor(Math.random() * 4)]].join(",") + ")"});
     }
     if (PO && L.po) PO.passo(L, aiuti);                      // i poteri: effetti a mossa, braci, teschi, neve
     // la falda del cappotto e' appesa al busto basso come un pendolo smorzato: quando il corpo va avanti si scosta all'indietro, quando si ferma ondeggia
@@ -1382,6 +1405,7 @@ const Arena = (() => {
   const COLORI_PROIETTILE = {fuoco: "#ff8a2a", gelo: "#8fe8ff", elettrico: "#fff27a", acido: "#9dff4a", psionico: "#e07bff",
                              magico: "#b86bff", perforante: "#ffe9b0", taglio: "#dfe8f0", contundente: "#cfd6e0"};
   const FIAMMA = ["#fff7c8", "#ffd24a", "#ff8a1f", "#e8400c", "#6a1a0c"];    // la rampa del fuoco: dal bianco caldo al rosso scuro
+  const ELETTRICO = ["#ffffff", "#fff6a0", "#ffe250", "#ffb020"];            // le scintille del Corpo Elettrico
   const proiettili = [];
   const futuro = (secondi, fn) => futuri.push({t: Math.max(0.0001, secondi), fn});
   const tipoSchivata = loc => loc === "testa" ? "abbassa" : loc && loc.startsWith("gamba") ? "salto" : "indietro";
@@ -1600,7 +1624,8 @@ const Arena = (() => {
     if (sotto && L.cop && !L.copStacc) staccaCopricapo(L, primo);
     else if (!sotto && L.copStacc) L.copStacc = null;
     L.extra = pg.extra || {};                                    // ali (potere Ali), braccia extra (2x2), volo (stance): spariscono con loro
-    if (primo) { L.acq = L.extra.acqua ? 1 : 0; L.fuo = L.extra.fuoco ? 1 : 0; }                    // (Forma d'acqua: a duello gia' avviato niente dissolvenza)
+    L.sangue = inPalestra ? [] : (pg.effetti || []).filter(e => e.nome === "Sanguinamento").map(e => e.loc || null);          // chi sanguina (dove, se si sa)
+    if (primo) { L.acq = L.extra.acqua ? 1 : 0; L.fuo = L.extra.fuoco ? 1 : 0; L.ele = conStance(L, STANCE_CORPO_ELETTRICO) ? 1 : 0; }                    // (Forma d'acqua: a duello gia' avviato niente dissolvenza)
     if (primo) L.fk = 1 + FORZA_RANGO * (L.extra.forza || 0);    // (a duello gia' avviato niente crescita: e' gia' cosi')
     L.pup.volo(!!L.extra.volo);
     const morto = !inPalestra && (pg.hp.testa.val <= 0 || pg.hp.busto.val <= 0);
