@@ -65,6 +65,7 @@ function schedaHtml(e, titolo = "", opz = {}) {
       ${e.storia.map(s => `<div>giro ${s.round + 1}: ${s.novita.map(esc).join(", ") || "—"}</div>`).join("")}</details>` : "";
   return `<div class="evo-scheda ${e.elite ? "elite" : ""} ${opz.cls || ""}">
     ${titolo ? `<div class="evo-eroe-sub">${titolo}</div>` : ""}
+    ${e.scala ? `<div class="evo-scala" title="Oltre le statistiche, i poteri e le mutazioni: la scala dell'infinito non ha fondo">∞ livello ${e.infinito}: +${e.scala.hp} hp (testa e busto) · +${e.scala.armatura} armatura · +${e.scala.danni}% danni</div>` : ""}
     <div class="evo-scheda-testa">
       ${sagoma(e.aspetto)}
       <div class="evo-scheda-nome"><div class="evo-eroe-nome">${esc(e.nome)}${e.elite ? ' <span class="evo-elite">ÉLITE</span>' : ""}</div>
@@ -82,7 +83,8 @@ function schedaHtml(e, titolo = "", opz = {}) {
 /* la striscia in alto: dove sei nella corsa, gettoni, il tuo eroe */
 function hudHtml() {
   const tappe = ["Ottavi", "Quarti", "Semifinale", "Finale"].map((t, i) =>
-    `<span class="evo-tappa ${i < S.round ? "fatta" : i === S.round ? "qui" : ""}" title="${t}">${i + 1}</span>`).join('<i></i>');
+    `<span class="evo-tappa ${i < S.round || inf() ? "fatta" : i === S.round ? "qui" : ""}" title="${t}">${i + 1}</span>`).join('<i></i>')
+    + (inf() ? `<i></i><span class="evo-tappa qui evo-inf" title="Modalità infinita: livello ${inf().livello}">∞${inf().livello}</span>` : "");
   const e = S.eroe;
   return `<div class="evo-hud">
     <div class="evo-hud-eroe"><b>${esc(e.nome)}</b>${barraVita(e.hp.frazione, "corta")}</div>
@@ -93,6 +95,11 @@ function hudHtml() {
   </div>
   ${e.mutazioni.length ? `<div class="evo-hud-mut">${e.mutazioni.map(m => chipMut(m)).join("")}</div>` : ""}`;
 }
+
+/* la modalita' infinita (dopo il titolo): {vinti, livello, record, boss} se e' in corso, altrimenti null */
+const inf = () => (S.infinito && S.infinito.attivo ? S.infinito : null);
+const ritiraHtml = () => inf() ? `<button class="btn btn-ghost evo-ritira" onclick="if (confirm('Ti ritiri dall\\'infinito? Il punteggio resta tuo.')) azione({tipo:'ritira'})"
+    title="Perdere o ritirarsi vale lo stesso: il punteggio che hai fatto resta">Ritirati</button>` : "";
 
 const avvisoHtml = () => (S.avviso && S.avviso.length) ? `<div class="evo-avviso">${S.avviso.map(esc).join("<br>")}</div>` : "";
 const erroreHtml = () => errore ? `<div class="evo-errore" role="alert">${esc(errore)}</div>` : "";
@@ -136,7 +143,7 @@ function render() {
 function renderLanding() {
   const m = S.meta, asc = S.ascensioni;
   if (ascScelta > m.ascensione_max) ascScelta = 0;
-  const storico = m.storico.slice().reverse().slice(0, 6).map(r => `<tr><td>${esc(r.eroe)}</td><td>${esc(r.turno)}${r.titolo ? " 🏆" : ""}</td>
+  const storico = m.storico.slice().reverse().slice(0, 6).map(r => `<tr><td>${esc(r.eroe)}</td><td>${r.infinito ? "∞ " + r.infinito : esc(r.turno)}${r.titolo ? " 🏆" : ""}</td>
       <td>▲${r.ascensione}</td><td>${r.mutazioni} mut.</td><td><b>${r.punteggio}</b></td></tr>`).join("");
   app().innerHTML = `
     <div class="evo-hero">
@@ -149,6 +156,7 @@ function renderLanding() {
         <div><b>${m.migliore}</b><span>miglior punteggio</span></div>
         <div><b>${m.corse}</b><span>corse</span></div>
         <div><b>${m.titoli}</b><span>titoli</span></div>
+        <div title="Gli sfidanti battuti di fila nella modalità infinita, dopo il titolo"><b>${m.infinito_max}</b><span>record infinito</span></div>
       </div>
       <div class="evo-asc-scelta" role="radiogroup" aria-label="Ascensione">
         ${asc.map(a => `<button class="evo-asc ${a.indice === ascScelta ? "scelta" : ""}" role="radio" aria-checked="${a.indice === ascScelta}"
@@ -196,7 +204,7 @@ function renderScontro() {
   app().innerHTML = `
     <div class="evo-intro">
       ${hudHtml()}
-      <div class="evo-kicker">${sparring ? "SPARRING D'ÉLITE" : S.nome_turno.toUpperCase()}</div>
+      <div class="evo-kicker">${sparring ? "SPARRING D'ÉLITE" : inf() ? `${inf().boss ? "☠ BOSS · " : ""}INFINITO · LIVELLO ${inf().livello}` : S.nome_turno.toUpperCase()}</div>
       <h2 class="evo-vs">${esc(S.eroe.nome)} <span class="muted">vs</span> ${esc(S.avversario.nome)}</h2>
       ${sparring ? `<p class="muted evo-nota">Se vinci: 5 gettoni e un bottino di mutazioni rare. Se perdi: perdi tutti i gettoni e resti a un quarto della vita, ma la corsa continua.</p>` : ""}
       ${regolaHtml(S.regola)}
@@ -205,12 +213,12 @@ function renderScontro() {
       <div class="evo-vsrow">
         ${schedaHtml(S.eroe, "IL TUO CAMPIONE", {cls: "mio", mutazioniEstese: true})}
         <div class="evo-vsmezzo">VS</div>
-        ${schedaHtml(S.avversario, sparring ? "L'ÉLITE" : "L'AVVERSARIO", {storia: true, mutazioniEstese: true})}
+        ${schedaHtml(S.avversario, sparring ? "L'ÉLITE" : inf() ? (inf().boss ? "IL BOSS" : "LO SFIDANTE") : "L'AVVERSARIO", {storia: true, mutazioniEstese: true})}
       </div>
       ${erroreHtml()}
-      <button class="btn btn-volt evo-cta" onclick="azione({tipo:'combatti'})">⚔ COMBATTI</button>
+      <button class="btn btn-volt evo-cta" onclick="azione({tipo:'combatti'})">⚔ COMBATTI</button>${sparring ? "" : ritiraHtml()}
       ${S.log_arena.length ? `<div class="evo-arena-log">${S.log_arena.map(esc).join("<br>")}</div>` : ""}
-      ${sparring ? "" : `<details class="evo-tabellone"><summary>Il tabellone</summary>${bracketHtml()}</details>`}
+      ${sparring || inf() ? "" : `<details class="evo-tabellone"><summary>Il tabellone</summary>${bracketHtml()}</details>`}
     </div>`;
 }
 
@@ -261,7 +269,7 @@ function renderPorte() {
   app().innerHTML = `
     <div class="evo-intro">
       ${hudHtml()}
-      <div class="evo-kicker">UNA PAUSA PRIMA DEI ${S.nome_turno.toUpperCase()}</div>
+      <div class="evo-kicker">${inf() ? `UNA PAUSA PRIMA DEL LIVELLO ${inf().livello}` : `UNA PAUSA PRIMA DEI ${S.nome_turno.toUpperCase()}`}</div>
       <h2 class="evo-vs">Scegli una porta</h2>
       ${avvisoHtml()}
       <div class="evo-porte">
@@ -276,7 +284,7 @@ function renderPorte() {
         </button>`).join("")}
       </div>
       ${erroreHtml()}
-      <details class="evo-tabellone"><summary>Il tabellone</summary>${bracketHtml()}</details>
+      ${inf() ? ritiraHtml() : `<details class="evo-tabellone"><summary>Il tabellone</summary>${bracketHtml()}</details>`}
     </div>`;
 }
 
@@ -330,16 +338,28 @@ function renderFine() {
   const coriandoli = vinto ? Array.from({length: 16}, (_, i) =>
     `<span class="coriandolo" style="left:${6 * i + 3}%; animation-delay:${(i % 5) * .35}s"></span>`).join("") : "";
   const righe = r.righe.map(([et, p]) => `<tr><td>${esc(et)}</td><td>+${p}</td></tr>`).join("");
+  const fineInf = !vinto && r.infinito != null;                // finita la modalita' infinita (persa o ritirato): il titolo c'e' gia'
+  const infinitaHtml = vinto && S.puo_infinito ? `<div class="evo-infinita">
+      <h3>♾ Modalità infinita <small>facoltativa</small></h3>
+      <p>Continua a combattere contro sfidanti sempre più forti, uno dopo l'altro, finché non perdi. Il tuo punteggio resta e ogni sfidante battuto ne aggiunge; ogni quinto è un boss.
+      Parti con un bottino garantito. Il tuo record: <b>${S.infinito.record}</b>.</p>
+      <button class="btn btn-volt" onclick="azione({tipo:'infinito'})">CONTINUA ALL'INFINITO</button></div>` : "";
+  const titolo = vinto ? "CAMPIONE <span>EVO</span>" : fineInf ? (r.ritirato ? "RITIRATO" : "ELIMINATO") : "ELIMINATO";
+  const sotto = vinto ? `${esc(S.eroe.nome)} ha vinto il Torneo Evo.`
+    : fineInf ? `${esc(S.eroe.nome)} ha vinto il Torneo Evo e nella modalità infinita ha battuto <b>${r.infinito}</b> ${r.infinito === 1 ? "sfidante" : "sfidanti"}${r.ritirato ? " prima di ritirarsi" : ""}.`
+    : `${esc(S.eroe.nome)} esce ai ${esc(S.nome_turno.toLowerCase())}. Il torneo l'ha vinto <b>${esc(S.campione)}</b>.`;
   app().innerHTML = `
     <div class="${vinto ? "evo-vittoria" : "evo-intro"}">${coriandoli}
       ${vinto ? '<div class="evo-trofeo">🏆</div>' : ""}
-      <h1 class="evo-title ${vinto ? "" : "evo-rosso"}">${vinto ? "CAMPIONE <span>EVO</span>" : "ELIMINATO"}</h1>
-      <p class="muted">${vinto ? `${esc(S.eroe.nome)} ha vinto il Torneo Evo.` : `${esc(S.eroe.nome)} esce ai ${esc(S.nome_turno.toLowerCase())}. Il torneo l'ha vinto <b>${esc(S.campione)}</b>.`}</p>
+      <h1 class="evo-title ${vinto || r.ritirato ? "" : "evo-rosso"}">${titolo}</h1>
+      <p class="muted">${sotto}</p>
       <table class="evo-riepilogo"><caption>Il punteggio</caption>${righe}
         ${r.moltiplicatore > 1 ? `<tr class="mol"><td>Ascensione ▲${S.ascensione} (${esc(S.ascensione_nome)})</td><td>×${r.moltiplicatore.toFixed(2)}</td></tr>` : ""}
         <tr class="tot"><td>TOTALE</td><td>${r.totale}</td></tr></table>
       ${r.record ? '<div class="evo-record">★ NUOVO RECORD</div>' : `<p class="muted">Il tuo record: ${S.meta.migliore}</p>`}
       ${r.sbloccata ? `<div class="evo-record">🔓 Ascensione sbloccata: ${esc(r.sbloccata)}</div>` : ""}
+      ${fineInf && r.infinito >= S.meta.infinito_max && r.infinito > 0 ? `<div class="evo-record">♾ RECORD INFINITO: ${r.infinito}</div>` : ""}
+      ${infinitaHtml}
       <div class="evo-vsrow solo">${schedaHtml(S.eroe, "IL TUO CAMPIONE", {mutazioniEstese: true})}</div>
       <details class="evo-tabellone"><summary>Il tabellone</summary>${bracketHtml()}</details>
       <div class="evo-azioni-finali">

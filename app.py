@@ -2480,6 +2480,8 @@ AZIONI_TORNEO = {
     "allena": lambda t, d: t.allena(d.get("indice")),
     "evento": lambda t, d: t.scegli_evento(d.get("indice")),
     "chiudi_evento": lambda t, d: t.chiudi_evento(),
+    "infinito": lambda t, d: t.inizia_infinito(),
+    "ritira": lambda t, d: t.ritira(),
 }
 
 

@@ -1323,3 +1323,11 @@ a.pal-tab { text-decoration: none; display: inline-block; }
 .regola-chip { padding: 2px 10px; border: 1px solid var(--warn); border-radius: 12px; font-size: 12px; color: var(--warn); }
 .regola-chip:empty { display: none; }
 .pi.mut-rara { border-color: var(--teal); } .pi.mut-leggendaria { border-color: var(--volt); } .pi.mut-maledetta { border-color: var(--danger); }
+
+/* la modalita' infinita (dopo il titolo) */
+.evo-infinita { max-width: 520px; margin: 18px auto 6px; padding: 14px 18px; border: 1px solid var(--volt); border-radius: 12px; background: rgba(215, 255, 62, .05); text-align: left; }
+.evo-infinita h3 { font-style: italic; font-weight: 900; margin-bottom: 4px; } .evo-infinita h3 small { color: var(--muted); font-size: 11px; letter-spacing: 2px; font-style: normal; }
+.evo-infinita p { color: var(--muted); font-size: 13px; line-height: 1.5; margin-bottom: 10px; }
+.evo-tappa.evo-inf { width: auto; min-width: 22px; padding: 0 6px; border-radius: 11px; }
+.evo-ritira { display: block; margin: 14px auto 0; font-size: 12px; }
+.evo-scala { font-size: 11.5px; color: var(--warn); border: 1px dashed var(--warn); border-radius: 8px; padding: 4px 8px; }

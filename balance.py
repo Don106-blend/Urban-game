@@ -766,33 +766,48 @@ def _scelte_evo(t, politica):
 
 def _lavoro_torneo(args):
     """Un lotto di corse intere del Torneo Evo con una politica ('caso' o 'furbo') e un'ascensione. Ritorna un dizionario di misure."""
-    n, seed, politica, asc = args
+    n, seed, politica, asc = args[:4]
+    inf = len(args) > 4 and args[4]            # dopo il titolo si continua all'infinito, finche' non si perde
     applica_what_if(WHAT_IF)
     random.seed(seed)
     profilo_neutro()
     app.evo.PERCORSO = None
-    out = {"corse": 0, "titoli": 0, "eccezioni": Counter(), "round": [], "sparring": [0, 0], "mutazioni": [], "gettoni": []}
+    out = {"corse": 0, "titoli": 0, "eccezioni": Counter(), "round": [], "sparring": [0, 0], "mutazioni": [], "gettoni": [], "inf": [], "lunghi_inf": 0}
     for _ in range(n):
         try:
             t = app.evo.Corsa(asc)
             app.TORNEO = t
-            passi = 0
-            while t.fase not in ("vittoria", "eliminato"):
+            passi, titolo = 0, False
+            while t.fase != "eliminato":
+                if t.fase == "vittoria":
+                    titolo = True
+                    if not inf:
+                        break
+                    t.inizia_infinito()
                 passi += 1
-                if passi > 200:
+                if passi > 3000:
                     raise RuntimeError(f"corsa bloccata in {t.fase}")
+                if t.infinito and t.giro_inf >= 120 and t.fase in ("bracket", "porte"):
+                    t.ritira()
+                    break
                 if t.fase in ("bracket", "sparring"):
                     sparring = t.fase == "sparring"
-                    prima = t.conta["sparring"]
+                    prima, all_infinito = t.conta["sparring"], t.infinito
                     if _gioca_duello_evo(t):
-                        out["eccezioni"]["duello infinito nel torneo"] += 1
+                        # (nell'infinito, contro un'armatura enorme, un duello che non finisce in 120 round e' una sconfitta: succede, non e' un errore)
+                        if all_infinito:
+                            out["lunghi_inf"] += 1
+                        else:
+                            out["eccezioni"]["duello infinito nel torneo"] += 1
                     if sparring:
                         out["sparring"][0] += t.conta["sparring"] > prima
                         out["sparring"][1] += 1
                 else:
                     _scelte_evo(t, politica)
             out["corse"] += 1
-            out["titoli"] += t.fase == "vittoria"
+            out["titoli"] += titolo
+            if titolo and inf:
+                out["inf"].append(t.giro_inf)
             out["round"].append(t.conta["vittorie"])
             out["mutazioni"].append(len(t.eroe()["mutazioni"]))
             out["gettoni"].append(t.gettoni)
@@ -808,8 +823,8 @@ def m_torneo(es, a, rep):
     blocchi = es.jobs * 2
     per = max(10, a.n // blocchi // 8)
     tot_ecc = 0
-    for politica, fascia, nome in (("caso", (4, 14), "scelte a caso"), ("furbo", (15, 45), "scelte da giocatore furbo")):
-        ris = es.mappa(_lavoro_torneo, [(per, a.seed * 13 + i, politica, 0) for i in range(blocchi)])
+    for politica, fascia, nome, fascia_inf in (("caso", (4, 14), "scelte a caso", (0, 4)), ("furbo", (15, 45), "scelte da giocatore furbo", (8, 25))):
+        ris = es.mappa(_lavoro_torneo, [(per, a.seed * 13 + i, politica, 0, True) for i in range(blocchi)])
         corse = sum(r["corse"] for r in ris)
         titoli = sum(r["titoli"] for r in ris)
         ecc = Counter()
@@ -818,6 +833,11 @@ def m_torneo(es, a, rep):
         tot_ecc += sum(ecc.values())
         v = 100.0 * titoli / max(1, corse)
         rep.riga("T", f"titolo del Torneo Evo, {nome} ({corse} corse)", f"{v:.1f}%", f"{fascia[0]}-{fascia[1]}%", _entro(v, *fascia))
+        inf = sorted(x for r in ris for x in r["inf"])      # la modalita' infinita: gli sfidanti battuti da chi ha vinto il titolo, finche' non perde
+        if len(inf) >= 10:
+            mediana, p90 = inf[len(inf) // 2], inf[min(len(inf) - 1, int(0.9 * len(inf)))]
+            rep.riga("T", f"infinito, {nome}: sfidanti battuti (mediana, {len(inf)} titoli)", f"{mediana}  (p90 {p90}, max {inf[-1]})", f"{fascia_inf[0]}-{fascia_inf[1]}, p90 <= 45",
+                     _entro(mediana, *fascia_inf) and p90 <= 45)
         vittorie = [x for r in ris for x in r["round"]]
         if vittorie:
             rep.info(f"{nome}: vittorie per corsa in media {statistics.mean(vittorie):.2f} su 4; "
@@ -826,6 +846,9 @@ def m_torneo(es, a, rep):
         sp = [sum(r["sparring"][0] for r in ris), sum(r["sparring"][1] for r in ris)]
         if sp[1]:
             rep.info(f"{nome}: sparring d'elite giocati {sp[1]}, vinti {100.0 * sp[0] / sp[1]:.0f}%")
+        lunghi = sum(r["lunghi_inf"] for r in ris)
+        if lunghi:
+            rep.info(f"{nome}: {lunghi} duelli dell'infinito non finiti in {CAP_ROUND} round (armatura enorme: contati come sconfitta)")
         for firma, c in ecc.most_common(5):
             rep.info(f"{c}x {firma}")
     rep.riga("T", "eccezioni / duelli infiniti nel torneo", str(tot_ecc), "0", tot_ecc == 0)

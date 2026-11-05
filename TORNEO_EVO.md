@@ -22,7 +22,7 @@ costruisce il combattente con scelte che pesano (e che si possono sbagliare), la
    sempre una mutazione rara o leggendaria.
 6. **Porte.** Si scelgono una di tre (di cinque tipi): *Riposo* (vita al massimo, ferite guarite: sempre presente sotto il 55% di vita), *Mercato nero*,
    *Allenamento* (+1 a una statistica o a un rango, a scelta), *Sparring d'élite* (vedi sotto), *Incontro* (evento).
-7. Si torna al tabellone, fino al titolo o all'eliminazione.
+7. Si torna al tabellone, fino al titolo o all'eliminazione. Dopo il titolo, a scelta, la **modalità infinita** (v. sotto).
 
 ### Le carte del bottino
 Un **potere nuovo** (rango = turno + 1, mai oltre il Controllo), il **rango di un potere** (mai oltre il Controllo, che sale di uno a ogni vittoria), una
@@ -85,6 +85,24 @@ moltiplica per `1 + 0,25 × ascensione`. Il riepilogo di fine corsa mostra ogni 
 Si sblocca la successiva vincendo il titolo alla più alta già sbloccata. «Bot a caso» sceglie tutto a caso; «bot furbo» sceglie per valore misurato (e **non**
 prende poteri: vedi sotto). Entrambi giocano i duelli con la stessa IA delle CPU: un giocatore vero, che sa usare stance, mira e Banco, fa meglio.
 
+## Modalità infinita (facoltativa)
+Dopo la vittoria in Finale, la schermata del titolo offre **«Continua all'infinito»**: sfidanti sempre più forti, uno dopo l'altro, finché non si perde (o ci si ritira).
+Il punteggio del titolo resta già contato (e salvato nello storico): l'infinito ci aggiunge sopra, e chi non sceglie niente non perde niente.
+
+- **Come si riparte.** Subito un bottino garantito (una mutazione rara o leggendaria) e una porta, poi il primo sfidante. Dopo ogni vittoria: bottino (ogni terzo garantito, ogni
+  quinto lo scrigno dell'élite: tre mutazioni rare o leggendarie) e una porta, come nella corsa. La vita continua a non ricaricarsi da sola; lo sparring d'élite c'è ancora e cresce
+  coi livelli. Ci si può **ritirare** tra un combattimento e l'altro (anche alle porte): vale quanto perdere.
+- **Lo sfidante di livello n.** È cresciuto come un finalista più *n* giri (con gli extra dell'ascensione) e ha, in più, una **scala senza fondo** che non dipende da statistiche,
+  poteri o mutazioni (che prima o poi finiscono): `hp massimi di testa e busto +25·L`, `armatura su ogni locazione +15·L`, `danni ×(1 + 0,08·L)`, con `L = n + n²/25`
+  (lineare all'inizio, poi sempre più ripida: anche la build più forte, prima o poi, cede). La scheda dello sfidante dice quanto ha di scala. Ogni quinto è un **boss**: un'élite con
+  più crescita e una mutazione rara, sempre su una regola d'arena non regolare, e paga il bottino dell'élite.
+- **Punteggio.** Ogni sfidante battuto vale `60 + 20·n` (+100 se è un boss), più la vita rimasta e la rapidità; tutto si somma in una voce («Modalità infinita») e si moltiplica per
+  l'ascensione. Al titolo si aggiunge il record dell'infinito (`infinito_max`: gli sfidanti battuti di fila, nel salvataggio), e lo storico mostra «∞ n».
+- **Misurato** (`python balance.py torneo`, che continua i bot all'infinito dopo il titolo): il bot a caso batte in mediana 1 sfidante; quello che sceglie per valore ne batte in mediana
+  16–19 (p90 circa 30, massimo 36). Contro un'armatura così alta qualche duello non finisce in 120 round: nell'harness vale come sconfitta.
+- **API.** `infinito` (solo da `vittoria`) e `ritira` (solo tra un combattimento e l'altro); `stato()` ha `puo_infinito` e `infinito: {attivo, vinti, livello, record, boss}`, e
+  `nome_turno` diventa «Infinito n». Le corse salvate prima dell'infinito si leggono ancora.
+
 ## Una cosa che il bilanciamento ha mostrato
 `python balance.py carte` misura anche le altre carte con lo stesso metodo: per chi lascia giocare i poteri all'IA, un **potere nuovo vale in media −10 punti di
 forza** e un **rango in più −6** (accendere un potere costa un'azione e stamina, e l'IA li accende tutti), mentre una protesi vale +7, i riflessi +10 e le
@@ -97,9 +115,9 @@ Lo stato è tutto JSON (record di combattenti, come in palestra): si salva dopo 
 torna alla schermata prima). Il file contiene anche il record e le ultime corse.
 
 `GET /api/torneo/stato`, `POST /api/torneo/azione {tipo, …}`: `inizia {ascensione}`, `campione {indice}`, `carta {indice}`, `rilancia`, `salta`, `porta {indice}`,
-`compra {indice}`, `esci_mercato`, `allena {indice}`, `evento {indice}`, `chiudi_evento`, `combatti`, `chiudi`. Ogni risposta è lo stato nuovo; un rifiuto è un 400 con
+`compra {indice}`, `esci_mercato`, `allena {indice}`, `evento {indice}`, `chiudi_evento`, `combatti`, `infinito`, `ritira`, `chiudi`. Ogni risposta è lo stato nuovo; un rifiuto è un 400 con
 `errore`. Cosa c'è in `stato()` dipende dalla fase (`campioni`, `bracket`, `duello`, `bottino`, `porte`, `mercato`, `allenamento`, `evento`, `sparring`,
-`vittoria`, `eliminato`).
+`vittoria`, `eliminato`; la modalità infinita riusa `bracket`, `bottino`, `porte`...).
 
 ## Provarlo
 ```

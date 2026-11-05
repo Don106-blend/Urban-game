@@ -17,9 +17,9 @@ const client = new Function(src + "\nreturn {render, vai: s => { S = s; render()
 
 // per ogni fase, un pezzo di testo che la schermata deve avere
 const ATTESO = {
-  landing: ["INIZIA LA CORSA", "miglior punteggio"], campioni: ["SCEGLI IL TUO CAMPIONE", "SCEGLI "], bracket: ["COMBATTI", "Regola", "VS"],
+  landing: ["INIZIA LA CORSA", "miglior punteggio", "record infinito"], campioni: ["SCEGLI IL TUO CAMPIONE", "SCEGLI "], bracket: ["COMBATTI", "VS"],
   sparring: ["COMBATTI", "SPARRING"], bottino: ["Salta", "carta"], porte: ["Scegli una porta"], mercato: ["Esci dal mercato", "Medikit"],
-  allenamento: ["Su cosa lavori"], evento: ["INCONTRO"], vittoria: ["CAMPIONE", "TOTALE"], eliminato: ["ELIMINATO", "TOTALE"], duello: ["duello"],
+  allenamento: ["Su cosa lavori"], evento: ["INCONTRO"], vittoria: ["CAMPIONE", "TOTALE"], eliminato: ["TOTALE"], duello: ["duello"],
 };
 const viste = new Set();
 for (const s of stati) {
@@ -33,6 +33,24 @@ for (const s of stati) {
 }
 for (const f of ["landing", "campioni", "bracket", "bottino", "porte", "vittoria", "eliminato"])
   ok(viste.has(f), `nessuno stato di prova per la fase ${f}`);
+
+// la modalita' infinita: l'offerta dopo il titolo, lo sfidante (e il boss) e il ritiro durante, il riepilogo alla fine
+const inf = {offerta: 0, scontro: 0, boss: 0, porte: 0, fine: 0};
+for (const s of stati) {
+  if (!s.attivo) continue;
+  client.vai(s);
+  const h = out.innerHTML, attiva = s.infinito && s.infinito.attivo;
+  if (s.fase === "eliminato") ok(h.includes("ELIMINATO") || h.includes("RITIRATO"), "eliminato: manca il titolo della schermata");
+  if (s.fase === "vittoria" && s.puo_infinito) { inf.offerta++; ok(h.includes("CONTINUA ALL'INFINITO") && h.includes("facoltativa"), "vittoria: manca l'offerta dell'infinito"); }
+  if (s.fase === "bracket" && attiva) {
+    inf.scontro++;
+    ok(h.includes("INFINITO") && h.includes("Ritirati") && (h.includes("LO SFIDANTE") || h.includes("IL BOSS")) && !h.includes("Il tabellone") && h.includes("hp (testa e busto)"), "scontro dell'infinito: manca qualcosa");
+    if (s.infinito.boss) { inf.boss++; ok(h.includes("BOSS"), "il boss non si vede"); }
+  }
+  if (s.fase === "porte" && attiva) { inf.porte++; ok(h.includes("LIVELLO") && h.includes("Ritirati") && !h.includes("Il tabellone"), "porte dell'infinito"); }
+  if (s.fase === "eliminato" && s.riepilogo && s.riepilogo.infinito != null) { inf.fine++; ok(h.includes("modalità infinita") && h.includes("RITIRATO"), "fine dell'infinito"); }
+}
+ok(inf.offerta && inf.scontro && inf.boss && inf.porte && inf.fine, "stati di prova dell'infinito mancanti: " + JSON.stringify(inf));
 
 // i nomi vengono dal server: mai HTML crudo
 const base = stati.find(s => s.attivo && s.fase === "bracket");

@@ -3,6 +3,7 @@
 Una corsa: 16 eroi base (tre ne offrono la scelta), eliminazione diretta Ottavi -> Finale. Dopo ogni vittoria si pesca il bottino (tre
 carte: un potere, un rango, una statistica, un impianto o una mutazione) e si sceglie una porta (riposo, mercato, allenamento, sparring
 d'elite, evento). La vita si porta dietro da un duello all'altro. I gettoni sono la moneta della corsa (mercato, rilanci, puntate).
+Dopo il titolo c'e' la modalita' infinita (facoltativa): sfidanti sempre piu' forti, uno dopo l'altro, finche' non si perde.
 Tutto lo stato e' JSON (dizionari di record, come in palestra): si salva dopo ogni mossa in save/evo.json e si riprende da dove si era.
 
 Il modulo non importa `app` (si caricherebbe due volte lanciando app.py): `collega()` riceve il DB e le funzioni che servono."""
@@ -58,6 +59,13 @@ SCONTO_MAX = 0.5
 PUNTI_VITTORIA, PUNTI_SPARRING, PUNTI_SALUTE, PUNTI_GETTONE, PUNTI_TITOLO = 100, 50, 50, 10, 300
 BONUS_ASCENSIONE = 0.25      # il punteggio finale cresce del 25% per ascensione
 
+# la modalita' infinita: dopo il titolo, sfidanti sempre piu' forti. Lo sfidante di livello n e' cresciuto come un finalista piu' n giri e ha, oltre i limiti
+# delle statistiche, dei poteri e delle mutazioni, una scala senza fondo (hp, armatura e danni crescono a ogni livello). Ogni BOSS_OGNI-esimo e' un boss.
+PUNTI_INFINITO, PUNTI_INFINITO_PASSO, PUNTI_BOSS = 60, 20, 100      # una vittoria all'infinito vale 60 + 20 per livello (+100 per un boss)
+BOSS_OGNI = 5
+SCALA_HP, SCALA_ARMATURA, SCALA_DANNI = 25, 15, 0.08      # per livello: hp massimi di testa e busto, armatura su ogni locazione, moltiplicatore dei danni
+VALORE_SCALA = 20                                         # quanto vale la scala di un livello nella forza (per il pronostico)
+
 ASCENSIONI = [
     {"nome": "Esordiente", "regola": "Nessuna difficoltà in più."},
     {"nome": "Veterano", "regola": "Le CPU ottengono un miglioramento in più a ogni round e spesso una mutazione in più."},
@@ -78,7 +86,7 @@ META = None           # record e storico, sopravvivono alla corsa
 
 
 def _meta_vuoto():
-    return {"corse": 0, "titoli": 0, "migliore": 0, "ascensione_max": 0, "storico": []}
+    return {"corse": 0, "titoli": 0, "migliore": 0, "ascensione_max": 0, "infinito_max": 0, "storico": []}
 
 
 def collega(db, record_to_pg, controlla_equip, percorso=None):
@@ -240,7 +248,20 @@ def forza(rec):
 
 
 def extra_forza(rec):
-    return VALORE_EQUIP * (len(rec["protesi"]) + len(rec["augments"])) + sum(VALORE_MUT[MUTAZIONI[m]["rarita"]] for m in rec["mutazioni"])
+    return (VALORE_EQUIP * (len(rec["protesi"]) + len(rec["augments"])) + sum(VALORE_MUT[MUTAZIONI[m]["rarita"]] for m in rec["mutazioni"])
+            + round(VALORE_SCALA * liv_scala(rec.get("infinito", 0))))
+
+
+def liv_scala(n):
+    """Quanta scala ha lo sfidante di livello `n`: lineare all'inizio, poi sempre piu' ripida (anche la build piu' forte, prima o poi, cede)."""
+    return n + n * n / 25
+
+
+def ops_scala(n):
+    """La scala dell'infinito: cio' che lo sfidante di livello `n` ha in piu', senza limite."""
+    L = liv_scala(n)
+    return [{"op": "hp_max", "valore": round(SCALA_HP * L), "locazioni": ["testa", "busto"]}, {"op": "armatura", "valore": round(SCALA_ARMATURA * L), "locazione": "tutte"},
+            {"op": "mult_danno", "valore": 1 + SCALA_DANNI * L}]
 
 
 # ---------------------------------------------------------------- dal record al Personaggio del duello
@@ -299,6 +320,8 @@ def crea_pg(rec, ops_extra=()):
     p = _record_to_pg(base)
     for mid in rec["mutazioni"]:
         applica_ops(p, [o for o in MUTAZIONI[mid]["ops"] if o["op"] != "stat"])
+    if rec.get("infinito"):
+        applica_ops(p, ops_scala(rec["infinito"]))
     applica_ops(p, ops_extra)
     hp = rec.get("hp")
     if hp:
@@ -364,6 +387,8 @@ def scheda(rec):
     """Tutto cio' che il client mostra di un combattente."""
     frac, locs = salute(rec)
     return {"nome": rec["nome"], "aspetto": rec["aspetto"], "stats": dict(rec["stats"]), "forza": forza(rec), "elite": rec.get("elite", False),
+            "infinito": rec.get("infinito", 0), "scala": ({"hp": round(SCALA_HP * liv_scala(rec["infinito"])), "armatura": round(SCALA_ARMATURA * liv_scala(rec["infinito"])),
+                                                           "danni": round(SCALA_DANNI * liv_scala(rec["infinito"]) * 100)} if rec.get("infinito") else None),
             "poteri": [{"id": p["id"], "nome": _def_potere(p["id"])["nome"], "rango": p["rango"],
                         "descrizione": _def_potere(p["id"]).get("descrizione", ""), "mosse": mosse_potere(p["id"], p["rango"])} for p in rec["poteri"]],
             "protesi": [{"id": i, "nome": _def_item("protesi", i)["nome"], "descrizione": _def_item("protesi", i).get("descrizione", "")} for i in rec["protesi"]],
@@ -438,6 +463,12 @@ class Corsa:
     campioni (si sceglie l'eroe) -> bracket (si vede l'avversario) -> duello -> bottino (tre carte) -> porte (riposo, mercato, allenamento,
     sparring, evento) -> bracket... fino a vittoria (il titolo) o eliminato. Ogni mossa ritorna None, o il motivo per cui non si puo' fare."""
 
+    infinito = False             # la modalita' infinita e' in corso (c'e' il default sulla classe: le corse salvate prima non hanno questi campi)
+    giro_inf = 0                 # gli sfidanti dell'infinito battuti
+    sfidante = None              # il prossimo avversario dell'infinito (un record)
+    riepilogo_titolo = None      # il riepilogo del titolo, da cui riparte il punteggio dell'infinito
+    migliore_altri = 0           # il record prima di questa corsa
+
     def __init__(self, ascensione=0):
         self.ascensione = ascensione
         self.fase = "campioni"
@@ -503,6 +534,8 @@ class Corsa:
     def avversario(self):
         if self.fase == "sparring" or (self.fase == "duello" and self.duello_tipo == "sparring"):
             return self.sparring["rec"]
+        if self.infinito:
+            return self.sfidante
         return self.eroi[self.avversario_idx()]
 
     def _vince_cpu(self, a, b):
@@ -516,7 +549,8 @@ class Corsa:
 
     def _entra_bracket(self):
         self.fase = "bracket"
-        self.regola = self._scegli_regola(dura=self.round == 3)
+        boss = bool(self.infinito and self.sfidante and self.sfidante.get("elite"))
+        self.regola = self._scegli_regola(dura=boss if self.infinito else self.round == 3)
 
     # ---------- la scelta dell'eroe ----------
     def scegli_campione(self, i):
@@ -554,7 +588,7 @@ class Corsa:
         del self.log_arena[:-12]
 
     def _punti(self, voce, n):
-        self.punti[voce] = self.punti.get(voce, 0) + n
+        self.punti["infinito" if self.infinito else voce] = self.punti.get("infinito" if self.infinito else voce, 0) + n      # all'infinito tutto si somma in una voce sola
 
     def risolvi_duello(self, vinto, duello=None):
         if self.fase != "duello":
@@ -568,6 +602,8 @@ class Corsa:
         self.avviso = []
         if self.duello_tipo == "sparring":
             self._finisci_sparring(vinto, pg, frac)
+        elif self.infinito:
+            self._finisci_infinito(vinto, pg, frac, round_duello)
         else:
             self._finisci_match(vinto, pg, frac, round_duello)
         self._fine()
@@ -629,6 +665,86 @@ class Corsa:
             if m:
                 dai_mutazione(rivale, m["id"])
         self._apri_bottino("garantito" if self.round >= 2 else "normale", "porte")
+
+    # ---------- la modalita' infinita ----------
+    def puo_infinito(self):
+        return self.fase == "vittoria" and not self.infinito
+
+    def inizia_infinito(self):
+        """Dopo il titolo: si continua contro sfidanti sempre piu' forti, finche' non si perde (o ci si ritira). Il punteggio del titolo resta, ogni vittoria in
+        piu' ne aggiunge; si riparte con un bottino garantito (una mutazione rara o leggendaria) e una porta."""
+        if not self.puo_infinito():
+            return "la modalità infinita si apre dopo la vittoria in finale"
+        self.infinito = True
+        self.giro_inf = 0
+        self.riepilogo_titolo = dict(self.riepilogo)
+        self.sfidante = None
+        self.avviso = []
+        self._nota("Modalità infinita: sfidanti sempre più forti, finché non perdi.")
+        self._nuovo_sfidante()
+        self._apri_bottino("garantito", "porte")
+        return self._fine()
+
+    def _nuovo_sfidante(self):
+        """Lo sfidante di livello n: i finalisti hanno 3 giri di crescita, lui 3 + n (con gli extra dell'ascensione), e in piu' la scala senza fondo."""
+        n = self.giro_inf + 1
+        usati = {e["nome"] for e in self.eroi} | ({self.sfidante["nome"]} if self.sfidante else set())
+        p = eroe_base(DB["attacchi"], DB["poteri"], DB["stances"], usati)
+        rec = rec_da_pg(p, aspetto.genera(p.nome, [e["aspetto"] for e in self.eroi]))
+        for g in range(3 + n):
+            evolvi_cpu(rec, min(4, g + 2), extra=CPU_EXTRA[self.ascensione], giro=g, mut_extra=CPU_MUT_EXTRA[self.ascensione])
+        if n % BOSS_OGNI == 0:                                    # un boss: un'élite con piu' crescita e una mutazione rara
+            rec["elite"] = True
+            for g in range(2):
+                evolvi_cpu(rec, 4, giro=3 + n + g, mut_extra=1)
+            m = pesca_mutazione(rec, "rara", corsa=False)
+            if m:
+                dai_mutazione(rec, m["id"])
+        rec["infinito"] = n
+        self.sfidante = rec
+
+    def _finisci_infinito(self, vinto, pg, frac, round_duello):
+        if not vinto:
+            self.fase = "eliminato"
+            self._chiudi_infinito()
+            return
+        n = self.giro_inf + 1
+        boss = bool(self.sfidante.get("elite"))
+        self.giro_inf = n
+        self._punti("infinito", PUNTI_INFINITO + PUNTI_INFINITO_PASSO * n + (PUNTI_BOSS if boss else 0))
+        META["infinito_max"] = max(META["infinito_max"], n)
+        self._premi_vittoria(pg, frac, round_duello)
+        self._nota(f"{'Boss' if boss else 'Sfidante'} di livello {n} battuto!")
+        self._nuovo_sfidante()
+        self._apri_bottino("elite" if boss else "garantito" if n % 3 == 0 else "normale", "porte")
+
+    def ritira(self):
+        """Ci si ritira dall'infinito tra un combattimento e l'altro: il punteggio resta quello (perdere o ritirarsi vale lo stesso)."""
+        if not self.infinito or self.fase not in ("bracket", "porte"):
+            return "ti puoi ritirare solo tra un combattimento e l'altro dell'infinito"
+        self.porte = None
+        self.fase = "eliminato"
+        self._chiudi_infinito(ritirato=True)
+        return self._fine()
+
+    def _chiudi_infinito(self, ritirato=False):
+        """Fine dell'infinito: il punteggio del titolo (gia' contato) piu' i punti dell'infinito, e il record dell'infinito."""
+        eroe = self.eroe()
+        t = self.riepilogo_titolo
+        extra = self.punti.get("infinito", 0)
+        righe = [list(r) for r in t["righe"]] + ([[f"Modalità infinita ({self.giro_inf} sfidanti battuti)", extra]] if extra else [])
+        base = t["base"] + extra
+        molt = t["moltiplicatore"]
+        totale = round(base * molt)
+        raggiunto = f"Infinito {self.giro_inf}" if self.giro_inf else "Campione"
+        record = totale > self.migliore_altri
+        META["migliore"] = max(META["migliore"], totale)
+        META["infinito_max"] = max(META["infinito_max"], self.giro_inf)
+        voce = META["storico"][-1] if META["storico"] else None
+        if voce and voce["eroe"] == eroe["nome"] and voce.get("titolo"):          # la corsa e' gia' nello storico dal titolo: si aggiorna
+            voce.update(punteggio=totale, turno=raggiunto, infinito=self.giro_inf, mutazioni=len(eroe["mutazioni"]))
+        self.riepilogo = {"righe": righe, "base": base, "moltiplicatore": molt, "totale": totale, "turno": raggiunto, "record": record,
+                          "sbloccata": t.get("sbloccata"), "titolo": True, "infinito": self.giro_inf, "ritirato": ritirato}
 
     def _finisci_sparring(self, vinto, pg, frac):
         eroe = self.eroe()
@@ -774,8 +890,8 @@ class Corsa:
         p = eroe_base(DB["attacchi"], DB["poteri"], DB["stances"], usati)
         rec = rec_da_pg(p, aspetto.genera(p.nome, [e["aspetto"] for e in self.eroi]))
         rec["elite"] = True
-        for g in range(self.round + 2 + (1 if finale else 0)):
-            evolvi_cpu(rec, g + 2, giro=g)
+        for g in range(self.round + 2 + (1 if finale else 0) + self.giro_inf):          # (all'infinito l'élite cresce coi livelli)
+            evolvi_cpu(rec, min(4, g + 2), giro=g)
         m = pesca_mutazione(rec, "rara", corsa=False)
         if m:
             dai_mutazione(rec, m["id"])
@@ -983,12 +1099,13 @@ class Corsa:
                  (f"Gettoni avanzati ({self.gettoni})", self.gettoni * PUNTI_GETTONE)]
         if titolo:
             righe.append(("Titolo del Torneo Evo", PUNTI_TITOLO))
-        righe = [r for r in righe if r[1]]
+        righe = [list(r) for r in righe if r[1]]
         base = sum(p for _, p in righe)
         molt = 1 + BONUS_ASCENSIONE * self.ascensione
         totale = round(base * molt)
         raggiunto = "Campione" if titolo else NOMI_TURNI[min(self.round, 3)]
         record = totale > META["migliore"]
+        self.migliore_altri = META["migliore"]
         META["corse"] += 1
         META["titoli"] += 1 if titolo else 0
         META["migliore"] = max(META["migliore"], totale)
@@ -1012,11 +1129,15 @@ class Corsa:
     # ---------- per il client ----------
     def stato(self):
         eroe = self.eroe() if self.io is not None else None
-        out = {"attivo": True, "fase": self.fase, "round": self.round, "nome_turno": NOMI_TURNI[min(self.round, 3)],
+        inf = self.infinito
+        out = {"attivo": True, "fase": self.fase, "round": self.round, "nome_turno": f"Infinito {self.giro_inf + 1}" if inf else NOMI_TURNI[min(self.round, 3)],
                "ascensione": self.ascensione, "ascensione_nome": ASCENSIONI[self.ascensione]["nome"], "gettoni": self.gettoni, "io": self.io,
                "partecipanti": [{"nome": e["nome"], "potenza": forza(e)} for e in self.eroi], "turni": self.turni,
                "cronaca": self.cronaca[-6:], "avviso": self.avviso, "log_arena": self.log_arena[-6:], "campione": self.campione,
-               "riepilogo": self.riepilogo, "punteggio_parziale": sum(self.punti.values()), "meta": META}
+               "riepilogo": self.riepilogo, "meta": META, "puo_infinito": self.puo_infinito(),
+               "punteggio_parziale": (self.riepilogo_titolo["base"] + self.punti.get("infinito", 0)) if inf and self.riepilogo_titolo else sum(self.punti.values()),
+               "infinito": {"attivo": inf, "vinti": self.giro_inf, "livello": self.giro_inf + 1, "record": META["infinito_max"],
+                            "boss": bool(inf and self.sfidante and self.sfidante.get("elite") and (self.fase == "bracket" or (self.fase == "duello" and self.duello_tipo == "torneo")))}}
         if self.fase == "campioni":
             out["candidati"] = [dict(scheda(self.eroi[i]), indice=i) for i in self.candidati]
         if eroe is not None:

@@ -679,6 +679,142 @@ def pilota_un_passo(c):
         c.scegli_evento(len(c.evento["scelte"]) - 1) if c.evento["esito"] is None else c.chiudi_evento()
 
 
+def fino_al_bracket(c, passi=80):
+    """Dal bottino alle porte fino al prossimo combattimento (uno sparring che capita si vince)."""
+    for _ in range(passi):
+        if c.fase in ("bracket", "eliminato"):
+            return
+        if c.fase == "sparring":
+            vinci(c, True)
+        else:
+            pilota_un_passo(c)
+    raise AssertionError("non si arriva al combattimento: " + c.fase)
+
+
+def test_infinito():
+    # prima del titolo non esiste
+    c = nuova(seed=15)
+    ok(c.inizia_infinito() is not None and c.ritira() is not None and not c.puo_infinito() and not c.stato()["puo_infinito"])
+    pilota(c, True)
+    ok(c.fase == "vittoria" and c.puo_infinito() and c.stato()["puo_infinito"] and not c.stato()["infinito"]["attivo"])
+    titolo = json.loads(json.dumps(c.riepilogo))
+    corse, storico, migliore = E.META["corse"], len(E.META["storico"]), E.META["migliore"]
+    ok(c.inizia_infinito() is None and c.infinito and c.giro_inf == 0 and c.fase == "bottino")
+    ok(c.bottino["tipo"] == "garantito" and c.bottino["dopo"] == "porte" and c.sfidante["infinito"] == 1 and not c.puo_infinito() and c.inizia_infinito() is not None)
+    st = c.stato()
+    json.dumps(st)
+    ok(st["nome_turno"] == "Infinito 1" and st["infinito"]["attivo"] and st["infinito"]["livello"] == 1 and st["punteggio_parziale"] == titolo["base"])
+    ok(c.ritira() is not None, "non ci si ritira in mezzo al bottino")
+    ok(c.scegli_carta(0) is None)
+    fino_al_bracket(c)
+    # sfidanti sempre piu' forti: livello dopo livello, con una scala senza fondo e un boss ogni BOSS_OGNI
+    forze, tot_inf = [], 0
+    for k in range(12):
+        liv = k + 1
+        ok(c.fase == "bracket" and c.avversario() is c.sfidante and c.sfidante["infinito"] == liv and c.stato()["nome_turno"] == f"Infinito {liv}")
+        st = c.stato()
+        json.dumps(st)
+        boss = liv % E.BOSS_OGNI == 0
+        ok(st["avversario"]["infinito"] == liv and st["avversario"]["scala"]["hp"] == round(E.SCALA_HP * E.liv_scala(liv)) and st["infinito"]["boss"] == boss and st["avversario"]["elite"] == boss)
+        ok(0 <= st["pronostico"] <= 1)
+        if boss:
+            ok(c.regola != "standard", "un boss non e' mai su un ring regolare")
+        pg, nemico, regola = c.prepara_duello()
+        ok(nemico.hp_max["busto"] >= LOCAZIONI["busto"] + round(E.SCALA_HP * E.liv_scala(liv)) and nemico.mult_danno >= 1 + E.SCALA_DANNI * E.liv_scala(liv) - 1e-9
+           and nemico.armatura["gamba_dx"] >= round(E.SCALA_ARMATURA * E.liv_scala(liv)), "la scala e' addosso allo sfidante")
+        c.fase = "bracket"
+        forze.append(E.forza(c.sfidante))
+        g0 = c.gettoni
+        vinci(c, True, round_duello=4)
+        ok(c.giro_inf == liv and E.META["infinito_max"] == liv and c.gettoni > g0 and c.sfidante["infinito"] == liv + 1)
+        ok(c.punti["infinito"] > tot_inf, "ogni sfidante battuto vale punti")
+        ok(E.PUNTI_INFINITO + E.PUNTI_INFINITO_PASSO * liv + (E.PUNTI_BOSS if boss else 0) <= c.punti["infinito"] - tot_inf, "e di piu' i livelli alti")
+        tot_inf = c.punti["infinito"]
+        if c.fase == "bottino":
+            ok(c.bottino["tipo"] == ("elite" if boss else "garantito" if liv % 3 == 0 else "normale") and c.bottino["dopo"] == "porte")
+        ok(E.META["corse"] == corse and len(E.META["storico"]) == storico)
+        fino_al_bracket(c)
+    ok(sum(forze[-3:]) > sum(forze[:3]) + 60, forze)
+    ok(c.conta["vittorie"] == 4, "i quattro turni del torneo non cambiano")
+    # lo sparring cresce coi livelli
+    el = c._crea_elite()
+    ok(len(el["storia"]) == c.round + 2 + c.giro_inf)
+    # si perde: il punteggio del titolo resta e si aggiungono i punti dell'infinito
+    vinci(c, False)
+    ok(c.fase == "eliminato")
+    r = c.riepilogo
+    ok(r["infinito"] == 12 and not r["ritirato"] and r["turno"] == "Infinito 12" and r["titolo"])
+    ok(r["righe"][:len(titolo["righe"])] == titolo["righe"] and r["righe"][-1][0].startswith("Modalità infinita (12") and r["righe"][-1][1] == c.punti["infinito"], r["righe"])
+    ok(c.punti["infinito"] >= tot_inf and r["base"] == titolo["base"] + c.punti["infinito"] and r["totale"] == round(r["base"] * r["moltiplicatore"]) and r["totale"] > titolo["totale"])
+    ok(r["sbloccata"] == titolo["sbloccata"])
+    ok(E.META["corse"] == corse and len(E.META["storico"]) == storico, "e' la stessa corsa: non si conta due volte")
+    ok(E.META["migliore"] == max(migliore, r["totale"]) and E.META["infinito_max"] == 12 and r["record"])
+    ultima = E.META["storico"][-1]
+    ok(ultima["infinito"] == 12 and ultima["punteggio"] == r["totale"] and ultima["turno"] == "Infinito 12" and ultima["titolo"])
+    st = c.stato()
+    json.dumps(st)
+    ok(st["fase"] == "eliminato" and st["riepilogo"]["infinito"] == 12 and c.chiudi() is None)
+
+    # ci si ritira tra un combattimento e l'altro (anche alle porte): vale quanto perdere. Senza sfidanti battuti il punteggio e' quello del titolo
+    c = nuova(seed=16)
+    pilota(c, True)
+    base_t = c.riepilogo["base"]
+    c.inizia_infinito()
+    c.scegli_carta(0)
+    ok(c.fase == "porte" and c.ritira() is None and c.fase == "eliminato" and c.porte is None)
+    r = c.riepilogo
+    ok(r["infinito"] == 0 and r["ritirato"] and r["turno"] == "Campione" and r["base"] == base_t and not any("infinita" in x[0] for x in r["righe"]))
+    ok(c.ritira() is not None, "una volta sola")
+    c = nuova(seed=17)
+    pilota(c, True)
+    c.inizia_infinito()
+    fino_al_bracket(c)
+    vinci(c, True)
+    fino_al_bracket(c)
+    pg, nemico, regola = c.prepara_duello()
+    ok(c.fase == "duello" and c.ritira() is not None, "non in mezzo a un duello")
+    c.fase = "bracket"
+    ok(c.ritira() is None and c.riepilogo["infinito"] == 1 and c.riepilogo["ritirato"])
+
+    # l'ascensione moltiplica anche i punti dell'infinito
+    E.META["ascensione_max"] = 2
+    c = nuova(asc=2, seed=18)
+    pilota(c, True)
+    c.inizia_infinito()
+    fino_al_bracket(c)
+    vinci(c, True)
+    fino_al_bracket(c)
+    vinci(c, False)
+    r = c.riepilogo
+    ok(r["moltiplicatore"] == 1.5 and r["totale"] == round(r["base"] * 1.5) and r["infinito"] == 1)
+
+    # salvataggio: a meta' dell'infinito, e con un duello interrotto
+    c = nuova(seed=19)
+    pilota(c, True)
+    c.inizia_infinito()
+    fino_al_bracket(c)
+    vinci(c, True)
+    fino_al_bracket(c)
+    E.salva(c)
+    c2 = E.carica()
+    ok(c2.a_dict() == c.a_dict() and c2.infinito and c2.giro_inf == 1 and c2.sfidante == c.sfidante and c2.fase == "bracket")
+    c.prepara_duello()
+    c3 = E.carica()
+    ok(c3.fase == "bracket" and c3.avversario() == c.sfidante, "un duello interrotto all'infinito riparte dallo stesso sfidante")
+    # una corsa salvata prima dell'infinito (senza i campi nuovi) si legge ancora
+    vecchio = c3.a_dict()
+    for k in ("infinito", "giro_inf", "sfidante", "riepilogo_titolo", "migliore_altri"):
+        vecchio.pop(k)
+    c4 = E.Corsa.da_dict(vecchio)
+    ok(c4.infinito is False and c4.giro_inf == 0 and c4.sfidante is None and not c4.puo_infinito())
+    meta_vecchio = E._meta_vuoto()
+    meta_vecchio.pop("infinito_max")
+    with open(E.PERCORSO, "w", encoding="utf-8") as f:
+        json.dump({"v": 1, "meta": meta_vecchio, "corsa": None}, f)
+    ok(E.carica() is None and E.META["infinito_max"] == 0)
+    E.salva(None)
+
+
 def test_forza_e_cpu():
     r = gemello()
     f = E.forza(r)
@@ -875,6 +1011,33 @@ def corsa_a_caso(seme, asc=0):
     return c
 
 
+def test_api_infinito():
+    W.TORNEO = None
+    W.DUELLO = None
+    E.META.update(E._meta_vuoto())
+    cli = W.app.test_client()
+    post = lambda **b: cli.post("/api/torneo/azione", json=b)
+    ok(post(tipo="infinito").status_code == 400 and post(tipo="ritira").status_code == 400, "senza una corsa")
+    c = nuova(seed=15)
+    W.TORNEO = c
+    ok(post(tipo="infinito").status_code == 400 and post(tipo="ritira").status_code == 400, "prima del titolo")
+    pilota(c, True)
+    s = cli.get("/api/torneo/stato").get_json()
+    ok(s["fase"] == "vittoria" and s["puo_infinito"] and s["infinito"]["attivo"] is False)
+    r = post(tipo="infinito")
+    ok(r.status_code == 200)
+    s = r.get_json()
+    ok(s["fase"] == "bottino" and s["infinito"]["attivo"] and s["infinito"]["livello"] == 1 and s["nome_turno"] == "Infinito 1" and not s["puo_infinito"])
+    ok(post(tipo="infinito").status_code == 400 and post(tipo="ritira").status_code == 400 and post(tipo="chiudi").status_code == 400)
+    ok(post(tipo="carta", indice=0).get_json()["fase"] == "porte")
+    r = post(tipo="ritira")
+    ok(r.status_code == 200 and r.get_json()["fase"] == "eliminato" and r.get_json()["riepilogo"]["ritirato"])
+    r = post(tipo="chiudi").get_json()
+    ok(r["attivo"] is False and W.TORNEO is None and r["meta"]["infinito_max"] == 0)
+    W.TORNEO = None
+    E.META.update(E._meta_vuoto())
+
+
 def test_corse_a_caso():
     esiti = {"vittoria": 0, "eliminato": 0}
     for seme in range(14):
@@ -914,6 +1077,21 @@ def test_client():
     c = nuova(seed=15)
     pilota(c, True)
     STATI_PER_FASE["vittoria"] = c.stato()
+    c.inizia_infinito()
+    fino_al_bracket(c)
+    STATI_PER_FASE["bracket_inf"] = c.stato()
+    vinci(c, True)
+    fino_al_bracket(c)
+    while c.sfidante["infinito"] < E.BOSS_OGNI:
+        vinci(c, True)
+        fino_al_bracket(c)
+    STATI_PER_FASE["boss_inf"] = c.stato()
+    c.fase = "porte"
+    c.porte = [c._porta("riposo")]
+    STATI_PER_FASE["porte_inf"] = c.stato()
+    c.fase = "bracket"
+    c.ritira()
+    STATI_PER_FASE["eliminato_inf"] = c.stato()
     E.META.update(E._meta_vuoto())
     STATI_PER_FASE["landing"] = E.stato_iniziale()
     STATI_PER_FASE["campioni"] = E.Corsa(0).stato()
@@ -933,8 +1111,8 @@ def main():
     # il collegamento con l'app: le funzioni che evo.py riceve
     ok(E.DB is DB and E.PERCORSO == os.path.join(_SAVE_TMP, "evo.json") and isinstance(E.META, dict))
     for t in (test_dati, test_mutazioni, test_regole, test_creazione_e_primo_bottino, test_tipi_di_carte, test_duello_e_vita_che_resta, test_sconfitta_e_fine,
-              test_porte, test_mercato, test_allenamento, test_eventi, test_sparring, test_ascensioni, test_forza_e_cpu, test_salvataggio, test_api,
-              test_corse_a_caso, test_client):
+              test_porte, test_mercato, test_allenamento, test_eventi, test_sparring, test_ascensioni, test_infinito, test_forza_e_cpu, test_salvataggio, test_api,
+              test_api_infinito, test_corse_a_caso, test_client):
         random.seed(1)
         E.META.update(E._meta_vuoto())
         t()
